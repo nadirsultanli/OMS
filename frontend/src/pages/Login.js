@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import authService from '../services/authService';
 import Logo from '../assets/Logo.svg';
 import './Login.css';
@@ -13,9 +13,20 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordAttempted, setForgotPasswordAttempted] = useState(false);
   const [message, setMessage] = useState('');
 
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if redirected from verification with success message
+    if (location.state?.message) {
+      setMessage(location.state.message);
+      // Clear the state to prevent showing message on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -80,6 +91,7 @@ const Login = () => {
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
+    setForgotPasswordAttempted(true);
     
     if (!forgotPasswordEmail) {
       setErrors({ forgotPassword: 'Please enter your email address' });
@@ -101,6 +113,7 @@ const Login = () => {
         setMessage(result.message);
         setShowForgotPassword(false);
         setForgotPasswordEmail('');
+        setForgotPasswordAttempted(false);
       } else {
         setErrors({ forgotPassword: result.error });
       }
@@ -178,7 +191,11 @@ const Login = () => {
             <div className="forgot-password-link">
               <button
                 type="button"
-                onClick={() => setShowForgotPassword(true)}
+                onClick={() => {
+                  setShowForgotPassword(true);
+                  setErrors({});
+                  setForgotPasswordAttempted(false);
+                }}
                 className="link-button"
                 disabled={isLoading}
               >
@@ -193,7 +210,7 @@ const Login = () => {
               <p>Enter your email address and we'll send you instructions to reset your password.</p>
             </div>
 
-            {errors.forgotPassword && (
+            {errors.forgotPassword && forgotPasswordAttempted && (
               <div className="message error-message">
                 {errors.forgotPassword}
               </div>
@@ -229,6 +246,7 @@ const Login = () => {
                   setShowForgotPassword(false);
                   setForgotPasswordEmail('');
                   setErrors({});
+                  setForgotPasswordAttempted(false);
                 }}
                 className="link-button"
                 disabled={isLoading}
