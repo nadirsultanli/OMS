@@ -14,7 +14,6 @@ class UserRole(str, Enum):
 class User:
     id: UUID
     email: str
-    hashed_password: str
     name: Optional[str]
     role: UserRole
     is_active: bool
@@ -40,29 +39,33 @@ class User:
         self.updated_at = datetime.now()
         
     @staticmethod
-    def create(email: str, hashed_password: str, role: UserRole, name: Optional[str] = None) -> "User":
+    def create(email: str, role: UserRole, name: Optional[str] = None, auth_user_id: Optional[UUID] = None) -> "User":
         now = datetime.now()
         return User(
             id=uuid4(),
             email=email,
-            hashed_password=hashed_password,
             name=name,
             role=role,
-            is_active=False,
+            is_active=True,
             created_at=now,
-            updated_at=now
+            updated_at=now,
+            auth_user_id=auth_user_id or uuid4(),
+            phone_number=None,
+            driver_license_number=None
         )
 
     def to_dict(self) -> dict:
         return {
             "id": str(self.id),
             "email": self.email,
-            "hashed_password": self.hashed_password,
             "name": self.name,
             "role": self.role.value,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat()
+            "updated_at": self.updated_at.isoformat(),
+            "auth_user_id": str(self.auth_user_id),
+            "phone_number": self.phone_number,
+            "driver_license_number": self.driver_license_number
         }
 
     @classmethod
@@ -70,10 +73,12 @@ class User:
         return cls(
             id=UUID(data["id"]),
             email=data["email"],
-            hashed_password=data["hashed_password"],
             name=data.get("name"),
             role=UserRole(data["role"]),
             is_active=data["is_active"],
             created_at=datetime.fromisoformat(data["created_at"]),
             updated_at=datetime.fromisoformat(data["updated_at"]),
+            auth_user_id=UUID(data.get("auth_user_id", str(uuid4()))),
+            phone_number=data.get("phone_number"),
+            driver_license_number=data.get("driver_license_number")
         )
