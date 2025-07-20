@@ -66,7 +66,7 @@ class Customer:
             phone_number=phone_number,
             tax_id=tax_id,
             credit_terms_day=credit_terms_day,
-            status=CustomerStatus.INACTIVE,  # Default to inactive
+            status=CustomerStatus.ACTIVE,  # Default to inactive
             created_at=now,
             updated_at=now
         )
