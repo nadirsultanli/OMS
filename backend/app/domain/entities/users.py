@@ -24,10 +24,15 @@ class User:
     driver_license_number: Optional[str]
 
     def __post_init__(self):
+        # Convert string timestamps to datetime
         if isinstance(self.created_at, str):
             self.created_at = datetime.fromisoformat(self.created_at)
         if isinstance(self.updated_at, str):
             self.updated_at = datetime.fromisoformat(self.updated_at)
+        
+        # Convert string role to UserRole enum
+        if isinstance(self.role, str):
+            self.role = UserRole(self.role)
         
     def update(self, name: Optional[str] = None, role: Optional[UserRole] = None, email: Optional[str] = None):
         if name:

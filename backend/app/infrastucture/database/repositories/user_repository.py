@@ -4,7 +4,7 @@ from app.domain.repositories.user_repository import UserRepository as UserReposi
 from app.infrastucture.database.repositories import SupabaseRepository
 
 
-class UserRepository(UserRepositoryInterface):
+class UserRepository(SupabaseRepository[User], UserRepositoryInterface):
     """User repository implementation"""
     
     def __init__(self):

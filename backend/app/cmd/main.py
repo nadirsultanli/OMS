@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from decouple import config
 from app.core.logging_config import setup_logging, get_request_logger
 from app.infrastucture.logs.logger import default_logger
@@ -36,7 +37,17 @@ app = FastAPI(
     title="OMS Backend",
     description="Order Management System Backend API",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    openapi_tags=[
+        {
+            "name": "Authentication",
+            "description": "Authentication operations (login, signup, logout, refresh)"
+        },
+        {
+            "name": "Users", 
+            "description": "User management operations"
+        }
+    ]
 )
 
 # Setup logging
@@ -54,6 +65,43 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    # Add security scheme
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter your Supabase JWT token"
+        }
+    }
+    
+    # Add security to all protected endpoints
+    for path in openapi_schema["paths"]:
+        if path.startswith("/api/v1/users") and path != "/api/v1/users/":
+            # All user endpoints except create user need authentication
+            for method in openapi_schema["paths"][path]:
+                if method in ["get", "put", "delete", "post"]:
+                    if "security" not in openapi_schema["paths"][path][method]:
+                        openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 @app.get("/")
 async def root():

@@ -42,11 +42,12 @@ async def signup(
                 detail="Failed to create user account"
             )
         
-        # Create user in our database
+        # Create user in our database with the auth_user_id
         user = await user_service.create_user(
             email=request.email,
             role=request.role,
-            name=request.name
+            name=request.name,
+            password=request.password
         )
         
         default_logger.info(f"User signed up successfully", user_id=str(user.id), email=request.email)
