@@ -10,19 +10,22 @@ class DatabaseConnection:
     
     def __init__(self):
         self._client: Optional[Client] = None
+        self._admin_client: Optional[Client] = None
         self._url: Optional[str] = None
-        self._key: Optional[str] = None
+        self._anon_key: Optional[str] = None
+        self._service_role_key: Optional[str] = None
         self._lock = asyncio.Lock()
         
-    def configure(self, url: str, key: str) -> None:
+    def configure(self, url: str, anon_key: str, service_role_key: str = None) -> None:
         """Configure database connection"""
         self._url = url
-        self._key = key
+        self._anon_key = anon_key
+        self._service_role_key = service_role_key
         default_logger.info("Database connection configured", url=url[:20] + "...")
     
     async def connect(self) -> Client:
         """Create and return Supabase client asynchronously"""
-        if not self._url or not self._key:
+        if not self._url or not self._anon_key:
             raise ValueError("Database not configured. Call configure() first.")
         
         async with self._lock:
@@ -32,7 +35,7 @@ class DatabaseConnection:
                     loop = asyncio.get_event_loop()
                     self._client = await loop.run_in_executor(
                         None, 
-                        lambda: create_client(self._url, self._key)
+                        lambda: create_client(self._url, self._anon_key)
                     )
                     default_logger.info("Database connection established successfully")
                 except Exception as e:
@@ -77,13 +80,14 @@ db_connection = DatabaseConnection()
 async def init_database() -> None:
     """Initialize database connection from environment variables"""
     url = config("SUPABASE_URL", default=None)
-    key = config("SUPABASE_KEY", default=None)
+    anon_key = config("SUPABASE_KEY", default=None)
+    service_role_key = config("SUPABASE_SERVICE_ROLE_KEY", default=None)
     
-    if not url or not key:
+    if not url or not anon_key:
         default_logger.warning("Supabase credentials not found in environment variables")
         return
     
-    db_connection.configure(url, key)
+    db_connection.configure(url, anon_key, service_role_key)
     
     # Test connection
     await db_connection.test_connection()
@@ -98,5 +102,15 @@ def get_supabase_client_sync() -> Client:
     """Get Supabase client instance synchronously (for auth operations)"""
     # For auth operations that need sync client
     if db_connection._client is None:
-        db_connection._client = create_client(db_connection._url, db_connection._key)
-    return db_connection._client 
+        db_connection._client = create_client(db_connection._url, db_connection._anon_key)
+    return db_connection._client
+
+
+def get_supabase_admin_client_sync() -> Client:
+    """Get Supabase admin client instance synchronously (for admin operations)"""
+    # For admin operations that need service role key
+    if db_connection._admin_client is None:
+        if not db_connection._service_role_key:
+            raise ValueError("Service role key not configured for admin operations")
+        db_connection._admin_client = create_client(db_connection._url, db_connection._service_role_key)
+    return db_connection._admin_client 

@@ -10,7 +10,6 @@ class Customer:
     id: UUID
     hashed_password: str
     full_name: Optional[str]
-    role: UserRole
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -21,24 +20,21 @@ class Customer:
         if isinstance(self.updated_at, str):
             self.updated_at = datetime.fromisoformat(self.updated_at)
         
-    def update(self, full_name: Optional[str] = None, role: Optional[UserRole] = None, email: Optional[str] = None):
+    def update(self, full_name: Optional[str] = None, email: Optional[str] = None):
         if full_name:
             self.full_name = full_name
-        if role:
-            self.role = role
         if email:
             self.email = email
         self.updated_at = datetime.now()
         
     @staticmethod
-    def create(email: str, hashed_password: str, role: UserRole, full_name: Optional[str] = None) -> "User":
+    def create(email: str, hashed_password: str, full_name: Optional[str] = None) -> "Customer":
         now = datetime.now()
-        return User(
+        return Customer(
             id=uuid4(),
             email=email,
             hashed_password=hashed_password,
             full_name=full_name,
-            role=role,
             is_active=False,
             created_at=now,
             updated_at=now
@@ -57,13 +53,12 @@ class Customer:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "User":
+    def from_dict(cls, data: dict) -> "Customer":
         return cls(
             id=UUID(data["id"]),
             email=data["email"],
             hashed_password=data["hashed_password"],
             full_name=data.get("full_name"),
-            role=UserRole(data["role"]),
             is_active=data["is_active"],
             created_at=datetime.fromisoformat(data["created_at"]),
             updated_at=datetime.fromisoformat(data["updated_at"]),

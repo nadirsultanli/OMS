@@ -3,7 +3,7 @@ from typing import Optional
 from app.domain.entities.users import UserRole
 
 
-class UserException(ABC):
+class UserException(Exception, ABC):
     """Base user exception interface"""
     
     @abstractmethod

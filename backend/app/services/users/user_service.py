@@ -10,6 +10,7 @@ from app.domain.exceptions.users import (
     UserValidationError
 )
 from app.infrastucture.logs.logger import default_logger
+from app.infrastucture.database.connection import get_supabase_admin_client_sync
 
 
 class UserService:
@@ -45,25 +46,60 @@ class UserService:
         return await self.user_repository.get_by_role(role)
     
     async def create_user(self, email: str, role: UserRole, name: Optional[str] = None) -> User:
-        """Create a new user with validation"""
+        """Create a new user with Supabase Auth integration"""
         try:
-            # Check if user already exists
+            # Check if user already exists in our database
             existing_user = await self.user_repository.get_by_email(email)
             if existing_user:
                 raise UserAlreadyExistsError(email=email)
             
-            # Create user
-            user = User.create(email=email, role=role, name=name)
+            # Create Supabase Auth user first
+            supabase = get_supabase_admin_client_sync()
+            
+            # Generate a random password
+            import secrets
+            import string
+            password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+            
+            # Create user in Supabase Auth
+            auth_response = supabase.auth.admin.create_user({
+                "email": email,
+                "password": password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "name": name,
+                    "role": role.value
+                }
+            })
+            
+            if not auth_response.user:
+                raise UserCreationError("Failed to create Supabase Auth user", email=email)
+            
+            # Get the auth_user_id from Supabase Auth
+            auth_user_id = auth_response.user.id
+            
+            # Create user in our database with the auth_user_id
+            user = User.create(
+                email=email, 
+                role=role, 
+                name=name, 
+                auth_user_id=auth_user_id
+            )
             created_user = await self.user_repository.create_user(user)
             
-            default_logger.info(f"User created successfully", user_id=str(created_user.id), email=email)
+            default_logger.info(
+                f"User created successfully", 
+                user_id=str(created_user.id), 
+                auth_user_id=str(auth_user_id),
+                email=email
+            )
             return created_user
             
         except UserAlreadyExistsError:
             raise
         except Exception as e:
             default_logger.error(f"Failed to create user: {str(e)}", email=email)
-            raise UserCreationError(f"Database error: {str(e)}", email=email)
+            raise UserCreationError(f"Failed to create user: {str(e)}", email=email)
     
     async def update_user(self, user_id: str, name: Optional[str] = None, 
                          role: Optional[UserRole] = None, email: Optional[str] = None) -> User:
