@@ -102,6 +102,14 @@ def get_supabase_client_sync() -> Client:
     """Get Supabase client instance synchronously (for auth operations)"""
     # For auth operations that need sync client
     if db_connection._client is None:
+        if not db_connection._url or not db_connection._anon_key:
+            # Try to configure from environment variables
+            from decouple import config
+            url = config("SUPABASE_URL", default=None)
+            anon_key = config("SUPABASE_KEY", default=None)
+            if not url or not anon_key:
+                raise ValueError("Database not configured. Call configure() first.")
+            db_connection.configure(url, anon_key)
         db_connection._client = create_client(db_connection._url, db_connection._anon_key)
     return db_connection._client
 
@@ -110,7 +118,19 @@ def get_supabase_admin_client_sync() -> Client:
     """Get Supabase admin client instance synchronously (for admin operations)"""
     # For admin operations that need service role key
     if db_connection._admin_client is None:
-        if not db_connection._service_role_key:
-            raise ValueError("Service role key not configured for admin operations")
-        db_connection._admin_client = create_client(db_connection._url, db_connection._service_role_key)
+        if not db_connection._service_role_key or not db_connection._url:
+            # Try to configure from environment variables
+            from decouple import config
+            url = config("SUPABASE_URL", default=None)
+            service_role_key = config("SUPABASE_SERVICE_ROLE_KEY", default=None)
+            if not url or not service_role_key:
+                raise ValueError("Service role key not configured for admin operations")
+            db_connection.configure(url, db_connection._anon_key, service_role_key)
+        
+        try:
+            db_connection._admin_client = create_client(db_connection._url, db_connection._service_role_key)
+            default_logger.info("Admin client created successfully")
+        except Exception as e:
+            default_logger.error(f"Failed to create admin client: {str(e)}")
+            raise
     return db_connection._admin_client 

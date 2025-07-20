@@ -11,6 +11,8 @@ from app.domain.exceptions.users import (
 )
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import get_supabase_admin_client_sync
+from app.infrastucture.tasks import send_verification_email_task
+from decouple import config
 
 
 class UserService:
@@ -45,7 +47,8 @@ class UserService:
         """Get users by role"""
         return await self.user_repository.get_by_role(role)
     
-    async def create_user(self, email: str, role: UserRole, name: Optional[str] = None) -> User:
+    async def create_user(self, email: str, role: UserRole, name: Optional[str] = None, 
+                         phone_number: Optional[str] = None, driver_license_number: Optional[str] = None) -> User:
         """Create a new user with Supabase Auth integration"""
         try:
             # Check if user already exists in our database
@@ -83,15 +86,34 @@ class UserService:
                 email=email, 
                 role=role, 
                 name=name, 
-                auth_user_id=auth_user_id
+                auth_user_id=auth_user_id,
+                phone_number=phone_number,
+                driver_license_number=driver_license_number
             )
             created_user = await self.user_repository.create_user(user)
             
+            # Send verification email
+            from app.infrastucture.tasks.send_verification_email_task import send_verification_email_task
+            from decouple import config
+            
+            # Get frontend URL based on role
+            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+            
+            # Queue the verification email task
+            task_result = send_verification_email_task.delay(
+                email=email,
+                user_name=name or email,
+                user_id=str(created_user.id),
+                role=role.value,
+                frontend_url=frontend_url
+            )
+            
             default_logger.info(
-                f"User created successfully", 
+                f"User created successfully and verification email queued", 
                 user_id=str(created_user.id), 
                 auth_user_id=str(auth_user_id),
-                email=email
+                email=email,
+                task_id=task_result.id
             )
             return created_user
             
@@ -102,7 +124,8 @@ class UserService:
             raise UserCreationError(f"Failed to create user: {str(e)}", email=email)
     
     async def update_user(self, user_id: str, name: Optional[str] = None, 
-                         role: Optional[UserRole] = None, email: Optional[str] = None) -> User:
+                         role: Optional[UserRole] = None, email: Optional[str] = None,
+                         phone_number: Optional[str] = None, driver_license_number: Optional[str] = None) -> User:
         """Update user with validation"""
         try:
             # Get existing user
@@ -115,7 +138,8 @@ class UserService:
                     raise UserAlreadyExistsError(email=email)
             
             # Update user
-            existing_user.update(name=name, role=role, email=email)
+            existing_user.update(name=name, role=role, email=email, 
+                               phone_number=phone_number, driver_license_number=driver_license_number)
             updated_user = await self.user_repository.update_user(user_id, existing_user)
             
             if not updated_user:

@@ -34,29 +34,35 @@ class User:
         if isinstance(self.role, str):
             self.role = UserRole(self.role)
         
-    def update(self, name: Optional[str] = None, role: Optional[UserRole] = None, email: Optional[str] = None):
+    def update(self, name: Optional[str] = None, role: Optional[UserRole] = None, email: Optional[str] = None,
+               phone_number: Optional[str] = None, driver_license_number: Optional[str] = None):
         if name:
             self.name = name
         if role:
             self.role = role
         if email:
             self.email = email
+        if phone_number is not None:
+            self.phone_number = phone_number
+        if driver_license_number is not None:
+            self.driver_license_number = driver_license_number
         self.updated_at = datetime.now()
         
     @staticmethod
-    def create(email: str, role: UserRole, name: Optional[str] = None, auth_user_id: Optional[UUID] = None) -> "User":
+    def create(email: str, role: UserRole, name: Optional[str] = None, auth_user_id: Optional[UUID] = None,
+               phone_number: Optional[str] = None, driver_license_number: Optional[str] = None) -> "User":
         now = datetime.now()
         return User(
             id=uuid4(),
             email=email,
             name=name,
             role=role,
-            is_active=True,
+            is_active=False,  # Users start as inactive until email verification
             created_at=now,
             updated_at=now,
             auth_user_id=auth_user_id or uuid4(),
-            phone_number=None,
-            driver_license_number=None
+            phone_number=phone_number,
+            driver_license_number=driver_license_number
         )
 
     def to_dict(self) -> dict:
