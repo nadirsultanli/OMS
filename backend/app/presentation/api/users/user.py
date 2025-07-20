@@ -16,13 +16,11 @@ from app.presentation.schemas.users import (
     UserResponse,
     UserListResponse
 )
-from app.presentation.dependencies.users import get_user_service
-from app.presentation.api.users.verification import router as verification_router
+from app.services.dependencies.users import get_user_service
 
 user_router = APIRouter(prefix="/users", tags=["Users"])
 
 # Include verification routes
-user_router.include_router(verification_router)
 
 
 @user_router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
