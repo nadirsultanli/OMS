@@ -7,7 +7,7 @@ from decouple import config
 from app.core.logging_config import setup_logging, get_request_logger
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import init_database
-from app.presentation.api.users import auth_router, user_router
+from app.presentation.api.users import auth_router, user_router, verification_router
 
 # Get configuration from environment
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")
@@ -65,6 +65,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
+app.include_router(verification_router, prefix='/api/v1')
 
 
 def custom_openapi():

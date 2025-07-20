@@ -20,7 +20,7 @@ from app.presentation.schemas.users.password_reset_schemas import (
     ResetPasswordRequest,
     ResetPasswordResponse
 )
-from app.presentation.dependencies.users import get_user_service
+from app.services.dependencies.users import get_user_service
 from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
 from app.infrastucture.tasks import send_password_reset_email_task
 from decouple import config
