@@ -4,7 +4,7 @@ class AuthService {
   // Login function
   async login(email, password) {
     try {
-      const response = await api.post('/auth/login', {
+      const response = await api.post('/api/v1/auth/login', {
         email,
         password
       });
@@ -44,7 +44,7 @@ class AuthService {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
-        await api.post('/auth/logout', {
+        await api.post('/api/v1/auth/logout', {
           refresh_token: refreshToken
         });
       }
@@ -71,22 +71,44 @@ class AuthService {
     return userStr ? JSON.parse(userStr) : null;
   }
 
-  // Placeholder for forgot password (API to be implemented later)
+  // Send forgot password email
   async forgotPassword(email) {
     try {
-      // TODO: Implement actual API call when backend is ready
-      console.log('Forgot password request for:', email);
+      const response = await api.post('/api/v1/auth/forgot-password', {
+        email
+      });
       
-      // Simulated response for now
       return {
         success: true,
-        message: 'Password reset instructions have been sent to your email.'
+        message: response.data.message
       };
     } catch (error) {
       console.error('Forgot password error:', error);
       return {
         success: false,
-        error: 'Failed to send password reset instructions. Please try again.'
+        error: error.response?.data?.detail || 'Failed to send password reset instructions. Please try again.'
+      };
+    }
+  }
+
+  // Reset password with token
+  async resetPassword(token, password, confirmPassword) {
+    try {
+      const response = await api.post('/api/v1/auth/reset-password', {
+        token,
+        password,
+        confirm_password: confirmPassword
+      });
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Failed to reset password. Please try again.'
       };
     }
   }
