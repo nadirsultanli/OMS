@@ -14,8 +14,16 @@ from app.presentation.schemas.users import (
     LogoutRequest,
     SignupRequest
 )
+from app.presentation.schemas.users.password_reset_schemas import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse
+)
 from app.presentation.dependencies.users import get_user_service
-from app.infrastucture.database.connection import get_supabase_client_sync
+from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
+from app.infrastucture.tasks import send_password_reset_email_task
+from decouple import config
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -109,7 +117,7 @@ async def login(
         except UserInactiveError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Account is inactive"
+                detail="Account is inactive, please activate your account or contact your administrator"
             )
         
         default_logger.info(f"User logged in successfully", user_id=str(user.id), email=request.email)
@@ -190,4 +198,104 @@ async def refresh_token(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token"
+        )
+
+
+@auth_router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    user_service: UserService = Depends(get_user_service)
+):
+    """Send password reset email if user exists"""
+    try:
+        # Check if user exists in our database
+        try:
+            user = await user_service.get_user_by_email(request.email)
+        except UserNotFoundError:
+            # Don't reveal if user exists or not for security
+            default_logger.info(f"Password reset requested for non-existent email: {request.email}")
+            return ForgotPasswordResponse(
+                message="If an account with this email exists, a password reset link has been sent."
+            )
+        
+        # Check if user is active
+        if not user.is_active:
+            default_logger.info(f"Password reset requested for inactive user: {request.email}")
+            return ForgotPasswordResponse(
+                message="If an account with this email exists, a password reset link has been sent."
+            )
+        
+        # Send password reset email
+        frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+        send_password_reset_email_task.delay(
+            email=request.email,
+            user_name=user.name or request.email.split('@')[0],
+            user_id=str(user.id),
+            role=user.role.value,
+            frontend_url=frontend_url
+        )
+        
+        default_logger.info(f"Password reset email sent to: {request.email}")
+        
+        return ForgotPasswordResponse(
+            message="If an account with this email exists, a password reset link has been sent."
+        )
+        
+    except Exception as e:
+        default_logger.error(f"Password reset request failed: {str(e)}", email=request.email)
+        # Don't reveal internal errors for security
+        return ForgotPasswordResponse(
+            message="If an account with this email exists, a password reset link has been sent."
+        )
+
+
+@auth_router.post("/reset-password", response_model=ResetPasswordResponse)
+async def reset_password(
+    request: ResetPasswordRequest,
+    user_service: UserService = Depends(get_user_service)
+):
+    """Reset password using token"""
+    try:
+        # Extract user_id from token (format: user_id_random_token)
+        token_parts = request.token.split('_', 1)
+        if len(token_parts) != 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid token format"
+            )
+        
+        user_id = token_parts[0]
+        
+        # Get user from database
+        user = await user_service.get_user_by_id(user_id)
+        
+        # Check if user is active
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account is inactive"
+            )
+        
+        # Update password in Supabase Auth
+        supabase = get_supabase_admin_client_sync()
+        supabase.auth.admin.update_user_by_id(
+            user.auth_user_id,
+            {"password": request.password}
+        )
+        
+        default_logger.info(f"Password reset successfully for user: {user_id}")
+        
+        return ResetPasswordResponse(
+            message="Password reset successfully.",
+            user_id=str(user.id),
+            email=user.email
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        default_logger.error(f"Password reset failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to reset password"
         ) 

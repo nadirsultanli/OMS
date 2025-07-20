@@ -11,3 +11,4 @@ httpx
 black
 flake8
 mypy
+celery

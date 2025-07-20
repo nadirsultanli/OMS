@@ -17,8 +17,12 @@ from app.presentation.schemas.users import (
     UserListResponse
 )
 from app.presentation.dependencies.users import get_user_service
+from app.presentation.api.users.verification import router as verification_router
 
 user_router = APIRouter(prefix="/users", tags=["Users"])
+
+# Include verification routes
+user_router.include_router(verification_router)
 
 
 @user_router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -31,7 +35,9 @@ async def create_user(
         user = await user_service.create_user(
             email=request.email,
             role=request.role,
-            name=request.name
+            name=request.name,
+            phone_number=request.phone_number,
+            driver_license_number=request.driver_license_number
         )
         
         return UserResponse(
@@ -157,7 +163,9 @@ async def update_user(
             user_id=user_id,
             name=request.name,
             role=request.role,
-            email=request.email
+            email=request.email,
+            phone_number=request.phone_number,
+            driver_license_number=request.driver_license_number
         )
         
         return UserResponse(
