@@ -11,7 +11,7 @@ class CustomerStatus(Enum):
 @dataclass
 class Customer:
     id: UUID
-    name: str
+    full_name: str
     tax_id: Optional[str] 
     phone_number: str
     email: str
@@ -28,11 +28,11 @@ class Customer:
         if isinstance(self.status, str):
             self.status = CustomerStatus(self.status)
         
-    def update(self, name: Optional[str] = None, email: Optional[str] = None, 
+    def update(self, full_name: Optional[str] = None, email: Optional[str] = None, 
                phone_number: Optional[str] = None, tax_id: Optional[str] = None,
                credit_terms_day: Optional[int] = None, status: Optional[CustomerStatus] = None):
-        if name:
-            self.name = name
+        if full_name:
+            self.full_name = full_name
         if email:
             self.email = email
         if phone_number:
@@ -56,17 +56,17 @@ class Customer:
         self.updated_at = datetime.now()
         
     @staticmethod
-    def create(name: str, email: str, phone_number: str, 
+    def create(full_name: str, email: str, phone_number: str, 
                tax_id: Optional[str] = None, credit_terms_day: int = 30) -> "Customer":
         now = datetime.now()
         return Customer(
             id=uuid4(),
-            name=name,
+            full_name=full_name,
             email=email,
             phone_number=phone_number,
             tax_id=tax_id,
             credit_terms_day=credit_terms_day,
-            status=CustomerStatus.ACTIVE,  # Default to inactive
+            status=CustomerStatus.ACTIVE,  # Default to active
             created_at=now,
             updated_at=now
         )
@@ -74,7 +74,7 @@ class Customer:
     def to_dict(self) -> dict:
         return {
             "id": str(self.id),
-            "name": self.name,
+            "full_name": self.full_name,
             "email": self.email,
             "phone_number": self.phone_number,
             "tax_id": self.tax_id,
@@ -88,12 +88,12 @@ class Customer:
     def from_dict(cls, data: dict) -> "Customer":
         return cls(
             id=UUID(data["id"]),
-            name=data["name"],
+            full_name=data["full_name"],
             email=data["email"],
             phone_number=data["phone_number"],
             tax_id=data.get("tax_id"),
             credit_terms_day=data["credit_terms_day"],
-            status=data.get("status", CustomerStatus.INACTIVE.value),
+            status=data.get("status", CustomerStatus.ACTIVE.value),
             created_at=datetime.fromisoformat(data["created_at"]),
             updated_at=datetime.fromisoformat(data["updated_at"]),
         )
