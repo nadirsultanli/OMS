@@ -15,8 +15,8 @@ class ResetPasswordRequest(BaseModel):
     confirm_password: str
 
     @field_validator('confirm_password')
-    def passwords_match(cls, v, values):
-        if 'password' in values and v != values['password']:
+    def passwords_match(cls, v, info):
+        if 'password' in info.data and v != info.data['password']:
             raise ValueError('Passwords do not match')
         return v
 
