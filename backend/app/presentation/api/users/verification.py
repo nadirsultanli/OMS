@@ -26,10 +26,10 @@ async def verify_email(
         # Check if user exists in database
         user = await user_service.get_user_by_email(request.email)
         
-        if user.is_active:
+        if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User is already active"
+                detail="User is not active"
             )
         
         # Send verification email with token
@@ -83,10 +83,10 @@ async def set_password(
         # Get user from database
         user = await user_service.get_user_by_id(user_id)
         
-        if user.is_active:
+        if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User is already active"
+                detail="User is not active"
             )
         
         # Update password in Supabase Auth
