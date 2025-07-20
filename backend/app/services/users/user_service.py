@@ -195,16 +195,26 @@ class UserService:
             raise UserUpdateError(f"Database error: {str(e)}", user_id)
     
     async def delete_user(self, user_id: str) -> bool:
-        """Delete user"""
+        """Delete user from both database and Supabase Auth"""
         try:
-            # Check if user exists
-            await self.get_user_by_id(user_id)
+            # Get user to access auth_user_id
+            user = await self.get_user_by_id(user_id)
             
+            # Delete from Supabase Auth first
+            try:
+                supabase = get_supabase_admin_client_sync()
+                supabase.auth.admin.delete_user(user.auth_user_id)
+                default_logger.info(f"User deleted from Supabase Auth", auth_user_id=str(user.auth_user_id))
+            except Exception as auth_error:
+                default_logger.warning(f"Failed to delete user from Supabase Auth: {auth_error}", auth_user_id=str(user.auth_user_id))
+                # Continue with database deletion even if Auth deletion fails
+            
+            # Delete from our database
             success = await self.user_repository.delete_user(user_id)
             if not success:
-                raise UserUpdateError("Failed to delete user", user_id)
+                raise UserUpdateError("Failed to delete user from database", user_id)
             
-            default_logger.info(f"User deleted successfully", user_id=user_id)
+            default_logger.info(f"User deleted successfully from both Auth and database", user_id=user_id)
             return True
             
         except UserNotFoundError:

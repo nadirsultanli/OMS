@@ -1,8 +1,13 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 class VerifyEmailRequest(BaseModel):
-    token: str
+    email: EmailStr
+
+
+class VerifyEmailResponse(BaseModel):
+    message: str
+    email: str
 
 
 class SetPasswordRequest(BaseModel):
@@ -11,8 +16,8 @@ class SetPasswordRequest(BaseModel):
     confirm_password: str
 
     @field_validator('confirm_password')
-    def passwords_match(cls, v, values):
-        if 'password' in values and v != values['password']:
+    def passwords_match(cls, v, info):
+        if 'password' in info.data and v != info.data['password']:
             raise ValueError('Passwords do not match')
         return v
 
@@ -21,12 +26,6 @@ class SetPasswordRequest(BaseModel):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
         return v
-
-
-class VerifyEmailResponse(BaseModel):
-    message: str
-    user_id: str
-    email: str
 
 
 class SetPasswordResponse(BaseModel):

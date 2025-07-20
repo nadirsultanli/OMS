@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.presentation.schemas.users.verification_schemas import (
     VerifyEmailRequest,
-    SetPasswordRequest,
     VerifyEmailResponse,
+    SetPasswordRequest,
     SetPasswordResponse
 )
 from app.services.users.user_service import UserService
@@ -21,20 +21,10 @@ async def verify_email(
     request: VerifyEmailRequest,
     user_service: UserService = Depends(get_user_service)
 ):
-    """Verify email token and return user info for password setup"""
+    """Receive email, validate if user exists, and send verification email"""
     try:
-        # Extract user_id from token (format: user_id_random_token)
-        token_parts = request.token.split('_', 1)
-        if len(token_parts) != 2:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid token format"
-            )
-        
-        user_id = token_parts[0]
-        
-        # Get user from database
-        user = await user_service.get_user_by_id(user_id)
+        # Check if user exists in database
+        user = await user_service.get_user_by_email(request.email)
         
         if user.is_active:
             raise HTTPException(
@@ -42,19 +32,34 @@ async def verify_email(
                 detail="User is already active"
             )
         
-        logger.info(f"Email verification successful for user: {user_id}")
+        # Send verification email with token
+        from app.infrastucture.tasks.send_verification_email_task import send_verification_email_task
+        from decouple import config
+        
+        # Get frontend URL based on role
+        frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+        
+        # Queue the verification email task
+        task_result = send_verification_email_task.delay(
+            email=request.email,
+            user_name=user.name or request.email,
+            user_id=str(user.id),
+            role=user.role.value,
+            frontend_url=frontend_url
+        )
+        
+        logger.info(f"Verification email sent to {request.email}", task_id=task_result.id)
         
         return VerifyEmailResponse(
-            message="Email verified successfully. Please set your password.",
-            user_id=str(user.id),
-            email=user.email
+            message="Verification email sent successfully. Please check your email and click the link to set your password.",
+            email=request.email
         )
         
     except Exception as e:
-        logger.error(f"Email verification failed: {e}")
+        logger.error(f"Failed to send verification email to {request.email}: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired token"
+            detail="Failed to send verification email"
         )
 
 
@@ -63,9 +68,9 @@ async def set_password(
     request: SetPasswordRequest,
     user_service: UserService = Depends(get_user_service)
 ):
-    """Set password for verified user and activate account"""
+    """Receive token and passwords, validate, and update user password"""
     try:
-        # Extract user_id from token
+        # Extract user_id from token (format: user_id_random_token)
         token_parts = request.token.split('_', 1)
         if len(token_parts) != 2:
             raise HTTPException(
@@ -107,4 +112,7 @@ async def set_password(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to set password"
-        ) 
+        )
+
+
+ 
