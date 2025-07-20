@@ -4,7 +4,7 @@ class VerificationService {
   // Set password for new user verification
   async setPassword(token, password, confirmPassword) {
     try {
-      const response = await api.post('/api/v1/users/verification/set-password', {
+      const response = await api.post('/api/v1/verification/set-password', {
         token,
         password,
         confirm_password: confirmPassword
@@ -26,7 +26,7 @@ class VerificationService {
   // Verify email (send verification email)
   async verifyEmail(email) {
     try {
-      const response = await api.post('/api/v1/users/verification/verify-email', {
+      const response = await api.post('/api/v1/verification/verify-email', {
         email
       });
       
