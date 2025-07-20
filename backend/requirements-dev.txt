@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic[email]
+python-decouple
+supabase
+python-multipart
+pytest
+pytest-asyncio
+httpx
+black
+flake8
+mypy
