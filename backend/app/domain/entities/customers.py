@@ -4,13 +4,19 @@ from uuid import uuid4, UUID
 from datetime import datetime
 from typing import Optional
 
+class CustomerStatus(Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
 
 @dataclass
 class Customer:
     id: UUID
-    hashed_password: str
-    full_name: Optional[str]
-    is_active: bool
+    name: str
+    tax_id: Optional[str] 
+    phone_number: str
+    email: str
+    credit_terms_day: int
+    status: CustomerStatus
     created_at: datetime
     updated_at: datetime
 
@@ -19,23 +25,48 @@ class Customer:
             self.created_at = datetime.fromisoformat(self.created_at)
         if isinstance(self.updated_at, str):
             self.updated_at = datetime.fromisoformat(self.updated_at)
+        if isinstance(self.status, str):
+            self.status = CustomerStatus(self.status)
         
-    def update(self, full_name: Optional[str] = None, email: Optional[str] = None):
-        if full_name:
-            self.full_name = full_name
+    def update(self, name: Optional[str] = None, email: Optional[str] = None, 
+               phone_number: Optional[str] = None, tax_id: Optional[str] = None,
+               credit_terms_day: Optional[int] = None, status: Optional[CustomerStatus] = None):
+        if name:
+            self.name = name
         if email:
             self.email = email
+        if phone_number:
+            self.phone_number = phone_number
+        if tax_id:
+            self.tax_id = tax_id
+        if credit_terms_day:
+            self.credit_terms_day = credit_terms_day
+        if status:
+            self.status = status
+        self.updated_at = datetime.now()
+        
+    def activate(self):
+        """Activate the customer"""
+        self.status = CustomerStatus.ACTIVE
+        self.updated_at = datetime.now()
+        
+    def deactivate(self):
+        """Deactivate the customer"""
+        self.status = CustomerStatus.INACTIVE
         self.updated_at = datetime.now()
         
     @staticmethod
-    def create(email: str, hashed_password: str, full_name: Optional[str] = None) -> "Customer":
+    def create(name: str, email: str, phone_number: str, 
+               tax_id: Optional[str] = None, credit_terms_day: int = 30) -> "Customer":
         now = datetime.now()
         return Customer(
             id=uuid4(),
+            name=name,
             email=email,
-            hashed_password=hashed_password,
-            full_name=full_name,
-            is_active=False,
+            phone_number=phone_number,
+            tax_id=tax_id,
+            credit_terms_day=credit_terms_day,
+            status=CustomerStatus.INACTIVE,  # Default to inactive
             created_at=now,
             updated_at=now
         )
@@ -43,11 +74,12 @@ class Customer:
     def to_dict(self) -> dict:
         return {
             "id": str(self.id),
+            "name": self.name,
             "email": self.email,
-            "hashed_password": self.hashed_password,
-            "full_name": self.full_name,
-            "role": self.role.value,
-            "is_active": self.is_active,
+            "phone_number": self.phone_number,
+            "tax_id": self.tax_id,
+            "credit_terms_day": self.credit_terms_day,
+            "status": self.status.value,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat()
         }
@@ -56,10 +88,12 @@ class Customer:
     def from_dict(cls, data: dict) -> "Customer":
         return cls(
             id=UUID(data["id"]),
+            name=data["name"],
             email=data["email"],
-            hashed_password=data["hashed_password"],
-            full_name=data.get("full_name"),
-            is_active=data["is_active"],
+            phone_number=data["phone_number"],
+            tax_id=data.get("tax_id"),
+            credit_terms_day=data["credit_terms_day"],
+            status=data.get("status", CustomerStatus.INACTIVE.value),
             created_at=datetime.fromisoformat(data["created_at"]),
             updated_at=datetime.fromisoformat(data["updated_at"]),
         )

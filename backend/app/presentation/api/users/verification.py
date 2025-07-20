@@ -6,17 +6,17 @@ from app.presentation.schemas.users.verification_schemas import (
     SetPasswordResponse
 )
 from app.services.users.user_service import UserService
-from app.presentation.dependencies.users import get_user_service
+from app.services.dependencies.users import get_user_service
 from app.infrastucture.database.connection import get_supabase_admin_client_sync
 from app.infrastucture.logs.logger import default_logger
 import secrets
 
-router = APIRouter(prefix="/verification", tags=["verification"])
+verification_router = APIRouter(prefix="/verification", tags=["verification"])
 
 logger = default_logger
 
 
-@router.post("/verify-email", response_model=VerifyEmailResponse)
+@verification_router.post("/verify-email", response_model=VerifyEmailResponse)
 async def verify_email(
     request: VerifyEmailRequest,
     user_service: UserService = Depends(get_user_service)
@@ -63,7 +63,7 @@ async def verify_email(
         )
 
 
-@router.post("/set-password", response_model=SetPasswordResponse)
+@verification_router.post("/set-password", response_model=SetPasswordResponse)
 async def set_password(
     request: SetPasswordRequest,
     user_service: UserService = Depends(get_user_service)
