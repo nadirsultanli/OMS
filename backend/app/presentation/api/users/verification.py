@@ -10,6 +10,7 @@ from app.services.dependencies.users import get_user_service
 from app.infrastucture.database.connection import get_supabase_admin_client_sync
 from app.infrastucture.logs.logger import default_logger
 import secrets
+from app.domain.entities.users import UserStatus
 
 verification_router = APIRouter(prefix="/verification", tags=["verification"])
 
@@ -21,37 +22,22 @@ async def verify_email(
     request: VerifyEmailRequest,
     user_service: UserService = Depends(get_user_service)
 ):
-    """Receive email, validate if user exists, and send verification email"""
+    """Receive email, validate if user exists. Supabase will send verification email automatically on signup."""
     try:
         # Check if user exists in database
         user = await user_service.get_user_by_email(request.email)
         
-        if not user.is_active:
+        if user.status != UserStatus.ACTIVE:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User is not active"
             )
         
-        # Send verification email with token
-        from app.infrastucture.tasks.send_verification_email_task import send_verification_email_task
-        from decouple import config
-        
-        # Get frontend URL based on role
-        frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
-        
-        # Queue the verification email task
-        task_result = send_verification_email_task.delay(
-            email=request.email,
-            user_name=user.name or request.email,
-            user_id=str(user.id),
-            role=user.role.value,
-            frontend_url=frontend_url
-        )
-        
-        logger.info(f"Verification email sent to {request.email}", task_id=task_result.id)
+        # No need to send verification email manually; Supabase handles this
+        logger.info(f"Verification email for {request.email} handled by Supabase Auth.")
         
         return VerifyEmailResponse(
-            message="Verification email sent successfully. Please check your email and click the link to set your password.",
+            message="Verification email sent successfully (via Supabase). Please check your email and click the link to set your password.",
             email=request.email
         )
         
