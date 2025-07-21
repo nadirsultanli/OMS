@@ -8,6 +8,7 @@ from app.core.logging_config import setup_logging, get_request_logger
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import init_database
 from app.presentation.api.users import auth_router, user_router, verification_router
+from app.presentation.api.customers import customer_router
 
 # Get configuration from environment
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")
@@ -46,6 +47,10 @@ app = FastAPI(
         {
             "name": "Users", 
             "description": "User management operations"
+        },
+        {
+            "name": "Customers",
+            "description": "Customer management operations"
         }
     ]
 )
@@ -66,6 +71,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(verification_router, prefix='/api/v1')
+app.include_router(customer_router, prefix="/api/v1")
 
 
 def custom_openapi():
@@ -93,6 +99,13 @@ def custom_openapi():
     for path in openapi_schema["paths"]:
         if path.startswith("/api/v1/users") and path != "/api/v1/users/":
             # All user endpoints except create user need authentication
+            for method in openapi_schema["paths"][path]:
+                if method in ["get", "put", "delete", "post"]:
+                    if "security" not in openapi_schema["paths"][path][method]:
+                        openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+        
+        if path.startswith("/api/v1/customers"):
+            # All customer endpoints need authentication
             for method in openapi_schema["paths"][path]:
                 if method in ["get", "put", "delete", "post"]:
                     if "security" not in openapi_schema["paths"][path][method]:
