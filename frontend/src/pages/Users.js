@@ -72,7 +72,7 @@ const Users = () => {
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(user =>
-        user.name?.toLowerCase().includes(searchTerm) ||
+        user.full_name?.toLowerCase().includes(searchTerm) ||
         user.email?.toLowerCase().includes(searchTerm) ||
         user.phone_number?.toLowerCase().includes(searchTerm)
       );
@@ -136,6 +136,30 @@ const Users = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleResendInvitation = async (userId, email) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/v1/users/${userId}/resend-invitation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        setMessage(`Invitation email resent to ${email}`);
+      } else {
+        const error = await response.json();
+        setErrors({ general: error.detail || 'Failed to resend invitation' });
+      }
+    } catch (error) {
+      setErrors({ general: 'An error occurred while resending invitation' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -147,8 +171,19 @@ const Users = () => {
     setLoading(true);
 
     try {
+      // Get the current user to extract tenant_id
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      // Transform form data to match backend schema
+      const userData = {
+        email: formData.email,
+        full_name: formData.name, // Transform name to full_name
+        role: formData.role,
+        tenant_id: currentUser.tenant_id || "332072c1-5405-4f09-a56f-a631defa911b" // Default to Circl Team for now
+      };
+      
       // Create user
-      const createResult = await userService.createUser(formData);
+      const createResult = await userService.createUser(userData);
 
       if (createResult.success) {
         setMessage(`User created successfully! Verification email sent to ${formData.email}`);
@@ -185,12 +220,46 @@ const Users = () => {
     });
   };
 
-  const getRoleBadgeClass = (role) => {
-    return role === 'admin' ? 'role-badge admin' : 'role-badge driver';
+  const getRoleDisplayName = (role) => {
+    const roleNames = {
+      'tenant_admin': 'Admin',
+      'sales_rep': 'Sales Rep',
+      'driver': 'Driver',
+      'dispatcher': 'Dispatcher',
+      'accounts': 'Accounts'
+    };
+    return roleNames[role] || role;
   };
 
-  const getStatusBadgeClass = (isActive) => {
-    return isActive ? 'status-badge active' : 'status-badge inactive';
+  const getRoleBadgeClass = (role) => {
+    const roleClass = {
+      'tenant_admin': 'admin',
+      'sales_rep': 'sales',
+      'driver': 'driver',
+      'dispatcher': 'dispatcher',
+      'accounts': 'accounts'
+    };
+    return `role-badge ${roleClass[role] || 'default'}`;
+  };
+
+  const getStatusBadgeClass = (status) => {
+    const statusClasses = {
+      'active': 'status-badge active',
+      'pending': 'status-badge pending',
+      'deactivated': 'status-badge inactive',
+      'deleted': 'status-badge deleted'
+    };
+    return statusClasses[status] || 'status-badge default';
+  };
+
+  const getStatusDisplayName = (status) => {
+    const statusNames = {
+      'active': 'Active',
+      'pending': 'Pending',
+      'deactivated': 'Inactive',
+      'deleted': 'Deleted'
+    };
+    return statusNames[status] || status;
   };
 
   return (
@@ -248,8 +317,11 @@ const Users = () => {
               className="filter-select"
             >
               <option value="">All Roles</option>
-              <option value="admin">Admin</option>
+              <option value="tenant_admin">Admin</option>
+              <option value="sales_rep">Sales Rep</option>
               <option value="driver">Driver</option>
+              <option value="dispatcher">Dispatcher</option>
+              <option value="accounts">Accounts</option>
             </select>
           </div>
         </div>
@@ -272,31 +344,44 @@ const Users = () => {
                 <th>Phone Number</th>
                 <th>Status</th>
                 <th>Created</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => (
                   <tr key={user.id}>
-                    <td className="name-cell">{user.name || '-'}</td>
+                    <td className="name-cell">{user.full_name || '-'}</td>
                     <td className="email-cell">{user.email}</td>
                     <td>
                       <span className={getRoleBadgeClass(user.role)}>
-                        {user.role}
+                        {getRoleDisplayName(user.role)}
                       </span>
                     </td>
                     <td>{user.phone_number || '-'}</td>
                     <td>
-                      <span className={getStatusBadgeClass(user.is_active)}>
-                        {user.is_active ? 'Active' : 'Inactive'}
+                      <span className={getStatusBadgeClass(user.status)}>
+                        {getStatusDisplayName(user.status)}
                       </span>
                     </td>
                     <td className="date-cell">{formatDate(user.created_at)}</td>
+                    <td className="actions-cell">
+                      {user.status === 'pending' && (
+                        <button
+                          onClick={() => handleResendInvitation(user.id, user.email)}
+                          className="resend-invitation-btn"
+                          disabled={loading}
+                          title="Resend invitation email"
+                        >
+                          Resend Invite
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="empty-state">
+                  <td colSpan="7" className="empty-state">
                     {filters.search || filters.role ? 'No users found matching your filters.' : 'No users found.'}
                   </td>
                 </tr>
@@ -366,8 +451,11 @@ const Users = () => {
                     disabled={loading}
                   >
                     <option value="">Select Role</option>
-                    <option value="admin">Admin</option>
+                    <option value="tenant_admin">Admin</option>
+                    <option value="sales_rep">Sales Rep</option>
                     <option value="driver">Driver</option>
+                    <option value="dispatcher">Dispatcher</option>
+                    <option value="accounts">Accounts</option>
                   </select>
                   {errors.role && <span className="error-text">{errors.role}</span>}
                 </div>

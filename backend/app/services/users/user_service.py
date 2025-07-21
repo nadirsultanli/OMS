@@ -12,8 +12,9 @@ from app.domain.exceptions.users import (
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import get_supabase_admin_client_sync
 from decouple import config
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
+import asyncio
 
 
 class UserService:
@@ -53,55 +54,133 @@ class UserService:
         return await self.user_repository.get_by_role(role)
     
     async def create_user(self, email: str, name: str, role: UserRoleType, tenant_id: str, created_by: Optional[str] = None) -> User:
-        """Create a new user with Supabase Auth integration"""
+        """Create a new user with mandatory Supabase Auth integration"""
         try:
             # Check if user already exists in our database
             existing_user = await self.user_repository.get_by_email(email)
             if existing_user:
                 raise UserAlreadyExistsError(email=email)
-
-            # Create Supabase Auth user first
+            
+            # Get Supabase admin client
             supabase = get_supabase_admin_client_sync()
-
-            # Use Supabase's invite user functionality which will send an email
-            # The user will receive an invite email from Supabase with a link to set their password
+            
+            # Check if user already exists in Supabase Auth (optional check, don't fail if it fails)
+            try:
+                existing_auth_users = supabase.auth.admin.list_users()
+                if existing_auth_users and existing_auth_users.users:
+                    for auth_user in existing_auth_users.users:
+                        if auth_user.email == email:
+                            raise UserAlreadyExistsError(email=email)
+            except UserAlreadyExistsError:
+                raise
+            except Exception as e:
+                default_logger.warning(f"Could not check existing auth users: {str(e)}")
+                # Continue - this is just a pre-check, not critical
+            
+            # Configure redirect URL based on role  
             frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
-
-            # Configure redirect URL based on role
             if role.value.lower() == "driver":
                 driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
                 redirect_url = f"{driver_frontend_url}/accept-invitation"
             else:
                 redirect_url = f"{frontend_url}/accept-invitation"
-
-            auth_response = supabase.auth.admin.invite_user_by_email(
-                email=email,
-                data={
-                    "name": name,
-                    "role": role.value
-                },
-                redirect_to=redirect_url
-            )
-
-            if not auth_response.user:
-                raise UserCreationError("Failed to create Supabase Auth user", email=email)
-
-            # Get the auth_user_id from Supabase Auth
-            auth_user_id = auth_response.user.id
-
-            # Create user in our database with the auth_user_id
+            
+            # Step 1: Create Supabase Auth user first (MANDATORY)
+            auth_user_id = None
+            default_logger.info(f"Creating Supabase Auth user", email=email)
+            
+            try:
+                # Method 1: Try invite_user_by_email first
+                # Note: Don't include tenant_id in user_metadata as it causes "tenants" table lookup issues
+                auth_response = supabase.auth.admin.invite_user_by_email(
+                    email=email,
+                    options={
+                        "data": {
+                            "name": name,
+                            "role": role.value
+                        },
+                        "redirect_to": redirect_url
+                    }
+                )
+                
+                if auth_response and auth_response.user:
+                    auth_user_id = auth_response.user.id
+                    default_logger.info(f"Auth user created via invitation", 
+                                      email=email, 
+                                      auth_user_id=str(auth_user_id))
+                else:
+                    raise Exception("Invitation returned no user")
+                    
+            except Exception as invite_error:
+                default_logger.warning(f"Invitation method failed: {str(invite_error)}")
+                
+                # Method 2: Try create_user as fallback
+                # Note: Don't include tenant_id in user_metadata as it causes "tenants" table lookup issues
+                try:
+                    fallback_response = supabase.auth.admin.create_user({
+                        "email": email,
+                        "user_metadata": {
+                            "name": name,
+                            "role": role.value
+                        },
+                        "email_confirm": False
+                    })
+                    
+                    if fallback_response and fallback_response.user:
+                        auth_user_id = fallback_response.user.id
+                        default_logger.info(f"Auth user created via direct creation", 
+                                          email=email, 
+                                          auth_user_id=str(auth_user_id))
+                        
+                        # Try to send invitation after user creation
+                        try:
+                            supabase.auth.admin.invite_user_by_email(
+                                email=email,
+                                options={"redirect_to": redirect_url}
+                            )
+                            default_logger.info(f"Invitation sent after user creation", email=email)
+                        except Exception as post_invite_error:
+                            default_logger.warning(f"Post-creation invitation failed: {str(post_invite_error)}")
+                            # User exists in auth, so continue
+                    else:
+                        raise Exception("Direct creation returned no user")
+                        
+                except Exception as creation_error:
+                    error_msg = str(creation_error)
+                    # Check for specific database errors
+                    if "relation \"tenants\" does not exist" in error_msg:
+                        detailed_error = "Supabase configuration issue: Auth service trying to access missing 'tenants' table. This is likely due to custom user metadata causing database lookups."
+                        default_logger.error(detailed_error, email=email, original_error=error_msg)
+                        raise UserCreationError(f"Supabase Auth configuration error: {detailed_error}", email=email)
+                    elif "Database error" in error_msg:
+                        detailed_error = f"Supabase database error during user creation: {error_msg}"
+                        default_logger.error(detailed_error, email=email)
+                        raise UserCreationError(detailed_error, email=email)
+                    else:
+                        full_error = f"Both invitation and direct creation failed: {error_msg}"
+                        default_logger.error(full_error, email=email)
+                        raise UserCreationError(f"Failed to create Supabase Auth user: {full_error}", email=email)
+            
+            # Ensure we have a valid auth_user_id before proceeding
+            if not auth_user_id:
+                raise UserCreationError("Failed to obtain auth_user_id from Supabase", email=email)
+            
+            # Step 2: Create user in our database with the auth_user_id
+            default_logger.info(f"Creating app database user", email=email, auth_user_id=str(auth_user_id))
+            
             user = User.create(
                 email=email, 
                 full_name=name,
                 role=role,
                 tenant_id=UUID(tenant_id),
                 created_by=UUID(created_by) if created_by else None,
-                auth_user_id=UUID(auth_user_id)
+                auth_user_id=auth_user_id
             )
+            
             created_user = await self.user_repository.create_user(user)
 
             default_logger.info(
-                f"User created successfully and invite email sent via Supabase", 
+                f"User creation completed successfully", 
                 user_id=str(created_user.id), 
                 auth_user_id=str(auth_user_id),
                 email=email
@@ -110,9 +189,11 @@ class UserService:
 
         except UserAlreadyExistsError:
             raise
+        except UserCreationError:
+            raise
         except Exception as e:
             import traceback
-            default_logger.error(f"Failed to create user: {str(e)}\n{traceback.format_exc()}", email=email)
+            default_logger.error(f"Unexpected error during user creation: {str(e)}\n{traceback.format_exc()}", email=email)
             raise UserCreationError(f"Failed to create user: {str(e)}", email=email)
     
     async def update_user(self, user_id: str, name: Optional[str] = None, 
@@ -250,3 +331,499 @@ class UserService:
         user.updated_by = updated_by
         
         return await self.user_repository.update_user(str(user.id), user) 
+
+    async def link_auth_user(self, user_id: str, auth_user_id: str) -> User:
+        """Link a user to their Supabase Auth user ID"""
+        try:
+            user = await self.get_user_by_id(user_id)
+            user.auth_user_id = UUID(auth_user_id)
+            updated_user = await self.user_repository.update_user(user_id, user)
+            if not updated_user:
+                raise UserUpdateError("Failed to link auth user", user_id)
+            default_logger.info(f"User linked to auth user successfully", 
+                              user_id=user_id, 
+                              auth_user_id=auth_user_id)
+            return updated_user
+        except Exception as e:
+            default_logger.error(f"Failed to link auth user: {str(e)}", user_id=user_id)
+            raise UserUpdateError(f"Failed to link auth user: {str(e)}", user_id)
+    
+    async def resend_invitation(self, user_id: str) -> bool:
+        """Resend invitation email for a user"""
+        try:
+            user = await self.get_user_by_id(user_id)
+            
+            # Configure redirect URL based on role
+            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+            if user.role.value.lower() == "driver":
+                driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                redirect_url = f"{driver_frontend_url}/accept-invitation"
+            else:
+                redirect_url = f"{frontend_url}/accept-invitation"
+            
+            supabase = get_supabase_admin_client_sync()
+            
+            # If user doesn't have auth_user_id, create them in Supabase first
+            if not user.auth_user_id:
+                try:
+                    # Note: Don't include tenant_id in user_metadata as it causes "tenants" table lookup issues
+                    auth_response = supabase.auth.admin.create_user({
+                        "email": user.email,
+                        "user_metadata": {
+                            "name": user.full_name,
+                            "role": user.role.value
+                        },
+                        "email_confirm": False
+                    })
+                    
+                    if auth_response and auth_response.user:
+                        # Link the auth user
+                        await self.link_auth_user(user_id, auth_response.user.id)
+                        user.auth_user_id = UUID(auth_response.user.id)
+                        
+                except Exception as e:
+                    default_logger.warning(f"Failed to create auth user for resend: {str(e)}", 
+                                         email=user.email)
+            
+            # Send invitation
+            try:
+                supabase.auth.admin.invite_user_by_email(
+                    email=user.email,
+                    options={"redirect_to": redirect_url}
+                )
+                default_logger.info(f"Invitation resent successfully", email=user.email)
+                return True
+                
+            except Exception as e:
+                default_logger.error(f"Failed to resend invitation: {str(e)}", email=user.email)
+                return False
+                
+        except Exception as e:
+            default_logger.error(f"Failed to resend invitation: {str(e)}", user_id=user_id)
+            return False
+    
+    async def fix_missing_auth_users(self) -> dict:
+        """Fix users that were created without auth_user_id by creating them in Supabase Auth"""
+        try:
+            # Get all users without auth_user_id
+            users_without_auth = await self.user_repository.get_users_without_auth()
+            
+            results = {
+                "total": len(users_without_auth),
+                "fixed": 0,
+                "failed": []
+            }
+            
+            if not users_without_auth:
+                default_logger.info("No users found without auth_user_id")
+                return results
+            
+            supabase = get_supabase_admin_client_sync()
+            
+            for user in users_without_auth:
+                try:
+                    default_logger.info(f"Attempting to fix user without auth", 
+                                      user_id=str(user.id), 
+                                      email=user.email)
+                    
+                    # Check if user already exists in auth (maybe created elsewhere)
+                    existing_auth_users = supabase.auth.admin.list_users()
+                    auth_user_found = None
+                    
+                    if existing_auth_users.users:
+                        for auth_user in existing_auth_users.users:
+                            if auth_user.email == user.email:
+                                auth_user_found = auth_user
+                                break
+                    
+                    if auth_user_found:
+                        # Link existing auth user
+                        await self.link_auth_user(str(user.id), auth_user_found.id)
+                        results["fixed"] += 1
+                        default_logger.info(f"Linked to existing auth user", 
+                                          user_id=str(user.id), 
+                                          auth_user_id=str(auth_user_found.id))
+                    else:
+                        # Create new auth user
+                        # Note: Don't include tenant_id in user_metadata as it causes "tenants" table lookup issues
+                        auth_response = supabase.auth.admin.create_user({
+                            "email": user.email,
+                            "user_metadata": {
+                                "name": user.full_name,
+                                "role": user.role.value
+                            },
+                            "email_confirm": False
+                        })
+                        
+                        if auth_response and auth_response.user:
+                            await self.link_auth_user(str(user.id), auth_response.user.id)
+                            results["fixed"] += 1
+                            
+                            # Try to send invitation
+                            try:
+                                frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+                                if user.role.value.lower() == "driver":
+                                    driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                                    redirect_url = f"{driver_frontend_url}/accept-invitation"
+                                else:
+                                    redirect_url = f"{frontend_url}/accept-invitation"
+                                
+                                supabase.auth.admin.invite_user_by_email(
+                                    user.email,
+                                    options={"redirect_to": redirect_url}
+                                )
+                                default_logger.info(f"Invitation sent for fixed user", email=user.email)
+                                
+                            except Exception as invite_error:
+                                default_logger.warning(f"Failed to send invitation for fixed user: {str(invite_error)}", 
+                                                     email=user.email)
+                            
+                            default_logger.info(f"Created new auth user and linked", 
+                                              user_id=str(user.id), 
+                                              auth_user_id=str(auth_response.user.id))
+                        else:
+                            raise Exception("Auth user creation returned no user")
+                
+                except Exception as fix_error:
+                    error_msg = str(fix_error)
+                    results["failed"].append({
+                        "user_id": str(user.id),
+                        "email": user.email,
+                        "error": error_msg
+                    })
+                    default_logger.error(f"Failed to fix user without auth", 
+                                       user_id=str(user.id), 
+                                       email=user.email, 
+                                       error=error_msg)
+            
+            default_logger.info(f"Fix missing auth users completed", 
+                              total=results["total"], 
+                              fixed=results["fixed"], 
+                              failed=len(results["failed"]))
+            
+            return results
+            
+        except Exception as e:
+            default_logger.error(f"Failed to fix missing auth users: {str(e)}")
+            raise UserUpdateError(f"Failed to fix missing auth users: {str(e)}")
+    
+    async def test_supabase_connection(self) -> dict:
+        """Test Supabase connection and auth capabilities"""
+        try:
+            supabase = get_supabase_admin_client_sync()
+            
+            results = {
+                "connection": False,
+                "admin_access": False,
+                "can_create_users": False,
+                "can_list_users": False,
+                "error": None
+            }
+            
+            # Test basic connection
+            try:
+                # Test with a simple query
+                response = supabase.table("users").select("id").limit(1).execute()
+                results["connection"] = True
+                default_logger.info("Supabase basic connection successful")
+            except Exception as e:
+                results["error"] = f"Connection test failed: {str(e)}"
+                default_logger.error(f"Supabase connection test failed: {str(e)}")
+                return results
+            
+            # Test admin auth access
+            try:
+                auth_users = supabase.auth.admin.list_users()
+                results["admin_access"] = True
+                results["can_list_users"] = True
+                default_logger.info(f"Supabase auth admin access successful, found {len(auth_users.users)} users")
+            except Exception as e:
+                results["error"] = f"Auth admin test failed: {str(e)}"
+                default_logger.error(f"Supabase auth admin test failed: {str(e)}")
+                return results
+            
+            # Test user creation (with cleanup)
+            test_email = f"test-connection-{uuid4()}@example.com"
+            try:
+                create_response = supabase.auth.admin.create_user({
+                    "email": test_email,
+                    "user_metadata": {"test": True}
+                })
+                
+                if create_response and create_response.user:
+                    results["can_create_users"] = True
+                    # Clean up test user
+                    try:
+                        supabase.auth.admin.delete_user(create_response.user.id)
+                        default_logger.info("Test user created and deleted successfully")
+                    except Exception as cleanup_error:
+                        default_logger.warning(f"Failed to cleanup test user: {str(cleanup_error)}")
+                else:
+                    results["error"] = "User creation returned no user"
+                    
+            except Exception as e:
+                results["error"] = f"User creation test failed: {str(e)}"
+                default_logger.error(f"Supabase user creation test failed: {str(e)}")
+            
+            return results
+            
+        except Exception as e:
+            default_logger.error(f"Supabase connection test failed: {str(e)}")
+            return {
+                "connection": False,
+                "admin_access": False,
+                "can_create_users": False,
+                "can_list_users": False,
+                "error": str(e)
+            }
+    
+    async def create_user_with_trigger(self, email: str, name: str, role: UserRoleType, tenant_id: str, created_by: Optional[str] = None) -> User:
+        """Create a new user using Supabase Auth trigger (alternative method)"""
+        try:
+            # Check if user already exists in our database
+            existing_user = await self.user_repository.get_by_email(email)
+            if existing_user:
+                raise UserAlreadyExistsError(email=email)
+            
+            # Get Supabase admin client
+            supabase = get_supabase_admin_client_sync()
+            
+            # Configure redirect URL based on role  
+            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+            if role.value.lower() == "driver":
+                driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                redirect_url = f"{driver_frontend_url}/accept-invitation"
+            else:
+                redirect_url = f"{frontend_url}/accept-invitation"
+            
+            # Create Supabase Auth user - trigger handles app DB creation automatically
+            default_logger.info(f"Creating Auth user via trigger method", email=email, role=role.value)
+            
+            try:
+                # Try invite_user_by_email first (preferred method)
+                auth_response = supabase.auth.admin.invite_user_by_email(
+                    email=email,
+                    options={
+                        "data": {
+                            "name": name,
+                            "role": role.value
+                        },
+                        "redirect_to": redirect_url
+                    }
+                )
+                
+                if not (auth_response and auth_response.user):
+                    raise Exception("Invitation returned no user")
+                    
+                auth_user_id = auth_response.user.id
+                default_logger.info(f"Auth user created via invitation", email=email, auth_user_id=str(auth_user_id))
+                
+            except Exception as invite_error:
+                default_logger.warning(f"Invitation failed, trying direct creation: {str(invite_error)}")
+                
+                # Fallback to direct user creation
+                fallback_response = supabase.auth.admin.create_user({
+                    "email": email,
+                    "user_metadata": {
+                        "name": name,
+                        "role": role.value
+                    },
+                    "email_confirm": False
+                })
+                
+                if not (fallback_response and fallback_response.user):
+                    raise UserCreationError(f"Both invitation and direct creation failed for {email}")
+                
+                auth_user_id = fallback_response.user.id
+                default_logger.info(f"Auth user created via direct creation", email=email, auth_user_id=str(auth_user_id))
+                
+                # Try to send invitation manually
+                try:
+                    supabase.auth.admin.invite_user_by_email(email, options={"redirect_to": redirect_url})
+                    default_logger.info(f"Manual invitation sent", email=email)
+                except Exception as manual_invite_error:
+                    default_logger.warning(f"Manual invitation failed: {str(manual_invite_error)}")
+            
+            # Wait briefly for trigger to process
+            await asyncio.sleep(1.0)
+            
+            # Get the user created by trigger
+            created_user = await self.user_repository.get_by_email(email)
+            if not created_user:
+                raise UserCreationError(f"Trigger did not create user in app database for {email}")
+            
+            # Update tenant_id if needed (trigger uses default tenant)
+            if str(created_user.tenant_id) != tenant_id:
+                default_logger.info(f"Updating tenant_id from trigger default to specified", 
+                                  email=email, 
+                                  from_tenant=str(created_user.tenant_id), 
+                                  to_tenant=tenant_id)
+                created_user.tenant_id = UUID(tenant_id)
+                created_user.updated_at = datetime.now()
+                if created_by:
+                    created_user.updated_by = UUID(created_by)
+                created_user = await self.user_repository.update_user(str(created_user.id), created_user)
+            
+            default_logger.info(f"User creation completed via trigger method", 
+                              user_id=str(created_user.id), 
+                              auth_user_id=str(auth_user_id), 
+                              email=email)
+            return created_user
+            
+        except UserAlreadyExistsError:
+            raise
+        except UserCreationError:
+            raise
+        except Exception as e:
+            import traceback
+            default_logger.error(f"Trigger-based user creation failed: {str(e)}\n{traceback.format_exc()}", email=email)
+            raise UserCreationError(f"Failed to create user via trigger: {str(e)}", email=email)
+    
+    async def create_user_simple(self, email: str, name: str, role: UserRoleType, tenant_id: str, created_by: Optional[str] = None) -> User:
+        """Create user in both app database AND Supabase Auth with invitation"""
+        try:
+            # Check if user already exists in our database
+            existing_user = await self.user_repository.get_by_email(email)
+            if existing_user:
+                raise UserAlreadyExistsError(email=email)
+            
+            # Get Supabase admin client
+            supabase = get_supabase_admin_client_sync()
+            
+            # Check if user already exists in Supabase Auth
+            try:
+                existing_auth_users = supabase.auth.admin.list_users()
+                if existing_auth_users and hasattr(existing_auth_users, 'users') and existing_auth_users.users:
+                    for auth_user in existing_auth_users.users:
+                        if auth_user.email == email:
+                            raise UserAlreadyExistsError(email=email)
+                elif existing_auth_users and isinstance(existing_auth_users, list):
+                    # Handle case where list_users returns a list directly
+                    for auth_user in existing_auth_users:
+                        if hasattr(auth_user, 'email') and auth_user.email == email:
+                            raise UserAlreadyExistsError(email=email)
+            except UserAlreadyExistsError:
+                raise
+            except Exception as e:
+                default_logger.warning(f"Could not check existing auth users: {str(e)}")
+            
+            # Configure redirect URL based on role
+            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+            if role.value.lower() == "driver":
+                driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                redirect_url = f"{driver_frontend_url}/accept-invitation"
+            else:
+                redirect_url = f"{frontend_url}/accept-invitation"
+            
+            # Step 1: Create user in Supabase Auth FIRST (mandatory)
+            auth_user_id = None
+            default_logger.info(f"Creating Supabase Auth user for simple method", email=email)
+            
+            try:
+                # Method 1: Try invite_user_by_email first (sends email automatically)
+                auth_response = supabase.auth.admin.invite_user_by_email(
+                    email=email,
+                    options={
+                        "data": {
+                            "name": name,
+                            "role": role.value
+                        },
+                        "redirect_to": redirect_url
+                    }
+                )
+                
+                if auth_response and auth_response.user:
+                    auth_user_id = auth_response.user.id
+                    default_logger.info(f"Auth user created via invitation", 
+                                      email=email, 
+                                      auth_user_id=str(auth_user_id))
+                else:
+                    raise Exception("Invitation returned no user")
+                    
+            except Exception as invite_error:
+                default_logger.warning(f"Invitation method failed: {str(invite_error)}")
+                
+                # Method 2: Try create_user as fallback
+                try:
+                    fallback_response = supabase.auth.admin.create_user({
+                        "email": email,
+                        "user_metadata": {
+                            "name": name,
+                            "role": role.value
+                        },
+                        "email_confirm": False
+                    })
+                    
+                    if fallback_response and fallback_response.user:
+                        auth_user_id = fallback_response.user.id
+                        default_logger.info(f"Auth user created via direct creation", 
+                                          email=email, 
+                                          auth_user_id=str(auth_user_id))
+                        
+                        # Send invitation after user creation
+                        try:
+                            supabase.auth.admin.invite_user_by_email(
+                                email=email,
+                                options={"redirect_to": redirect_url}
+                            )
+                            default_logger.info(f"Invitation sent after user creation", email=email)
+                        except Exception as post_invite_error:
+                            default_logger.error(f"Post-creation invitation failed: {str(post_invite_error)}")
+                            # This is critical - if we can't send invitation, fail the whole process
+                            raise UserCreationError(f"Failed to send invitation email: {str(post_invite_error)}", email=email)
+                    else:
+                        raise Exception("Direct creation returned no user")
+                        
+                except Exception as creation_error:
+                    error_msg = str(creation_error)
+                    default_logger.error(f"Both invitation and direct creation failed: {error_msg}", email=email)
+                    raise UserCreationError(f"Failed to create Supabase Auth user: {error_msg}", email=email)
+            
+            # Ensure we have a valid auth_user_id before proceeding
+            if not auth_user_id:
+                raise UserCreationError("Failed to obtain auth_user_id from Supabase", email=email)
+            
+            # Step 2: Create user in our database with the auth_user_id
+            default_logger.info(f"Creating app database user", email=email, auth_user_id=str(auth_user_id))
+            
+            # Check again if user exists (might have been created by trigger)
+            existing_user = await self.user_repository.get_by_email(email)
+            if existing_user:
+                # User exists, just link the auth_user_id if missing
+                if not existing_user.auth_user_id:
+                    existing_user.auth_user_id = UUID(auth_user_id)
+                    created_user = await self.user_repository.update_user(str(existing_user.id), existing_user)
+                    default_logger.info(f"Linked auth_user_id to existing user", 
+                                      user_id=str(existing_user.id), 
+                                      auth_user_id=str(auth_user_id))
+                else:
+                    created_user = existing_user
+                    default_logger.info(f"User already exists with auth_user_id", 
+                                      user_id=str(existing_user.id))
+            else:
+                # Create new user
+                user = User.create(
+                    email=email,
+                    full_name=name,
+                    role=role,
+                    tenant_id=UUID(tenant_id),
+                    created_by=UUID(created_by) if created_by else None,
+                    auth_user_id=auth_user_id
+                )
+                created_user = await self.user_repository.create_user(user)
+            
+            default_logger.info(
+                f"User creation completed successfully in both Auth and database", 
+                user_id=str(created_user.id), 
+                auth_user_id=str(auth_user_id),
+                email=email
+            )
+            return created_user
+                
+        except UserAlreadyExistsError:
+            raise
+        except UserCreationError:
+            raise
+        except Exception as e:
+            default_logger.error(f"Simple user creation failed: {str(e)}", email=email)
+            raise UserCreationError(f"Failed to create user: {str(e)}", email=email) 

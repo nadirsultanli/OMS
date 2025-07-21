@@ -31,29 +31,37 @@ async def create_user(
 ):
     """Create a new user"""
     try:
-        user = await user_service.create_user(
+        # Try the simple method first (most reliable)
+        user = await user_service.create_user_simple(
             email=request.email,
-            full_name=request.full_name,
+            name=request.full_name,
             role=request.role,
-            tenant_id=request.tenant_id,
-            created_by=request.created_by
+            tenant_id=str(request.tenant_id),
+            created_by=str(request.created_by) if request.created_by else None
         )
+        
+        default_logger.info(f"User created successfully via simple method", 
+                          user_id=str(user.id), 
+                          email=request.email)
         return UserResponse(**user.to_dict())
+        
     except UserAlreadyExistsError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"User with email {request.email} already exists"
         )
     except UserCreationError as e:
+        # Log the detailed error but return user-friendly message
+        default_logger.error(f"User creation error: {str(e)}", email=request.email)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Failed to create user. Please check the email address and try again."
         )
     except Exception as e:
-        default_logger.error(f"Failed to create user: {str(e)}", email=request.email)
+        default_logger.error(f"Unexpected error creating user: {str(e)}", email=request.email)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user"
+            detail="An unexpected error occurred while creating the user"
         )
 
 
@@ -298,4 +306,140 @@ async def deactivate_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to deactivate user"
+        )
+
+
+@user_router.post("/{user_id}/resend-invitation", status_code=status.HTTP_200_OK)
+async def resend_user_invitation(
+    user_id: str,
+    user_service: UserService = Depends(get_user_service)
+):
+    """Resend invitation email to user"""
+    try:
+        success = await user_service.resend_invitation(user_id)
+        
+        if success:
+            return {"message": "Invitation email sent successfully"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to send invitation email"
+            )
+        
+    except UserNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found"
+        )
+    except Exception as e:
+        default_logger.error(f"Failed to resend invitation: {str(e)}", user_id=user_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resend invitation"
+        )
+
+
+@user_router.post("/fix-missing-auth", status_code=status.HTTP_200_OK)
+async def fix_missing_auth_users(
+    user_service: UserService = Depends(get_user_service)
+):
+    """Fix users that were created without auth_user_id by creating them in Supabase Auth"""
+    try:
+        results = await user_service.fix_missing_auth_users()
+        return {
+            "message": f"Fixed {results['fixed']} out of {results['total']} users",
+            "results": results
+        }
+        
+    except Exception as e:
+        default_logger.error(f"Failed to fix missing auth users: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fix missing auth users"
+        )
+
+
+@user_router.get("/test-supabase-connection", status_code=status.HTTP_200_OK)
+async def test_supabase_connection(
+    user_service: UserService = Depends(get_user_service)
+):
+    """Test Supabase connection and auth capabilities"""
+    try:
+        results = await user_service.test_supabase_connection()
+        return {
+            "message": "Supabase connection test completed",
+            "results": results
+        }
+        
+    except Exception as e:
+        default_logger.error(f"Failed to test Supabase connection: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to test Supabase connection"
+        )
+
+
+@user_router.post("/create-with-trigger", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user_with_trigger(
+    request: CreateUserRequest,
+    user_service: UserService = Depends(get_user_service)
+):
+    """Create a new user using Supabase Auth trigger (alternative method)"""
+    try:
+        user = await user_service.create_user_with_trigger(
+            email=request.email,
+            name=request.full_name,
+            role=request.role,
+            tenant_id=str(request.tenant_id),
+            created_by=str(request.created_by) if request.created_by else None
+        )
+        return UserResponse(**user.to_dict())
+    except UserAlreadyExistsError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"User with email {request.email} already exists"
+        )
+    except UserCreationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        default_logger.error(f"Failed to create user with trigger: {str(e)}", email=request.email)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user"
+        )
+
+
+@user_router.post("/create-simple", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user_simple(
+    request: CreateUserRequest,
+    user_service: UserService = Depends(get_user_service)
+):
+    """Create a new user with minimal Supabase Auth interaction (no triggers)"""
+    try:
+        user = await user_service.create_user_simple(
+            email=request.email,
+            name=request.full_name,
+            role=request.role,
+            tenant_id=str(request.tenant_id),
+            created_by=str(request.created_by) if request.created_by else None
+        )
+        return UserResponse(**user.to_dict())
+    except UserAlreadyExistsError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"User with email {request.email} already exists"
+        )
+    except UserCreationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        default_logger.error(f"Failed to create user simple: {str(e)}", email=request.email)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user simple"
         ) 

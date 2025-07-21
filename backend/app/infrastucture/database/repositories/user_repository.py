@@ -41,6 +41,12 @@ class UserRepository(UserRepositoryInterface):
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
 
+    async def get_users_without_auth(self) -> List[User]:
+        """Get all users that don't have auth_user_id set"""
+        result = await self._session.execute(select(UserORM).where(UserORM.auth_user_id.is_(None)))
+        objs = result.scalars().all()
+        return [self._to_entity(obj) for obj in objs]
+
     async def create_user(self, user: User) -> User:
         obj = UserORM(
             id=user.id,

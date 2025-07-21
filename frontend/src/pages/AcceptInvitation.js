@@ -16,6 +16,11 @@ const AcceptInvitation = () => {
   const location = useLocation();
 
   useEffect(() => {
+    // Clear any existing authentication data when accessing invitation page
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    
     // Extract token from URL parameters
     // Supabase sends invite links with 'access_token' and 'type=invite'
     const urlParams = new URLSearchParams(location.search);
@@ -80,6 +85,11 @@ const AcceptInvitation = () => {
       
       if (result.success) {
         setMessage('Account setup completed successfully! Redirecting to login...');
+        
+        // Clear any existing authentication data to force fresh login
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
         
         // Redirect to login page after 2 seconds
         setTimeout(() => {

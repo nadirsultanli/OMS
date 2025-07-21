@@ -1,6 +1,40 @@
 import api from './api';
 
 class UserService {
+  // Helper method to extract user-friendly error messages
+  extractErrorMessage(errorData) {
+    if (!errorData) {
+      return null;
+    }
+    
+    // If it's a simple string message
+    if (typeof errorData === 'string') {
+      return errorData;
+    }
+    
+    // If it's a simple object with detail
+    if (errorData.detail && typeof errorData.detail === 'string') {
+      return errorData.detail;
+    }
+    
+    // If it's FastAPI validation errors (array of error objects)
+    if (Array.isArray(errorData.detail)) {
+      const messages = errorData.detail.map(err => {
+        const field = err.loc ? err.loc.join(' -> ') : 'Field';
+        return `${field}: ${err.msg}`;
+      });
+      return messages.join(', ');
+    }
+    
+    // If it's a single validation error object
+    if (errorData.detail && typeof errorData.detail === 'object') {
+      return JSON.stringify(errorData.detail);
+    }
+    
+    // Fallback
+    return 'An error occurred';
+  }
+
   // Get all users with filtering and pagination
   async getUsers(params = {}) {
     try {
@@ -21,7 +55,7 @@ class UserService {
       console.error('Get users error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to fetch users.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to fetch users.'
       };
     }
   }
@@ -39,7 +73,7 @@ class UserService {
       console.error('Create user error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to create user.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to create user.'
       };
     }
   }
@@ -57,7 +91,7 @@ class UserService {
       console.error('Get user error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to fetch user.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to fetch user.'
       };
     }
   }
@@ -75,7 +109,7 @@ class UserService {
       console.error('Update user error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to update user.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to update user.'
       };
     }
   }
@@ -92,7 +126,7 @@ class UserService {
       console.error('Delete user error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to delete user.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to delete user.'
       };
     }
   }
@@ -110,7 +144,7 @@ class UserService {
       console.error('Activate user error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to activate user.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to activate user.'
       };
     }
   }
@@ -128,7 +162,7 @@ class UserService {
       console.error('Deactivate user error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to deactivate user.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to deactivate user.'
       };
     }
   }
@@ -148,7 +182,7 @@ class UserService {
       console.error('Send verification email error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to send verification email.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to send verification email.'
       };
     }
   }

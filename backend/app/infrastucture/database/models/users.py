@@ -23,7 +23,7 @@ class User(Base):
     tenant_id = Column(SAUUID(as_uuid=True), nullable=False)
     email = Column(String, unique=True, nullable=False)
     full_name = Column(String, nullable=True)
-    role = Column(String, nullable=False)
+    role = Column(PGEnum(UserRoleType, name="role_type", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False)
     status = Column(PGEnum(UserStatus, name="user_status", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, default=UserStatus.PENDING.value)
     last_login = Column(TIMESTAMP(timezone=True), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False)
