@@ -174,7 +174,7 @@ class UserService:
             )
             
             created_user = await self.user_repository.create_user(user)
-            
+
             default_logger.info(
                 f"User creation completed successfully", 
                 user_id=str(created_user.id), 
@@ -182,7 +182,7 @@ class UserService:
                 email=email
             )
             return created_user
-            
+
         except UserAlreadyExistsError:
             raise
         except UserCreationError:

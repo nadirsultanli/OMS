@@ -176,7 +176,7 @@ async def test_database():
         
         # Execute query asynchronously
         result = await db_connection.execute_query(
-            lambda client: client.table("users").select("id, email, name").limit(5).execute()
+            lambda client: client.table("users").select("id, email, full_name").limit(5).execute()
         )
         
         return {

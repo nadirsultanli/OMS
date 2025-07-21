@@ -2,6 +2,7 @@ from typing import Optional, List
 from uuid import UUID
 from app.domain.entities.customers import Customer, CustomerStatus, CustomerType
 from app.domain.repositories.customer_repository import CustomerRepository
+from app.services.addresses.address_service import AddressService
 
 class CustomerNotFoundError(Exception):
     pass
@@ -9,20 +10,25 @@ class CustomerAlreadyExistsError(Exception):
     pass
 
 class CustomerService:
-    def __init__(self, customer_repository: CustomerRepository):
+    def __init__(self, customer_repository: CustomerRepository, address_service: AddressService):
         self.customer_repository = customer_repository
+        self.address_service = address_service
 
     async def get_customer_by_id(self, customer_id: str) -> Customer:
         customer = await self.customer_repository.get_by_id(customer_id)
         if not customer:
             raise CustomerNotFoundError(customer_id)
+        customer.addresses = await self.address_service.get_addresses_by_customer(customer_id)
         return customer
 
     async def get_customer_by_name(self, name: str) -> Customer:
         raise NotImplementedError
 
     async def get_all_customers(self, limit: int = 100, offset: int = 0) -> List[Customer]:
-        return await self.customer_repository.get_all(limit, offset)
+        customers = await self.customer_repository.get_all(limit, offset)
+        for customer in customers:
+            customer.addresses = await self.address_service.get_addresses_by_customer(str(customer.id))
+        return customers
 
     async def get_active_customers(self) -> List[Customer]:
         return await self.customer_repository.get_active_customers()
@@ -36,8 +42,13 @@ class CustomerService:
             status = CustomerStatus.ACTIVE
         else:
             status = CustomerStatus.PENDING
-        # Set owner_sales_rep_id to created_by
-        owner_sales_rep_id = created_by
+        
+        # Extract owner_sales_rep_id from kwargs if provided, otherwise use created_by
+        owner_sales_rep_id = kwargs.pop('owner_sales_rep_id', created_by)
+        
+        # Remove created_by from kwargs if it exists to avoid duplicate
+        kwargs.pop('created_by', None)
+        
         customer = Customer.create(
             tenant_id=tenant_id,
             customer_type=customer_type,
@@ -67,16 +78,16 @@ class CustomerService:
 
     async def approve_customer(self, customer_id: str, approved_by: UUID) -> Optional[Customer]:
         customer = await self.get_customer_by_id(customer_id)
-        if customer.customer_type != CustomerType.CREDIT or customer.status != CustomerStatus.PENDING:
-            raise ValueError("Only pending credit customers can be approved.")
+        if customer.status != CustomerStatus.PENDING:
+            raise ValueError("Only pending customers can be approved.")
         customer.status = CustomerStatus.ACTIVE
         customer.updated_by = approved_by
         return await self.customer_repository.update_customer(customer_id, customer)
 
     async def reject_customer(self, customer_id: str, rejected_by: UUID) -> Optional[Customer]:
         customer = await self.get_customer_by_id(customer_id)
-        if customer.customer_type != CustomerType.CREDIT or customer.status != CustomerStatus.PENDING:
-            raise ValueError("Only pending credit customers can be rejected.")
+        if customer.status != CustomerStatus.PENDING:
+            raise ValueError("Only pending customers can be rejected.")
         customer.status = CustomerStatus.REJECTED
         customer.updated_by = rejected_by
         return await self.customer_repository.update_customer(customer_id, customer)
@@ -86,3 +97,6 @@ class CustomerService:
         customer.owner_sales_rep_id = new_owner_sales_rep_id
         customer.updated_by = reassigned_by
         return await self.customer_repository.update_customer(customer_id, customer) 
+
+    async def inactivate_customer(self, customer_id: str, inactivated_by: UUID) -> Optional[Customer]:
+        return await self.customer_repository.inactivate_customer(customer_id, inactivated_by) 
