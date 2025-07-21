@@ -36,6 +36,12 @@ class UserRepository(UserRepositoryInterface):
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
 
+    async def get_users_without_auth(self) -> List[User]:
+        """Get all users that don't have auth_user_id set"""
+        result = await self._session.execute(select(UserORM).where(UserORM.auth_user_id.is_(None)))
+        objs = result.scalars().all()
+        return [self._to_entity(obj) for obj in objs]
+
     async def create_user(self, user: User) -> User:
         obj = UserORM(
             id=user.id,
@@ -50,7 +56,8 @@ class UserRepository(UserRepositoryInterface):
             updated_at=user.updated_at,
             updated_by=user.updated_by,
             deleted_at=user.deleted_at,
-            deleted_by=user.deleted_by
+            deleted_by=user.deleted_by,
+            auth_user_id=user.auth_user_id
         )
         self._session.add(obj)
         await self._session.commit()
@@ -64,7 +71,7 @@ class UserRepository(UserRepositoryInterface):
             return None
         for field in [
             "tenant_id", "email", "full_name", "role", "status", "last_login",
-            "updated_at", "updated_by", "deleted_at", "deleted_by"
+            "updated_at", "updated_by", "deleted_at", "deleted_by", "auth_user_id"
         ]:
             setattr(obj, field, getattr(user, field))
         obj.updated_at = datetime.now()
