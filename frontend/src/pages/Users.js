@@ -270,7 +270,6 @@ const Users = () => {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Phone Number</th>
-                <th>Driver License</th>
                 <th>Status</th>
                 <th>Created</th>
               </tr>
@@ -287,7 +286,6 @@ const Users = () => {
                       </span>
                     </td>
                     <td>{user.phone_number || '-'}</td>
-                    <td>{user.driver_license_number || '-'}</td>
                     <td>
                       <span className={getStatusBadgeClass(user.is_active)}>
                         {user.is_active ? 'Active' : 'Inactive'}
@@ -298,7 +296,7 @@ const Users = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="empty-state">
+                  <td colSpan="6" className="empty-state">
                     {filters.search || filters.role ? 'No users found matching your filters.' : 'No users found.'}
                   </td>
                 </tr>
