@@ -1,100 +1,126 @@
 /* Dashboard Styles */
 .dashboard-container {
   min-height: 100vh;
-  background: #f9fafb;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 20px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-sizing: border-box;
 }
 
 .dashboard-header {
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.header-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 16px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 32px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 24px 32px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.header-content h1 {
-  font-size: 24px;
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-title {
+  font-size: 28px;
   font-weight: 700;
   color: #1f2937;
   margin: 0;
+  letter-spacing: -0.5px;
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.user-info span {
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.logout-button {
-  padding: 8px 16px;
-  background: #ef4444;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
+.page-subtitle {
+  font-size: 16px;
+  color: #2563eb;
+  margin: 4px 0 0 0;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  letter-spacing: 0.5px;
 }
 
-.logout-button:hover {
-  background: #dc2626;
-  transform: translateY(-1px);
+.dashboard-content {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.dashboard-main {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 40px 20px;
-}
-
-.dashboard-content h2 {
-  font-size: 32px;
-  font-weight: 700;
+.welcome-section h2 {
   color: #1f2937;
   margin: 0 0 16px 0;
+  font-size: 24px;
+  font-weight: 700;
 }
 
-.dashboard-content p {
-  font-size: 18px;
+.welcome-section p {
   color: #6b7280;
-  margin: 0 0 32px 0;
+  font-size: 16px;
+  line-height: 1.6;
+  margin-bottom: 24px;
 }
 
-.user-details {
-  background: white;
-  border-radius: 12px;
+.user-details,
+.quick-actions {
+  background: #f9fafb;
   padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  margin: 24px 0;
   border: 1px solid #e5e7eb;
 }
 
-.user-details h3 {
-  font-size: 20px;
-  font-weight: 600;
+.user-details h3,
+.quick-actions h3 {
   color: #1f2937;
   margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .user-details p {
-  font-size: 16px;
   color: #374151;
   margin: 8px 0;
+  font-size: 14px;
 }
 
 .user-details strong {
   color: #1f2937;
+  font-weight: 600;
+}
+
+.quick-actions p {
+  color: #6b7280;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 16px;
+  }
+
+  .dashboard-header {
+    padding: 20px;
+  }
+
+  .dashboard-content {
+    padding: 24px;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .welcome-section h2 {
+    font-size: 20px;
+  }
 }
