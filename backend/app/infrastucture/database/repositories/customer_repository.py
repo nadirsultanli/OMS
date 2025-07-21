@@ -52,7 +52,6 @@ class CustomerRepository(CustomerRepositoryInterface):
             incorporation_doc=customer.incorporation_doc,
             credit_days=customer.credit_days,
             credit_limit=customer.credit_limit,
-            sales_rep_id=customer.sales_rep_id,
             owner_sales_rep_id=customer.owner_sales_rep_id,
             created_at=customer.created_at,
             created_by=customer.created_by,
@@ -73,7 +72,7 @@ class CustomerRepository(CustomerRepositoryInterface):
             return None
         for field in [
             "tenant_id", "customer_type", "status", "name", "tax_pin", "incorporation_doc", "credit_days", "credit_limit",
-            "sales_rep_id", "owner_sales_rep_id", "updated_at", "updated_by", "deleted_at", "deleted_by"
+            "owner_sales_rep_id", "updated_at", "updated_by", "deleted_at", "deleted_by"
         ]:
             setattr(obj, field, getattr(customer, field))
         obj.updated_at = datetime.now()
@@ -172,7 +171,6 @@ class CustomerRepository(CustomerRepositoryInterface):
             incorporation_doc=obj.incorporation_doc,
             credit_days=obj.credit_days,
             credit_limit=float(obj.credit_limit) if obj.credit_limit is not None else None,
-            sales_rep_id=obj.sales_rep_id,
             owner_sales_rep_id=obj.owner_sales_rep_id,
             created_at=obj.created_at,
             created_by=obj.created_by,
