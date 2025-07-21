@@ -1,5 +1,5 @@
 import React from 'react';
-import LogoSvg from '../../assets/Logo.svg';
+import LogoSvg from '../../assets/CIRCL.svg';
 
 export const Logo = ({ className = '', size = 'md' }) => {
   const sizeClasses = {

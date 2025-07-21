@@ -18,7 +18,6 @@ import {
   Route,
   FileText
 } from 'lucide-react';
-import { Logo } from './ui/Logo';
 import { UserAvatar } from './ui/UserAvatar';
 import authService from '../services/authService';
 import './CollapsibleSidebar.css';
@@ -135,17 +134,9 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Logo/Brand Area */}
-        <div className="logo-section">
-          <div className="logo-container">
-            {(isExpanded || isMobileOpen) ? (
-              <Logo size="md" />
-            ) : (
-              <Logo size="sm" />
-            )}
-          </div>
-          {/* Mobile close button */}
-          {isMobileOpen && (
+        {/* Mobile close button */}
+        {isMobileOpen && (
+          <div className="mobile-header">
             <button
               onClick={() => setIsMobileOpen(false)}
               className="mobile-close-btn"
@@ -153,8 +144,8 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
             >
               <X className="close-icon" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Navigation Menu */}
         <nav className={`nav-menu ${showScrollbar && (isExpanded || isMobileOpen) ? 'show-scrollbar' : ''}`}>
