@@ -320,10 +320,20 @@ async def accept_invitation(
         supabase = get_supabase_client_sync()
         
         # Update the user's password using Supabase Auth
-        # For invitations, we update the password directly with the invite token
+        # For invitations, we need to set the session first, then update password
+        # Set the session using the invite token
+        session_response = supabase.auth.set_session(request.token, request.token)
+        
+        if not session_response.user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired invitation token"
+            )
+        
+        # Now update the password
         auth_response = supabase.auth.update_user({
             "password": request.password
-        }, access_token=request.token)
+        })
         
         if not auth_response.user:
             raise HTTPException(
@@ -335,7 +345,7 @@ async def accept_invitation(
         user = await user_service.get_user_by_email(auth_response.user.email)
         
         # Activate the user if they're not already active
-        if not user.is_active:
+        if user.status != UserStatus.ACTIVE:
             await user_service.activate_user(str(user.id))
         
         default_logger.info(f"Invitation accepted successfully for user: {user.id}")
@@ -389,7 +399,7 @@ async def handle_magic_link(
                 
                 # Check if user needs to set up password (first time)
                 # If user was created via invitation but hasn't set password yet
-                if not user.is_active:
+                if user.status != UserStatus.ACTIVE:
                     return {
                         "success": False,
                         "requires_password_setup": True,
@@ -405,7 +415,7 @@ async def handle_magic_link(
                         "id": str(user.id),
                         "email": user.email,
                         "role": user.role.value,
-                        "name": user.name
+                        "name": user.full_name
                     }
                 }
                 

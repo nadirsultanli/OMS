@@ -1,6 +1,40 @@
 import api from './api';
 
 class AuthService {
+  // Helper method to extract user-friendly error messages
+  extractErrorMessage(errorData) {
+    if (!errorData) {
+      return null;
+    }
+    
+    // If it's a simple string message
+    if (typeof errorData === 'string') {
+      return errorData;
+    }
+    
+    // If it's a simple object with detail
+    if (errorData.detail && typeof errorData.detail === 'string') {
+      return errorData.detail;
+    }
+    
+    // If it's FastAPI validation errors (array of error objects)
+    if (Array.isArray(errorData.detail)) {
+      const messages = errorData.detail.map(err => {
+        const field = err.loc ? err.loc.join(' -> ') : 'Field';
+        return `${field}: ${err.msg}`;
+      });
+      return messages.join(', ');
+    }
+    
+    // If it's a single validation error object
+    if (errorData.detail && typeof errorData.detail === 'object') {
+      return JSON.stringify(errorData.detail);
+    }
+    
+    // Fallback
+    return 'An error occurred';
+  }
+
   // Login function
   async login(email, password) {
     try {
@@ -34,7 +68,7 @@ class AuthService {
       console.error('Login error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Login failed. Please try again.'
+        error: this.extractErrorMessage(error.response?.data) || 'Login failed. Please try again.'
       };
     }
   }
@@ -86,7 +120,7 @@ class AuthService {
       console.error('Forgot password error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to send password reset instructions. Please try again.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to send password reset instructions. Please try again.'
       };
     }
   }
@@ -108,7 +142,7 @@ class AuthService {
       console.error('Reset password error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to reset password. Please try again.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to reset password. Please try again.'
       };
     }
   }
@@ -130,7 +164,7 @@ class AuthService {
       console.error('Accept invitation error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Failed to accept invitation. Please try again.'
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to accept invitation. Please try again.'
       };
     }
   }
