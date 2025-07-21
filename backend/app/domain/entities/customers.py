@@ -1,99 +1,101 @@
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass
 from enum import Enum
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 from datetime import datetime
 from typing import Optional
 
-class CustomerStatus(Enum):
+class CustomerStatus(str, Enum):
+    PENDING = "pending"
     ACTIVE = "active"
+    REJECTED = "rejected"
     INACTIVE = "inactive"
+
+class CustomerType(str, Enum):
+    CASH = "cash"
+    CREDIT = "credit"
 
 @dataclass
 class Customer:
     id: UUID
-    full_name: str
-    tax_id: Optional[str] 
-    phone_number: str
-    email: str
-    credit_terms_day: int
+    tenant_id: UUID
+    customer_type: CustomerType
     status: CustomerStatus
+    name: str
+    tax_pin: Optional[str]
+    incorporation_doc: Optional[str]
+    credit_days: Optional[int]
+    credit_limit: Optional[float]
+    sales_rep_id: Optional[UUID]
+    owner_sales_rep_id: Optional[UUID]
     created_at: datetime
+    created_by: Optional[UUID]
     updated_at: datetime
+    updated_by: Optional[UUID]
+    deleted_at: Optional[datetime]
+    deleted_by: Optional[UUID]
 
-    def __post_init__(self):
-        if isinstance(self.created_at, str):
-            self.created_at = datetime.fromisoformat(self.created_at)
-        if isinstance(self.updated_at, str):
-            self.updated_at = datetime.fromisoformat(self.updated_at)
-        if isinstance(self.status, str):
-            self.status = CustomerStatus(self.status)
-        
-    def update(self, full_name: Optional[str] = None, email: Optional[str] = None, 
-               phone_number: Optional[str] = None, tax_id: Optional[str] = None,
-               credit_terms_day: Optional[int] = None, status: Optional[CustomerStatus] = None):
-        if full_name:
-            self.full_name = full_name
-        if email:
-            self.email = email
-        if phone_number:
-            self.phone_number = phone_number
-        if tax_id:
-            self.tax_id = tax_id
-        if credit_terms_day:
-            self.credit_terms_day = credit_terms_day
-        if status:
-            self.status = status
-        self.updated_at = datetime.now()
-        
-    def activate(self):
-        """Activate the customer"""
-        self.status = CustomerStatus.ACTIVE
-        self.updated_at = datetime.now()
-        
-    def deactivate(self):
-        """Deactivate the customer"""
-        self.status = CustomerStatus.INACTIVE
-        self.updated_at = datetime.now()
-        
     @staticmethod
-    def create(full_name: str, email: str, phone_number: str, 
-               tax_id: Optional[str] = None, credit_terms_day: int = 30) -> "Customer":
+    def create(tenant_id: UUID, customer_type: CustomerType, name: str, created_by: Optional[UUID] = None, **kwargs) -> "Customer":
         now = datetime.now()
         return Customer(
             id=uuid4(),
-            full_name=full_name,
-            email=email,
-            phone_number=phone_number,
-            tax_id=tax_id,
-            credit_terms_day=credit_terms_day,
-            status=CustomerStatus.ACTIVE,  # Default to active
+            tenant_id=tenant_id,
+            customer_type=customer_type,
+            status=CustomerStatus.PENDING,
+            name=name,
+            tax_pin=kwargs.get("tax_pin"),
+            incorporation_doc=kwargs.get("incorporation_doc"),
+            credit_days=kwargs.get("credit_days"),
+            credit_limit=kwargs.get("credit_limit"),
+            sales_rep_id=kwargs.get("sales_rep_id"),
+            owner_sales_rep_id=kwargs.get("owner_sales_rep_id"),
             created_at=now,
-            updated_at=now
+            created_by=created_by,
+            updated_at=now,
+            updated_by=created_by,
+            deleted_at=None,
+            deleted_by=None
         )
 
     def to_dict(self) -> dict:
         return {
             "id": str(self.id),
-            "full_name": self.full_name,
-            "email": self.email,
-            "phone_number": self.phone_number,
-            "tax_id": self.tax_id,
-            "credit_terms_day": self.credit_terms_day,
+            "tenant_id": str(self.tenant_id),
+            "customer_type": self.customer_type.value,
             "status": self.status.value,
+            "name": self.name,
+            "tax_pin": self.tax_pin,
+            "incorporation_doc": self.incorporation_doc,
+            "credit_days": self.credit_days,
+            "credit_limit": self.credit_limit,
+            "sales_rep_id": str(self.sales_rep_id) if self.sales_rep_id else None,
+            "owner_sales_rep_id": str(self.owner_sales_rep_id) if self.owner_sales_rep_id else None,
             "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat()
+            "created_by": str(self.created_by) if self.created_by else None,
+            "updated_at": self.updated_at.isoformat(),
+            "updated_by": str(self.updated_by) if self.updated_by else None,
+            "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
+            "deleted_by": str(self.deleted_by) if self.deleted_by else None
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "Customer":
         return cls(
             id=UUID(data["id"]),
-            full_name=data["full_name"],
-            email=data["email"],
-            phone_number=data["phone_number"],
-            tax_id=data.get("tax_id"),
-            credit_terms_day=data["credit_terms_day"],
-            status=data.get("status", CustomerStatus.ACTIVE.value),
+            tenant_id=UUID(data["tenant_id"]),
+            customer_type=CustomerType(data["customer_type"]),
+            status=CustomerStatus(data["status"]),
+            name=data["name"],
+            tax_pin=data.get("tax_pin"),
+            incorporation_doc=data.get("incorporation_doc"),
+            credit_days=data.get("credit_days"),
+            credit_limit=float(data["credit_limit"]) if data.get("credit_limit") is not None else None,
+            sales_rep_id=UUID(data["sales_rep_id"]) if data.get("sales_rep_id") else None,
+            owner_sales_rep_id=UUID(data["owner_sales_rep_id"]) if data.get("owner_sales_rep_id") else None,
             created_at=datetime.fromisoformat(data["created_at"]),
+            created_by=UUID(data["created_by"]) if data.get("created_by") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]),
+            updated_by=UUID(data["updated_by"]) if data.get("updated_by") else None,
+            deleted_at=datetime.fromisoformat(data["deleted_at"]) if data.get("deleted_at") else None,
+            deleted_by=UUID(data["deleted_by"]) if data.get("deleted_by") else None
         )

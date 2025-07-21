@@ -1,5 +1,5 @@
 from typing import Optional, List
-from app.domain.entities.customers import Customer, CustomerStatus
+from app.domain.entities.customers import Customer, CustomerStatus, CustomerType
 from app.domain.repositories.customer_repository import CustomerRepository as CustomerRepositoryInterface
 from app.infrastucture.database.models.customers import Customer as CustomerORM
 from sqlalchemy.future import select
@@ -8,51 +8,58 @@ from uuid import UUID
 from datetime import datetime
 
 class CustomerRepository(CustomerRepositoryInterface):
-    """Customer repository using direct SQLAlchemy connection"""
     def __init__(self, session: AsyncSession):
         self._session = session
 
     async def get_by_id(self, customer_id: str) -> Optional[Customer]:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
         obj = result.scalar_one_or_none()
         return self._to_entity(obj) if obj else None
 
     async def get_by_email(self, email: str) -> Optional[Customer]:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.email == email))
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.email == email, CustomerORM.deleted_at == None))
         obj = result.scalar_one_or_none()
         return self._to_entity(obj) if obj else None
 
-    async def get_by_tax_id(self, tax_id: str) -> Optional[Customer]:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.tax_id == tax_id))
+    async def get_by_tax_id(self, tax_pin: str) -> Optional[Customer]:
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.tax_pin == tax_pin, CustomerORM.deleted_at == None))
         obj = result.scalar_one_or_none()
         return self._to_entity(obj) if obj else None
 
     async def get_all(self, limit: int = 100, offset: int = 0) -> List[Customer]:
-        result = await self._session.execute(select(CustomerORM).offset(offset).limit(limit))
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.deleted_at == None).offset(offset).limit(limit))
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
 
     async def get_active_customers(self) -> List[Customer]:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.status == "active"))
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.status == CustomerStatus.ACTIVE.value, CustomerORM.deleted_at == None))
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
 
     async def get_by_status(self, status: CustomerStatus) -> List[Customer]:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.status == status.value))
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.status == status.value, CustomerORM.deleted_at == None))
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
 
     async def create_customer(self, customer: Customer) -> Customer:
         obj = CustomerORM(
             id=customer.id,
-            full_name=customer.full_name,
-            email=customer.email,
-            phone_number=customer.phone_number,
-            tax_id=customer.tax_id,
-            credit_terms_day=customer.credit_terms_day,
+            tenant_id=customer.tenant_id,
+            customer_type=customer.customer_type.value,
             status=customer.status.value,
+            name=customer.name,
+            tax_pin=customer.tax_pin,
+            incorporation_doc=customer.incorporation_doc,
+            credit_days=customer.credit_days,
+            credit_limit=customer.credit_limit,
+            sales_rep_id=customer.sales_rep_id,
+            owner_sales_rep_id=customer.owner_sales_rep_id,
             created_at=customer.created_at,
-            updated_at=customer.updated_at
+            created_by=customer.created_by,
+            updated_at=customer.updated_at,
+            updated_by=customer.updated_by,
+            deleted_at=customer.deleted_at,
+            deleted_by=customer.deleted_by
         )
         self._session.add(obj)
         await self._session.commit()
@@ -60,43 +67,47 @@ class CustomerRepository(CustomerRepositoryInterface):
         return self._to_entity(obj)
 
     async def update_customer(self, customer_id: str, customer: Customer) -> Optional[Customer]:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
         obj = result.scalar_one_or_none()
         if not obj:
             return None
-        for field in ["full_name", "email", "phone_number", "tax_id", "credit_terms_day", "status", "updated_at"]:
+        for field in [
+            "tenant_id", "customer_type", "status", "name", "tax_pin", "incorporation_doc", "credit_days", "credit_limit",
+            "sales_rep_id", "owner_sales_rep_id", "updated_at", "updated_by", "deleted_at", "deleted_by"
+        ]:
             setattr(obj, field, getattr(customer, field))
         obj.updated_at = datetime.now()
         await self._session.commit()
         await self._session.refresh(obj)
         return self._to_entity(obj)
 
-    async def delete_customer(self, customer_id: str) -> bool:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+    async def delete_customer(self, customer_id: str, deleted_by: Optional[UUID] = None) -> bool:
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
         obj = result.scalar_one_or_none()
         if not obj:
             return False
-        await self._session.delete(obj)
+        obj.deleted_at = datetime.now()
+        obj.deleted_by = deleted_by
         await self._session.commit()
         return True
 
     async def activate_customer(self, customer_id: str) -> Optional[Customer]:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
         obj = result.scalar_one_or_none()
         if not obj:
             return None
-        obj.status = "active"
+        obj.status = CustomerStatus.ACTIVE.value
         obj.updated_at = datetime.now()
         await self._session.commit()
         await self._session.refresh(obj)
         return self._to_entity(obj)
 
     async def deactivate_customer(self, customer_id: str) -> Optional[Customer]:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
         obj = result.scalar_one_or_none()
         if not obj:
             return None
-        obj.status = "inactive"
+        obj.status = CustomerStatus.INACTIVE.value
         obj.updated_at = datetime.now()
         await self._session.commit()
         await self._session.refresh(obj)
@@ -105,12 +116,20 @@ class CustomerRepository(CustomerRepositoryInterface):
     def _to_entity(self, obj: CustomerORM) -> Customer:
         return Customer(
             id=obj.id,
-            full_name=obj.full_name,
-            email=obj.email,
-            phone_number=obj.phone_number,
-            tax_id=obj.tax_id,
-            credit_terms_day=obj.credit_terms_day,
+            tenant_id=obj.tenant_id,
+            customer_type=CustomerType(obj.customer_type),
             status=CustomerStatus(obj.status),
+            name=obj.name,
+            tax_pin=obj.tax_pin,
+            incorporation_doc=obj.incorporation_doc,
+            credit_days=obj.credit_days,
+            credit_limit=float(obj.credit_limit) if obj.credit_limit is not None else None,
+            sales_rep_id=obj.sales_rep_id,
+            owner_sales_rep_id=obj.owner_sales_rep_id,
             created_at=obj.created_at,
-            updated_at=obj.updated_at
+            created_by=obj.created_by,
+            updated_at=obj.updated_at,
+            updated_by=obj.updated_by,
+            deleted_at=obj.deleted_at,
+            deleted_by=obj.deleted_by
         ) 

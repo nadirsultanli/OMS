@@ -1,5 +1,5 @@
 from typing import Optional, List
-from app.domain.entities.users import User, UserRole
+from app.domain.entities.users import User, UserRoleType, UserStatus
 from app.domain.repositories.user_repository import UserRepository
 from app.domain.exceptions.users import (
     UserNotFoundError,
@@ -11,8 +11,9 @@ from app.domain.exceptions.users import (
 )
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import get_supabase_admin_client_sync
-from app.infrastucture.tasks import send_verification_email_task
 from decouple import config
+from uuid import UUID
+from datetime import datetime
 
 
 class UserService:
@@ -43,12 +44,11 @@ class UserService:
         """Get all active users"""
         return await self.user_repository.get_active_users()
     
-    async def get_users_by_role(self, role: UserRole) -> List[User]:
+    async def get_users_by_role(self, role: UserRoleType) -> List[User]:
         """Get users by role"""
         return await self.user_repository.get_by_role(role)
     
-    async def create_user(self, email: str, role: UserRole, name: Optional[str] = None, 
-                         phone_number: Optional[str] = None, driver_license_number: Optional[str] = None) -> User:
+    async def create_user(self, email: str, full_name: str, role: UserRoleType, tenant_id: str, created_by: Optional[str] = None) -> User:
         """Create a new user with Supabase Auth integration"""
         try:
             # Check if user already exists in our database
@@ -64,13 +64,12 @@ class UserService:
             import string
             password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
             
-            # Create user in Supabase Auth
+            # Create user in Supabase Auth (Supabase will send verification email automatically)
             auth_response = supabase.auth.admin.create_user({
                 "email": email,
                 "password": password,
-                "email_confirm": True,
                 "user_metadata": {
-                    "name": name,
+                    "full_name": full_name,
                     "role": role.value
                 }
             })
@@ -84,70 +83,60 @@ class UserService:
             # Create user in our database with the auth_user_id
             user = User.create(
                 email=email, 
-                role=role, 
-                name=name, 
-                auth_user_id=auth_user_id,
-                phone_number=phone_number,
-                driver_license_number=driver_license_number
+                full_name=full_name,
+                role=role,
+                tenant_id=UUID(tenant_id),
+                created_by=UUID(created_by) if created_by else None
             )
             created_user = await self.user_repository.create_user(user)
             
-            # Send verification email
-            from app.infrastucture.tasks.send_verification_email_task import send_verification_email_task
-            from decouple import config
-            
-            # Get frontend URL based on role
-            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
-            
-            # Queue the verification email task
-            task_result = send_verification_email_task.delay(
-                email=email,
-                user_name=name or email,
-                user_id=str(created_user.id),
-                role=role.value,
-                frontend_url=frontend_url
-            )
-            
             default_logger.info(
-                f"User created successfully and verification email queued", 
+                f"User created successfully (Supabase will send verification email)", 
                 user_id=str(created_user.id), 
-                auth_user_id=str(auth_user_id),
-                email=email,
-                task_id=task_result.id
+                email=email
             )
             return created_user
             
         except UserAlreadyExistsError:
             raise
         except Exception as e:
-            default_logger.error(f"Failed to create user: {str(e)}", email=email)
+            import traceback
+            default_logger.error(f"Failed to create user: {str(e)}\n{traceback.format_exc()}", email=email)
             raise UserCreationError(f"Failed to create user: {str(e)}", email=email)
     
-    async def update_user(self, user_id: str, name: Optional[str] = None, 
-                         role: Optional[UserRole] = None, email: Optional[str] = None,
-                         phone_number: Optional[str] = None, driver_license_number: Optional[str] = None) -> User:
+    async def update_user(self, user_id: str, full_name: Optional[str] = None, 
+                         role: Optional[UserRoleType] = None, email: Optional[str] = None) -> User:
         """Update user with validation"""
         try:
             # Get existing user
             existing_user = await self.get_user_by_id(user_id)
-            
             # Check if new email already exists (if email is being changed)
             if email and email != existing_user.email:
                 email_user = await self.user_repository.get_by_email(email)
                 if email_user:
                     raise UserAlreadyExistsError(email=email)
-            
-            # Update user
-            existing_user.update(name=name, role=role, email=email, 
-                               phone_number=phone_number, driver_license_number=driver_license_number)
-            updated_user = await self.user_repository.update_user(user_id, existing_user)
-            
+            # Create a new User instance with updated fields
+            updated_user_obj = User(
+                id=existing_user.id,
+                tenant_id=existing_user.tenant_id,
+                email=email if email is not None else existing_user.email,
+                full_name=full_name if full_name is not None else existing_user.full_name,
+                role=role if role is not None else existing_user.role,
+                status=existing_user.status,
+                last_login=existing_user.last_login,
+                created_at=existing_user.created_at,
+                created_by=existing_user.created_by,
+                updated_at=datetime.now(),
+                updated_by=existing_user.updated_by,
+                deleted_at=existing_user.deleted_at,
+                deleted_by=existing_user.deleted_by,
+                auth_user_id=existing_user.auth_user_id
+            )
+            updated_user = await self.user_repository.update_user(user_id, updated_user_obj)
             if not updated_user:
                 raise UserUpdateError("Failed to update user", user_id)
-            
             default_logger.info(f"User updated successfully", user_id=user_id)
             return updated_user
-            
         except (UserNotFoundError, UserAlreadyExistsError):
             raise
         except Exception as e:
@@ -158,36 +147,32 @@ class UserService:
         """Activate user"""
         try:
             user = await self.get_user_by_id(user_id)
-            if user.is_active:
+            if user.status == UserStatus.ACTIVE:
                 return user  # Already active
-            
-            activated_user = await self.user_repository.activate_user(user_id)
-            if not activated_user:
+            user.status = UserStatus.ACTIVE
+            updated_user = await self.user_repository.update_user(user_id, user)
+            if not updated_user:
                 raise UserUpdateError("Failed to activate user", user_id)
-            
             default_logger.info(f"User activated successfully", user_id=user_id)
-            return activated_user
-            
+            return updated_user
         except UserNotFoundError:
             raise
         except Exception as e:
             default_logger.error(f"Failed to activate user: {str(e)}", user_id=user_id)
             raise UserUpdateError(f"Database error: {str(e)}", user_id)
-    
+
     async def deactivate_user(self, user_id: str) -> User:
         """Deactivate user"""
         try:
             user = await self.get_user_by_id(user_id)
-            if not user.is_active:
-                return user  # Already inactive
-            
-            deactivated_user = await self.user_repository.deactivate_user(user_id)
+            if user.status == UserStatus.DEACTIVATED:
+                return user  # Already deactivated
+            user.status = UserStatus.DEACTIVATED
+            deactivated_user = await self.user_repository.update_user(user_id, user)
             if not deactivated_user:
                 raise UserUpdateError("Failed to deactivate user", user_id)
-            
             default_logger.info(f"User deactivated successfully", user_id=user_id)
             return deactivated_user
-            
         except UserNotFoundError:
             raise
         except Exception as e:
@@ -226,6 +211,6 @@ class UserService:
     async def validate_user_active(self, user_id: str) -> User:
         """Validate that user exists and is active"""
         user = await self.get_user_by_id(user_id)
-        if not user.is_active:
+        if user.status != UserStatus.ACTIVE:
             raise UserInactiveError(user_id)
         return user 
