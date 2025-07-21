@@ -112,6 +112,28 @@ class AuthService {
       };
     }
   }
+
+  // Accept invitation with token and set password
+  async acceptInvitation(token, password, confirmPassword) {
+    try {
+      const response = await api.post('/api/v1/auth/accept-invitation', {
+        token,
+        password,
+        confirm_password: confirmPassword
+      });
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Accept invitation error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Failed to accept invitation. Please try again.'
+      };
+    }
+  }
 }
 
 export default new AuthService();

@@ -1,3 +1,7 @@
+# DEPRECATED: This task is no longer used as we've migrated to Supabase's built-in email functionality
+# User invitation emails are now handled by Supabase Auth's invite_user_by_email() method
+# This file is kept for reference but should not be used in new code
+
 import secrets
 from app.infrastucture.logs.logger import default_logger
 from decouple import config

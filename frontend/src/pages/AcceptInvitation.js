@@ -5,18 +5,19 @@ import PasswordSetupForm from '../components/PasswordSetupForm';
 import Logo from '../assets/Logo.svg';
 import './Verification.css'; // Reuse the same styles
 
-const PasswordReset = () => {
+const AcceptInvitation = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [token, setToken] = useState('');
+  const [userEmail, setUserEmail] = useState('');
 
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     // Extract token from URL parameters
-    // Supabase sends password reset links with 'access_token' and 'type=recovery'
+    // Supabase sends invite links with 'access_token' and 'type=invite'
     const urlParams = new URLSearchParams(location.search);
     const accessToken = urlParams.get('access_token');
     const type = urlParams.get('type');
@@ -26,8 +27,8 @@ const PasswordReset = () => {
     const hashAccessToken = hashParams.get('access_token');
     const hashType = hashParams.get('type');
     
-    console.log('Password reset URL search params:', location.search);
-    console.log('Password reset URL hash params:', location.hash);
+    console.log('Invitation URL search params:', location.search);
+    console.log('Invitation URL hash params:', location.hash);
     console.log('Access token from search:', accessToken);
     console.log('Access token from hash:', hashAccessToken);
     console.log('Type from search:', type);
@@ -37,12 +38,26 @@ const PasswordReset = () => {
     const finalToken = accessToken || hashAccessToken;
     const finalType = type || hashType;
     
-    // Set the token if it exists and type is recovery
-    if (finalToken && finalType === 'recovery') {
+    // Set the token if it exists and type is invite
+    if (finalToken && finalType === 'invite') {
       setToken(finalToken);
-      console.log('Password reset token set successfully:', finalToken);
+      console.log('Invitation token set successfully:', finalToken);
+      
+      // Try to decode the token to get user email (optional, for display)
+      try {
+        const tokenParts = finalToken.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(atob(tokenParts[1]));
+          if (payload.email) {
+            setUserEmail(payload.email);
+          }
+        }
+      } catch (e) {
+        console.log('Could not decode token for email extraction:', e);
+      }
     } else {
-      console.warn('No valid password reset token found. Expected type=recovery with access_token.');
+      console.warn('No valid invitation token found. Expected type=invite with access_token.');
+      setErrors({ general: 'Invalid invitation link. Please check your email for the correct invitation link.' });
     }
   }, [location]);
 
@@ -52,25 +67,26 @@ const PasswordReset = () => {
     
     // Check if token exists
     if (!token) {
-      setErrors({ general: 'No reset token found. Please use the link from your email or request a new password reset.' });
+      setErrors({ general: 'No invitation token found. Please use the link from your invitation email.' });
       return;
     }
     
     setIsLoading(true);
-    console.log('Submitting password reset with token:', token);
+    console.log('Accepting invitation with token:', token);
     
     try {
-      const result = await authService.resetPassword(token, password, confirmPassword);
-      console.log('Reset password result:', result);
+      const result = await authService.acceptInvitation(token, password, confirmPassword);
+      console.log('Accept invitation result:', result);
       
       if (result.success) {
-        setMessage('Password reset successfully! Redirecting to login...');
+        setMessage('Account setup completed successfully! Redirecting to login...');
         
         // Redirect to login page after 2 seconds
         setTimeout(() => {
           navigate('/login', { 
             state: { 
-              message: 'Password reset successfully! You can now login with your new password.' 
+              message: 'Account setup completed! You can now login with your credentials.',
+              email: userEmail
             }
           });
         }, 2000);
@@ -78,14 +94,14 @@ const PasswordReset = () => {
         setErrors({ general: result.error });
       }
     } catch (error) {
-      console.error('Reset password catch error:', error);
-      setErrors({ general: 'An unexpected error occurred. Please try again.' });
+      console.error('Accept invitation catch error:', error);
+      setErrors({ general: 'An unexpected error occurred. Please try again or contact support.' });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRequestNewReset = () => {
+  const handleBackToLogin = () => {
     navigate('/login');
   };
 
@@ -113,16 +129,16 @@ const PasswordReset = () => {
           onSubmit={handlePasswordSubmit}
           isLoading={isLoading}
           errors={errors}
-          title="Reset Your Password"
-          description="Create a new secure password for your account"
-          buttonText="Reset Password"
-          loadingText="Resetting Password..."
+          title="Welcome to LPG-OMS"
+          description={userEmail ? `Set up your password for ${userEmail}` : 'Set up your password to complete your account'}
+          buttonText="Complete Account Setup"
+          loadingText="Setting Up Account..."
         />
 
         <div className="back-to-login">
           <button
             type="button"
-            onClick={handleRequestNewReset}
+            onClick={handleBackToLogin}
             className="link-button"
             disabled={isLoading}
           >
@@ -134,4 +150,4 @@ const PasswordReset = () => {
   );
 };
 
-export default PasswordReset;
+export default AcceptInvitation;
