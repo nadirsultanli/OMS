@@ -15,3 +15,5 @@ celery
 SQLAlchemy
 asyncpg
 psycopg2-binary
+geoalchemy2[shapely]
+shapely

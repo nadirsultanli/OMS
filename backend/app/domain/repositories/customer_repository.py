@@ -76,3 +76,8 @@ class CustomerRepository(ABC):
     async def reassign_owner(self, customer_id: str, new_owner_sales_rep_id: UUID, reassigned_by: UUID) -> Optional[Customer]:
         """Reassign owner"""
         pass 
+
+    @abstractmethod
+    async def inactivate_customer(self, customer_id: str, inactivated_by: UUID) -> Optional[Customer]:
+        """Inactivate customer"""
+        pass 

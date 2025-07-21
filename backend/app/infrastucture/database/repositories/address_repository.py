@@ -6,6 +6,8 @@ from sqlalchemy import update as sa_update
 from app.domain.entities.addresses import Address, AddressType
 from app.domain.repositories.address_repository import AddressRepository as AddressRepositoryInterface
 from datetime import datetime
+from geoalchemy2.elements import WKTElement
+from geoalchemy2.shape import to_shape
 
 # You will need to create the ORM model for Address in models/addresses.py
 from app.infrastucture.database.models.adresses import Address as AddressORM
@@ -30,6 +32,22 @@ class AddressRepository(AddressRepositoryInterface):
         return [self._to_entity(obj) for obj in objs]
 
     async def create_address(self, address: Address) -> Address:
+        coordinates = None
+        if address.coordinates is not None:
+            coordinates = WKTElement(address.coordinates, srid=4326)
+        # Unset other defaults if this address is default
+        if address.is_default:
+            await self._session.execute(
+                sa_update(AddressORM)
+                .where(
+                    AddressORM.tenant_id == address.tenant_id,
+                    AddressORM.customer_id == address.customer_id,
+                    AddressORM.address_type == address.address_type.value,
+                    AddressORM.is_default == True,
+                    AddressORM.deleted_at == None
+                )
+                .values(is_default=False)
+            )
         obj = AddressORM(
             id=address.id,
             tenant_id=address.tenant_id,
@@ -41,7 +59,7 @@ class AddressRepository(AddressRepositoryInterface):
             updated_by=address.updated_by,
             deleted_at=address.deleted_at,
             deleted_by=address.deleted_by,
-            coordinates=address.coordinates,
+            coordinates=coordinates,
             is_default=address.is_default,
             street=address.street,
             city=address.city,
@@ -63,7 +81,10 @@ class AddressRepository(AddressRepositoryInterface):
         for field in [
             "tenant_id", "customer_id", "address_type", "coordinates", "is_default", "street", "city", "state", "zip_code", "country", "access_instructions", "updated_at", "updated_by", "deleted_at", "deleted_by"
         ]:
-            setattr(obj, field, getattr(address, field))
+            if field == "coordinates" and getattr(address, field) is not None:
+                setattr(obj, field, WKTElement(getattr(address, field), srid=4326))
+            else:
+                setattr(obj, field, getattr(address, field))
         obj.updated_at = datetime.now()
         await self._session.commit()
         await self._session.refresh(obj)
@@ -99,6 +120,9 @@ class AddressRepository(AddressRepositoryInterface):
         return True
 
     def _to_entity(self, obj: AddressORM) -> Address:
+        coordinates = None
+        if obj.coordinates is not None:
+            coordinates = to_shape(obj.coordinates).wkt
         return Address(
             id=obj.id,
             tenant_id=obj.tenant_id,
@@ -110,7 +134,7 @@ class AddressRepository(AddressRepositoryInterface):
             updated_by=obj.updated_by,
             deleted_at=obj.deleted_at,
             deleted_by=obj.deleted_by,
-            coordinates=obj.coordinates,
+            coordinates=coordinates,
             is_default=obj.is_default,
             street=obj.street,
             city=obj.city,

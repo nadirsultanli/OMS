@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import UUID as SAUUID
 from .base import Base
 import uuid
 from enum import Enum
+from geoalchemy2 import Geography
 
 class AddressType(str, Enum):
     BILLING = "billing"
@@ -20,7 +21,7 @@ class Address(Base):
     updated_by = Column(SAUUID(as_uuid=True), nullable=True)
     deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
     deleted_by = Column(SAUUID(as_uuid=True), nullable=True)
-    coordinates = Column(String, nullable=True)  # Store as WKT or GeoJSON string
+    coordinates = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)  # Store as WKT or GeoJSON string
     is_default = Column(Boolean, nullable=False, server_default=text("false"))
     street = Column(String, nullable=False)
     city = Column(String, nullable=False)
