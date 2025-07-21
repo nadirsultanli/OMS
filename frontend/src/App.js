@@ -4,7 +4,9 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Verification from './pages/Verification';
 import PasswordReset from './pages/PasswordReset';
+import Users from './pages/Users';
 import ProtectedRoute from './components/ProtectedRoute';
+import Layout from './components/Layout';
 import authService from './services/authService';
 import './App.css';
 
@@ -44,7 +46,19 @@ function App() {
             path="/dashboard" 
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/users" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Users />
+                </Layout>
               </ProtectedRoute>
             } 
           />
