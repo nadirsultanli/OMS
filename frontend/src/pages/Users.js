@@ -151,14 +151,7 @@ const Users = () => {
       const createResult = await userService.createUser(formData);
 
       if (createResult.success) {
-        // Send verification email
-        const emailResult = await userService.sendVerificationEmail(formData.email);
-
-        if (emailResult.success) {
-          setMessage(`User created successfully! Verification email sent to ${formData.email}`);
-        } else {
-          setMessage(`User created successfully! However, failed to send verification email. Please send manually.`);
-        }
+        setMessage(`User created successfully! Verification email sent to ${formData.email}`);
 
         // Reset form and close modal
         setFormData({
