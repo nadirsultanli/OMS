@@ -26,7 +26,63 @@ const Login = () => {
       // Clear the state to prevent showing message on refresh
       window.history.replaceState({}, document.title);
     }
+
+    // Handle magic link authentication
+    const urlParams = new URLSearchParams(location.search);
+    const hashParams = new URLSearchParams(location.hash.substring(1));
+    
+    const accessToken = urlParams.get('access_token') || hashParams.get('access_token');
+    const type = urlParams.get('type') || hashParams.get('type');
+    
+    if (accessToken && type === 'magiclink') {
+      console.log('Magic link detected, processing authentication...');
+      handleMagicLinkAuth(accessToken);
+    }
   }, [location]);
+
+  const handleMagicLinkAuth = async (token) => {
+    try {
+      setIsLoading(true);
+      
+      // Process the magic link token through your backend
+      const response = await fetch('/api/v1/auth/magic-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // Store the authentication data
+        localStorage.setItem('accessToken', result.access_token);
+        localStorage.setItem('refreshToken', result.refresh_token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        
+        // Redirect to dashboard
+        navigate('/dashboard', { replace: true });
+      } else {
+        // If this is a first-time user (invitation scenario), redirect to password setup
+        if (result.requires_password_setup) {
+          navigate('/accept-invitation', { 
+            state: { 
+              token: token,
+              email: result.email 
+            }
+          });
+        } else {
+          setErrors({ general: result.error || 'Authentication failed' });
+        }
+      }
+    } catch (error) {
+      console.error('Magic link authentication error:', error);
+      setErrors({ general: 'Failed to process authentication link' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

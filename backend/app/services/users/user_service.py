@@ -11,7 +11,6 @@ from app.domain.exceptions.users import (
 )
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import get_supabase_admin_client_sync
-from app.infrastucture.tasks import send_verification_email_task
 from decouple import config
 
 
@@ -59,21 +58,25 @@ class UserService:
             # Create Supabase Auth user first
             supabase = get_supabase_admin_client_sync()
             
-            # Generate a random password
-            import secrets
-            import string
-            password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+            # Use Supabase's invite user functionality which will send an email
+            # The user will receive an invite email from Supabase with a link to set their password
+            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
             
-            # Create user in Supabase Auth
-            auth_response = supabase.auth.admin.create_user({
-                "email": email,
-                "password": password,
-                "email_confirm": True,
-                "user_metadata": {
+            # Configure redirect URL based on role
+            if role.value.lower() == "driver":
+                driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                redirect_url = f"{driver_frontend_url}/accept-invitation"
+            else:
+                redirect_url = f"{frontend_url}/accept-invitation"
+            
+            auth_response = supabase.auth.admin.invite_user_by_email(
+                email=email,
+                data={
                     "name": name,
                     "role": role.value
-                }
-            })
+                },
+                redirect_to=redirect_url
+            )
             
             if not auth_response.user:
                 raise UserCreationError("Failed to create Supabase Auth user", email=email)
@@ -92,28 +95,11 @@ class UserService:
             )
             created_user = await self.user_repository.create_user(user)
             
-            # Send verification email
-            from app.infrastucture.tasks.send_verification_email_task import send_verification_email_task
-            from decouple import config
-            
-            # Get frontend URL based on role
-            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
-            
-            # Queue the verification email task
-            task_result = send_verification_email_task.delay(
-                email=email,
-                user_name=name or email,
-                user_id=str(created_user.id),
-                role=role.value,
-                frontend_url=frontend_url
-            )
-            
             default_logger.info(
-                f"User created successfully and verification email queued", 
+                f"User created successfully and invite email sent via Supabase", 
                 user_id=str(created_user.id), 
                 auth_user_id=str(auth_user_id),
-                email=email,
-                task_id=task_result.id
+                email=email
             )
             return created_user
             
