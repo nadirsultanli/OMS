@@ -23,6 +23,7 @@ from app.presentation.schemas.users.password_reset_schemas import (
 from app.services.dependencies.users import get_user_service
 from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
 from decouple import config
+from app.domain.entities.users import UserStatus
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -53,7 +54,7 @@ async def signup(
         user = await user_service.create_user(
             email=request.email,
             role=request.role,
-            name=request.name,
+            name=request.full_name,
             password=request.password
         )
         
@@ -65,7 +66,7 @@ async def signup(
             user_id=str(user.id),
             email=user.email,
             role=user.role.value,
-            name=user.name
+            full_name=user.full_name
         )
         
     except HTTPException:
@@ -127,7 +128,7 @@ async def login(
             user_id=str(user.id),
             email=user.email,
             role=user.role.value,
-            name=user.name
+            full_name=user.full_name
         )
         
     except HTTPException:
@@ -205,7 +206,7 @@ async def forgot_password(
     request: ForgotPasswordRequest,
     user_service: UserService = Depends(get_user_service)
 ):
-    """Send password reset email if user exists"""
+    """Send password reset email if user exists (Supabase will send email automatically)"""
     try:
         # Check if user exists in our database
         try:
@@ -218,7 +219,7 @@ async def forgot_password(
             )
         
         # Check if user is active
-        if not user.is_active:
+        if user.status != UserStatus.ACTIVE:
             default_logger.info(f"Password reset requested for inactive user: {request.email}")
             return ForgotPasswordResponse(
                 message="If an account with this email exists, a password reset link has been sent."
@@ -283,7 +284,7 @@ async def reset_password(
         user = await user_service.get_user_by_email(auth_response.user.email)
         
         # Check if user is active
-        if not user.is_active:
+        if user.status != UserStatus.ACTIVE:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Account is inactive"

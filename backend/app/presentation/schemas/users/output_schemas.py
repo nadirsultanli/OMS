@@ -1,25 +1,27 @@
 from pydantic import BaseModel
 from typing import Optional, List
-
+from app.domain.entities.users import UserRoleType, UserStatus
 
 class UserResponse(BaseModel):
     id: str
+    tenant_id: str
     email: str
-    name: Optional[str]
-    role: str
-    is_active: bool
+    full_name: str
+    role: UserRoleType
+    status: UserStatus
+    last_login: Optional[str]
     created_at: str
+    created_by: Optional[str]
     updated_at: str
-    phone_number: Optional[str]
-    driver_license_number: Optional[str]
-
+    updated_by: Optional[str]
+    deleted_at: Optional[str]
+    deleted_by: Optional[str]
 
 class UserListResponse(BaseModel):
     users: List[UserResponse]
     total: int
     limit: int
     offset: int
-
 
 class LoginResponse(BaseModel):
     access_token: str
@@ -28,8 +30,7 @@ class LoginResponse(BaseModel):
     user_id: str
     email: str
     role: str
-    name: Optional[str]
-
+    full_name: Optional[str]
 
 class RefreshTokenResponse(BaseModel):
     access_token: str

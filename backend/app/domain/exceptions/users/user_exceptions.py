@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
-from app.domain.entities.users import UserRole
+from app.domain.entities.users import UserRoleType
 
 
 class UserException(Exception, ABC):
@@ -66,7 +66,7 @@ class InvalidUserRoleError(UserException):
     
     def __init__(self, role: str, valid_roles: list = None):
         self.role = role
-        self.valid_roles = valid_roles or [r.value for r in UserRole]
+        self.valid_roles = valid_roles or [r.value for r in UserRoleType]
     
     def get_message(self) -> str:
         return f"Invalid user role: {self.role}. Valid roles: {', '.join(self.valid_roles)}"
@@ -108,7 +108,7 @@ class UserAuthenticationError(UserException):
 class UserAuthorizationError(UserException):
     """User authorization exception"""
     
-    def __init__(self, message: str, user_id: str, required_role: UserRole = None):
+    def __init__(self, message: str, user_id: str, required_role: UserRoleType = None):
         self.message = message
         self.user_id = user_id
         self.required_role = required_role

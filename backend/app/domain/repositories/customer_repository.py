@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from app.domain.entities.customers import Customer, CustomerStatus
+from uuid import UUID
+from app.domain.entities.customers import Customer, CustomerStatus, CustomerType
 
 
 class CustomerRepository(ABC):
@@ -17,7 +18,7 @@ class CustomerRepository(ABC):
         pass
     
     @abstractmethod
-    async def get_by_tax_id(self, tax_id: str) -> Optional[Customer]:
+    async def get_by_tax_id(self, tax_pin: str) -> Optional[Customer]:
         """Get customer by tax ID"""
         pass
     
@@ -47,7 +48,7 @@ class CustomerRepository(ABC):
         pass
     
     @abstractmethod
-    async def delete_customer(self, customer_id: str) -> bool:
+    async def delete_customer(self, customer_id: str, deleted_by: Optional[UUID] = None) -> bool:
         """Delete customer"""
         pass
     
@@ -59,4 +60,19 @@ class CustomerRepository(ABC):
     @abstractmethod
     async def deactivate_customer(self, customer_id: str) -> Optional[Customer]:
         """Deactivate customer"""
+        pass
+
+    @abstractmethod
+    async def approve_customer(self, customer_id: str, approved_by: UUID) -> Optional[Customer]:
+        """Approve customer"""
+        pass
+
+    @abstractmethod
+    async def reject_customer(self, customer_id: str, rejected_by: UUID) -> Optional[Customer]:
+        """Reject customer"""
+        pass
+
+    @abstractmethod
+    async def reassign_owner(self, customer_id: str, new_owner_sales_rep_id: UUID, reassigned_by: UUID) -> Optional[Customer]:
+        """Reassign owner"""
         pass 

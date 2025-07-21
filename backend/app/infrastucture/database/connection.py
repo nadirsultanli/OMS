@@ -3,6 +3,9 @@ from typing import Optional
 from decouple import config
 from supabase import create_client, Client
 from app.infrastucture.logs.logger import default_logger
+import sqlalchemy
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class DatabaseConnection:
@@ -134,3 +137,48 @@ def get_supabase_admin_client_sync() -> Client:
             default_logger.error(f"Failed to create admin client: {str(e)}")
             raise
     return db_connection._admin_client 
+
+
+class DirectDatabaseConnection:
+    """Async SQLAlchemy direct database connection manager"""
+    def __init__(self):
+        self._engine = None
+        self._sessionmaker = None
+        self._url = None
+
+    def configure(self, url: str):
+        self._url = url
+        self._engine = create_async_engine(url, echo=False, future=True)
+        self._sessionmaker = async_sessionmaker(self._engine, expire_on_commit=False, class_=AsyncSession)
+        default_logger.info("Direct SQLAlchemy connection configured", url=url[:20] + "...")
+
+    async def get_session(self) -> AsyncSession:
+        if not self._sessionmaker:
+            raise ValueError("Direct database not configured. Call configure() first.")
+        async with self._sessionmaker() as session:
+            yield session
+
+    async def test_connection(self) -> bool:
+        if not self._engine:
+            raise ValueError("Direct database not configured. Call configure() first.")
+        try:
+            async with self._engine.connect() as conn:
+                await conn.execute(sqlalchemy.text("SELECT 1"))
+            default_logger.info("Direct SQLAlchemy connection test successful")
+            return True
+        except SQLAlchemyError as e:
+            default_logger.warning(f"Direct SQLAlchemy connection test failed: {str(e)}")
+            return False
+
+# Global direct database connection instance
+direct_db_connection = DirectDatabaseConnection()
+
+async def init_direct_database() -> None:
+    """Initialize direct SQLAlchemy database connection from environment variables"""
+    from decouple import config
+    url = config("DATABASE_URL", default=None)
+    if not url:
+        default_logger.warning("DATABASE_URL not found in environment variables")
+        return
+    direct_db_connection.configure(url)
+    await direct_db_connection.test_connection() 

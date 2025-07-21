@@ -1,41 +1,37 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from app.domain.entities.users import UserRole
-
+from app.domain.entities.users import UserRoleType, UserStatus
 
 class CreateUserRequest(BaseModel):
     email: EmailStr
-    name: Optional[str] = None
-    role: UserRole
-    phone_number: Optional[str] = None
-    driver_license_number: Optional[str] = None
-
+    full_name: str
+    role: UserRoleType
+    tenant_id: str
+    created_by: Optional[str] = None
 
 class UpdateUserRequest(BaseModel):
-    name: Optional[str] = None
+    full_name: Optional[str] = None
     email: Optional[EmailStr] = None
-    role: Optional[UserRole] = None
-    phone_number: Optional[str] = None
-    driver_license_number: Optional[str] = None
-
+    role: Optional[UserRoleType] = None
+    status: Optional[UserStatus] = None
+    last_login: Optional[str] = None
+    updated_by: Optional[str] = None
+    deleted_at: Optional[str] = None
+    deleted_by: Optional[str] = None
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
-
 
 class LogoutRequest(BaseModel):
     refresh_token: str
 
-
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str
-    name: Optional[str] = None
-    role: UserRole
-    phone_number: Optional[str] = None
-    driver_license_number: Optional[str] = None 
+    full_name: str
+    role: UserRoleType
+    tenant_id: str 

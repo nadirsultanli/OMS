@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    container_name: backend
     ports:
       - "8000:8000"
     environment:
@@ -16,54 +17,64 @@ services:
       - .:/app
       - ./logs:/app/logs
     restart: unless-stopped
-    depends_on:
-      - rabbitmq
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
-  celery-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    command: celery -A app.infrastucture.celery.celery_app worker --loglevel=info -Q email_queue,celery
-    environment:
-      - ENVIRONMENT=development
-      - LOG_LEVEL=DEBUG
-    env_file:
-      - .env
-    volumes:
-      - .:/app
-      - ./logs:/app/logs
-    restart: unless-stopped
-    depends_on:
-      - rabbitmq
+  # celery-worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.dev
+  #   command: celery -A app.infrastucture.celery.celery_app worker --loglevel=info -Q email_queue,celery
+  #   environment:
+  #     - ENVIRONMENT=development
+  #     - LOG_LEVEL=DEBUG
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - .:/app
+  #     - ./logs:/app/logs
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - rabbitmq
+  #   dns:
+  #     - 8.8.8.8
+  #     - 1.1.1.1
 
-  celery-beat:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    command: celery -A app.infrastucture.celery.celery_app beat --loglevel=info
-    environment:
-      - ENVIRONMENT=development
-      - LOG_LEVEL=DEBUG
-    env_file:
-      - .env
-    volumes:
-      - .:/app
-      - ./logs:/app/logs
-    restart: unless-stopped
-    depends_on:
-      - rabbitmq
+  # celery-beat:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.dev
+  #   command: celery -A app.infrastucture.celery.celery_app beat --loglevel=info
+  #   environment:
+  #     - ENVIRONMENT=development
+  #     - LOG_LEVEL=DEBUG
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - .:/app
+  #     - ./logs:/app/logs
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - rabbitmq
+  #   dns:
+  #     - 8.8.8.8
+  #     - 1.1.1.1
 
-  rabbitmq:
-    image: rabbitmq:3-management
-    ports:
-      - "5672:5672"   # AMQP protocol port
-      - "15672:15672" # Management UI port
-    environment:
-      - RABBITMQ_DEFAULT_USER=admin
-      - RABBITMQ_DEFAULT_PASS=admin123
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    restart: unless-stopped
+  # rabbitmq:
+  #   image: rabbitmq:3-management
+  #   ports:
+  #     - "5672:5672"   # AMQP protocol port
+  #     - "15672:15672" # Management UI port
+  #   environment:
+  #     - RABBITMQ_DEFAULT_USER=admin
+  #     - RABBITMQ_DEFAULT_PASS=admin123
+  #   volumes:
+  #     - rabbitmq_data:/var/lib/rabbitmq
+  #   restart: unless-stopped
+  #   dns:
+  #     - 8.8.8.8
+  #     - 1.1.1.1
 
 volumes:
   rabbitmq_data:

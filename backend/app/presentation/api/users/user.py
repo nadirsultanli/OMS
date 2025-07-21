@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import Optional
 from app.services.users import UserService
-from app.domain.entities.users import UserRole
+from app.domain.entities.users import UserRoleType, UserStatus
 from app.domain.exceptions.users import (
     UserNotFoundError,
     UserAlreadyExistsError,
@@ -32,24 +32,12 @@ async def create_user(
     try:
         user = await user_service.create_user(
             email=request.email,
+            full_name=request.full_name,
             role=request.role,
-            name=request.name,
-            phone_number=request.phone_number,
-            driver_license_number=request.driver_license_number
+            tenant_id=request.tenant_id,
+            created_by=request.created_by
         )
-        
-        return UserResponse(
-            id=str(user.id),
-            email=user.email,
-            name=user.name,
-            role=user.role.value,
-            is_active=user.is_active,
-            created_at=user.created_at.isoformat(),
-            updated_at=user.updated_at.isoformat(),
-            phone_number=user.phone_number,
-            driver_license_number=user.driver_license_number
-        )
-        
+        return UserResponse(**user.to_dict())
     except UserAlreadyExistsError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -79,14 +67,18 @@ async def get_user(
         
         return UserResponse(
             id=str(user.id),
+            tenant_id=str(user.tenant_id),
             email=user.email,
-            name=user.name,
+            full_name=user.full_name,
             role=user.role.value,
-            is_active=user.is_active,
+            status=user.status.value,
+            last_login=user.last_login.isoformat() if user.last_login else None,
             created_at=user.created_at.isoformat(),
+            created_by=str(user.created_by) if user.created_by else None,
             updated_at=user.updated_at.isoformat(),
-            phone_number=user.phone_number,
-            driver_license_number=user.driver_license_number
+            updated_by=str(user.updated_by) if user.updated_by else None,
+            deleted_at=user.deleted_at.isoformat() if user.deleted_at else None,
+            deleted_by=str(user.deleted_by) if user.deleted_by else None
         )
         
     except UserNotFoundError:
@@ -106,7 +98,7 @@ async def get_user(
 async def get_users(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    role: Optional[UserRole] = Query(None),
+    role: Optional[UserRoleType] = Query(None),
     active_only: bool = Query(False),
     user_service: UserService = Depends(get_user_service)
 ):
@@ -122,14 +114,18 @@ async def get_users(
         user_responses = [
             UserResponse(
                 id=str(user.id),
+                tenant_id=str(user.tenant_id),
                 email=user.email,
-                name=user.name,
+                full_name=user.full_name,
                 role=user.role.value,
-                is_active=user.is_active,
+                status=user.status.value,
+                last_login=user.last_login.isoformat() if user.last_login else None,
                 created_at=user.created_at.isoformat(),
+                created_by=str(user.created_by) if user.created_by else None,
                 updated_at=user.updated_at.isoformat(),
-                phone_number=user.phone_number,
-                driver_license_number=user.driver_license_number
+                updated_by=str(user.updated_by) if user.updated_by else None,
+                deleted_at=user.deleted_at.isoformat() if user.deleted_at else None,
+                deleted_by=str(user.deleted_by) if user.deleted_by else None
             )
             for user in users
         ]
@@ -159,23 +155,25 @@ async def update_user(
     try:
         user = await user_service.update_user(
             user_id=user_id,
-            name=request.name,
+            full_name=request.full_name,
             role=request.role,
-            email=request.email,
-            phone_number=request.phone_number,
-            driver_license_number=request.driver_license_number
+            email=request.email
         )
         
         return UserResponse(
             id=str(user.id),
+            tenant_id=str(user.tenant_id),
             email=user.email,
-            name=user.name,
+            full_name=user.full_name,
             role=user.role.value,
-            is_active=user.is_active,
+            status=user.status.value,
+            last_login=user.last_login.isoformat() if user.last_login else None,
             created_at=user.created_at.isoformat(),
+            created_by=str(user.created_by) if user.created_by else None,
             updated_at=user.updated_at.isoformat(),
-            phone_number=user.phone_number,
-            driver_license_number=user.driver_license_number
+            updated_by=str(user.updated_by) if user.updated_by else None,
+            deleted_at=user.deleted_at.isoformat() if user.deleted_at else None,
+            deleted_by=str(user.deleted_by) if user.deleted_by else None
         )
         
     except UserNotFoundError:
@@ -235,14 +233,18 @@ async def activate_user(
         
         return UserResponse(
             id=str(user.id),
+            tenant_id=str(user.tenant_id),
             email=user.email,
-            name=user.name,
+            full_name=user.full_name,
             role=user.role.value,
-            is_active=user.is_active,
+            status=user.status.value,
+            last_login=user.last_login.isoformat() if user.last_login else None,
             created_at=user.created_at.isoformat(),
+            created_by=str(user.created_by) if user.created_by else None,
             updated_at=user.updated_at.isoformat(),
-            phone_number=user.phone_number,
-            driver_license_number=user.driver_license_number
+            updated_by=str(user.updated_by) if user.updated_by else None,
+            deleted_at=user.deleted_at.isoformat() if user.deleted_at else None,
+            deleted_by=str(user.deleted_by) if user.deleted_by else None
         )
         
     except UserNotFoundError:
@@ -269,14 +271,18 @@ async def deactivate_user(
         
         return UserResponse(
             id=str(user.id),
+            tenant_id=str(user.tenant_id),
             email=user.email,
-            name=user.name,
+            full_name=user.full_name,
             role=user.role.value,
-            is_active=user.is_active,
+            status=user.status.value,
+            last_login=user.last_login.isoformat() if user.last_login else None,
             created_at=user.created_at.isoformat(),
+            created_by=str(user.created_by) if user.created_by else None,
             updated_at=user.updated_at.isoformat(),
-            phone_number=user.phone_number,
-            driver_license_number=user.driver_license_number
+            updated_by=str(user.updated_by) if user.updated_by else None,
+            deleted_at=user.deleted_at.isoformat() if user.deleted_at else None,
+            deleted_by=str(user.deleted_by) if user.deleted_by else None
         )
         
     except UserNotFoundError:

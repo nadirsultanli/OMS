@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from app.domain.entities.users import User, UserRole
+from app.domain.entities.users import User, UserRoleType
 
 
 class UserRepository(ABC):
@@ -27,7 +27,7 @@ class UserRepository(ABC):
         pass
     
     @abstractmethod
-    async def get_by_role(self, role: UserRole) -> List[User]:
+    async def get_by_role(self, role: UserRoleType) -> List[User]:
         """Get users by role"""
         pass
     
