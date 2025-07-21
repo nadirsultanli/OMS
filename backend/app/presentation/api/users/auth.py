@@ -66,7 +66,7 @@ async def signup(
             user_id=str(user.id),
             email=user.email,
             role=user.role.value,
-            name=user.full_name
+            full_name=user.full_name
         )
         
     except HTTPException:
@@ -225,11 +225,26 @@ async def forgot_password(
                 message="If an account with this email exists, a password reset link has been sent."
             )
         
-        # Use Supabase Auth to send password reset email
-        supabase = get_supabase_admin_client_sync()
-        supabase.auth.api.reset_password_for_email(request.email)
+        # Use Supabase's built-in password reset functionality
+        # This will send an email to the user with a password reset link
+        supabase = get_supabase_client_sync()
         
-        default_logger.info(f"Password reset email sent to: {request.email} (via Supabase)")
+        # Configure redirect URL based on role
+        frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+        if user.role.value.lower() == "driver":
+            driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+            redirect_url = f"{driver_frontend_url}/reset-password"
+        else:
+            redirect_url = f"{frontend_url}/reset-password"
+        
+        supabase.auth.reset_password_email(
+            email=request.email,
+            options={
+                "redirect_to": redirect_url
+            }
+        )
+        
+        default_logger.info(f"Password reset email sent via Supabase to: {request.email}")
         
         return ForgotPasswordResponse(
             message="If an account with this email exists, a password reset link has been sent."
@@ -248,20 +263,25 @@ async def reset_password(
     request: ResetPasswordRequest,
     user_service: UserService = Depends(get_user_service)
 ):
-    """Reset password using token"""
+    """Reset password using Supabase token"""
     try:
-        # Extract user_id from token (format: user_id_random_token)
-        token_parts = request.token.split('_', 1)
-        if len(token_parts) != 2:
+        # Use Supabase's built-in password reset functionality
+        # The token comes from the password reset email sent by Supabase
+        supabase = get_supabase_client_sync()
+        
+        # Update the user's password using Supabase Auth
+        auth_response = supabase.auth.update_user({
+            "password": request.password
+        }, access_token=request.token)
+        
+        if not auth_response.user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid token format"
+                detail="Invalid or expired password reset token"
             )
         
-        user_id = token_parts[0]
-        
-        # Get user from database
-        user = await user_service.get_user_by_id(user_id)
+        # Get user from our database using the email from auth response
+        user = await user_service.get_user_by_email(auth_response.user.email)
         
         # Check if user is active
         if user.status != UserStatus.ACTIVE:
@@ -270,14 +290,7 @@ async def reset_password(
                 detail="Account is inactive"
             )
         
-        # Update password in Supabase Auth
-        supabase = get_supabase_admin_client_sync()
-        supabase.auth.admin.update_user_by_id(
-            user.auth_user_id,
-            {"password": request.password}
-        )
-        
-        default_logger.info(f"Password reset successfully for user: {user_id}")
+        default_logger.info(f"Password reset successfully for user: {user.id}")
         
         return ResetPasswordResponse(
             message="Password reset successfully.",
@@ -292,4 +305,131 @@ async def reset_password(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to reset password"
+        )
+
+
+@auth_router.post("/accept-invitation", response_model=ResetPasswordResponse)
+async def accept_invitation(
+    request: ResetPasswordRequest,
+    user_service: UserService = Depends(get_user_service)
+):
+    """Accept invitation and set password using Supabase token"""
+    try:
+        # Use Supabase's built-in functionality to accept the invitation
+        # The token comes from the invitation email sent by Supabase
+        supabase = get_supabase_client_sync()
+        
+        # Update the user's password using Supabase Auth
+        # For invitations, we update the password directly with the invite token
+        auth_response = supabase.auth.update_user({
+            "password": request.password
+        }, access_token=request.token)
+        
+        if not auth_response.user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired invitation token"
+            )
+        
+        # Get user from our database using the email from auth response
+        user = await user_service.get_user_by_email(auth_response.user.email)
+        
+        # Activate the user if they're not already active
+        if not user.is_active:
+            await user_service.activate_user(str(user.id))
+        
+        default_logger.info(f"Invitation accepted successfully for user: {user.id}")
+        
+        return ResetPasswordResponse(
+            message="Account setup completed successfully.",
+            user_id=str(user.id),
+            email=user.email
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        default_logger.error(f"Accept invitation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to accept invitation"
+        )
+
+
+@auth_router.post("/magic-link")
+async def handle_magic_link(
+    request: dict,
+    user_service: UserService = Depends(get_user_service)
+):
+    """Handle magic link authentication"""
+    try:
+        token = request.get("token")
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token is required"
+            )
+        
+        # Verify the magic link token with Supabase
+        supabase = get_supabase_client_sync()
+        
+        try:
+            # Set the session using the token
+            auth_response = supabase.auth.set_session(token, token)  # Both access and refresh token
+            
+            if not auth_response.user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or expired magic link"
+                )
+            
+            # Get user from our database
+            try:
+                user = await user_service.get_user_by_email(auth_response.user.email)
+                
+                # Check if user needs to set up password (first time)
+                # If user was created via invitation but hasn't set password yet
+                if not user.is_active:
+                    return {
+                        "success": False,
+                        "requires_password_setup": True,
+                        "email": auth_response.user.email
+                    }
+                
+                # User exists and is active, return login success
+                return {
+                    "success": True,
+                    "access_token": auth_response.session.access_token,
+                    "refresh_token": auth_response.session.refresh_token,
+                    "user": {
+                        "id": str(user.id),
+                        "email": user.email,
+                        "role": user.role.value,
+                        "name": user.name
+                    }
+                }
+                
+            except UserNotFoundError:
+                # User doesn't exist in our database but exists in Supabase
+                # This shouldn't happen in normal flow
+                default_logger.warning(f"Magic link user not found in database: {auth_response.user.email}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User account not found"
+                )
+        
+        except Exception as e:
+            default_logger.error(f"Magic link verification failed: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired magic link"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        default_logger.error(f"Magic link processing failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process magic link"
         ) 

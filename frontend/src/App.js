@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Verification from './pages/Verification';
 import PasswordReset from './pages/PasswordReset';
+import AcceptInvitation from './pages/AcceptInvitation';
 import Users from './pages/Users';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
@@ -39,6 +40,16 @@ function App() {
           <Route 
             path="/reset-password" 
             element={<PasswordReset />} 
+          />
+          
+          {/* Accept invitation route */}
+          <Route 
+            path="/accept-invitation" 
+            element={<AcceptInvitation />} 
+          />
+          <Route 
+            path="/invite" 
+            element={<AcceptInvitation />} 
           />
           
           {/* Protected routes */}

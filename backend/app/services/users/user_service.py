@@ -48,57 +48,62 @@ class UserService:
         """Get users by role"""
         return await self.user_repository.get_by_role(role)
     
-    async def create_user(self, email: str, full_name: str, role: UserRoleType, tenant_id: str, created_by: Optional[str] = None) -> User:
+    async def create_user(self, email: str, name: str, role: UserRoleType, tenant_id: str, created_by: Optional[str] = None) -> User:
         """Create a new user with Supabase Auth integration"""
         try:
             # Check if user already exists in our database
             existing_user = await self.user_repository.get_by_email(email)
             if existing_user:
                 raise UserAlreadyExistsError(email=email)
-            
+
             # Create Supabase Auth user first
             supabase = get_supabase_admin_client_sync()
-            
-            # Generate a random password
-            import secrets
-            import string
-            password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
-            
-            # Create user in Supabase Auth (with email confirmation disabled for admin creation)
-            auth_response = supabase.auth.admin.create_user({
-                "email": email,
-                "password": password,
-                "email_confirm": False,
-                "user_metadata": {
-                    "full_name": full_name,
+
+            # Use Supabase's invite user functionality which will send an email
+            # The user will receive an invite email from Supabase with a link to set their password
+            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+
+            # Configure redirect URL based on role
+            if role.value.lower() == "driver":
+                driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                redirect_url = f"{driver_frontend_url}/accept-invitation"
+            else:
+                redirect_url = f"{frontend_url}/accept-invitation"
+
+            auth_response = supabase.auth.admin.invite_user_by_email(
+                email=email,
+                data={
+                    "name": name,
                     "role": role.value
-                }
-            })
-            
+                },
+                redirect_to=redirect_url
+            )
+
             if not auth_response.user:
                 raise UserCreationError("Failed to create Supabase Auth user", email=email)
-            
+
             # Get the auth_user_id from Supabase Auth
             auth_user_id = auth_response.user.id
-            
+
             # Create user in our database with the auth_user_id
             user = User.create(
                 email=email, 
-                full_name=full_name,
+                full_name=name,
                 role=role,
                 tenant_id=UUID(tenant_id),
                 created_by=UUID(created_by) if created_by else None,
                 auth_user_id=UUID(auth_user_id)
             )
             created_user = await self.user_repository.create_user(user)
-            
+
             default_logger.info(
-                f"User created successfully (Supabase will send verification email)", 
+                f"User created successfully and invite email sent via Supabase", 
                 user_id=str(created_user.id), 
+                auth_user_id=str(auth_user_id),
                 email=email
             )
             return created_user
-            
+
         except UserAlreadyExistsError:
             raise
         except Exception as e:
@@ -106,7 +111,7 @@ class UserService:
             default_logger.error(f"Failed to create user: {str(e)}\n{traceback.format_exc()}", email=email)
             raise UserCreationError(f"Failed to create user: {str(e)}", email=email)
     
-    async def update_user(self, user_id: str, full_name: Optional[str] = None, 
+    async def update_user(self, user_id: str, name: Optional[str] = None, 
                          role: Optional[UserRoleType] = None, email: Optional[str] = None) -> User:
         """Update user with validation"""
         try:
@@ -122,7 +127,7 @@ class UserService:
                 id=existing_user.id,
                 tenant_id=existing_user.tenant_id,
                 email=email if email is not None else existing_user.email,
-                full_name=full_name if full_name is not None else existing_user.full_name,
+                full_name=name if name is not None else existing_user.full_name,
                 role=role if role is not None else existing_user.role,
                 status=existing_user.status,
                 last_login=existing_user.last_login,
