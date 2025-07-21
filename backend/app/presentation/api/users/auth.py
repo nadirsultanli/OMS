@@ -106,6 +106,10 @@ async def login(
         try:
             user = await user_service.get_user_by_email(request.email)
             await user_service.validate_user_active(str(user.id))
+            
+            # Update last login time
+            user = await user_service.update_last_login(str(user.id))
+            
         except UserNotFoundError:
             # User exists in Supabase Auth but not in our database
             # This shouldn't happen in normal flow, but handle gracefully

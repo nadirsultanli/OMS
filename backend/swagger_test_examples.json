@@ -1,0 +1,550 @@
+{
+  "test_data": {
+    "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+    "user_id": "572c619c-32e4-45dc-9027-8c594a9d0612",
+    "customer_id": "cb93d0a0-6dd4-4a9b-a305-635c308586b1"
+  },
+  
+  "products": {
+    "create_13kg_cylinder": {
+      "endpoint": "POST /api/v1/products/",
+      "description": "Create 13kg LPG Cylinder product",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "name": "13kg LPG Cylinder",
+        "category": "LPG Cylinders",
+        "unit_of_measure": "PCS",
+        "min_price": "0.00",
+        "taxable": true,
+        "density_kg_per_l": "0.54",
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      }
+    },
+    
+    "create_19kg_cylinder": {
+      "endpoint": "POST /api/v1/products/",
+      "description": "Create 19kg LPG Cylinder product",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "name": "19kg LPG Cylinder",
+        "category": "LPG Cylinders",
+        "unit_of_measure": "PCS",
+        "min_price": "0.00",
+        "taxable": true,
+        "density_kg_per_l": "0.54",
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      }
+    },
+    
+    "update_product": {
+      "endpoint": "PUT /api/v1/products/{product_id}",
+      "description": "Update product details",
+      "request": {
+        "name": "13kg LPG Cylinder (Updated)",
+        "category": "LPG Cylinders",
+        "min_price": "100.00",
+        "taxable": true,
+        "updated_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      }
+    },
+    
+    "get_products": {
+      "endpoint": "GET /api/v1/products/?tenant_id=332072c1-5405-4f09-a56f-a631defa911b&limit=10&offset=0",
+      "description": "Get all products for tenant"
+    },
+    
+    "get_products_by_category": {
+      "endpoint": "GET /api/v1/products/?tenant_id=332072c1-5405-4f09-a56f-a631defa911b&category=LPG%20Cylinders",
+      "description": "Get products by category"
+    }
+  },
+  
+  "variants": {
+    "create_cyl13_full": {
+      "endpoint": "POST /api/v1/variants/",
+      "description": "Create full 13kg cylinder variant",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "product_id": "{{product_id}}",
+        "sku": "CYL13-FULL",
+        "status": "FULL",
+        "scenario": "XCH",
+        "tare_weight_kg": "12.5",
+        "capacity_kg": "13.0",
+        "gross_weight_kg": "25.5",
+        "deposit": null,
+        "inspection_date": "2024-12-31",
+        "active": true,
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      }
+    },
+    
+    "create_cyl13_empty": {
+      "endpoint": "POST /api/v1/variants/",
+      "description": "Create empty 13kg cylinder variant",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "product_id": "{{product_id}}",
+        "sku": "CYL13-EMPTY",
+        "status": "EMPTY",
+        "scenario": "XCH",
+        "tare_weight_kg": "12.5",
+        "capacity_kg": "13.0",
+        "gross_weight_kg": null,
+        "deposit": null,
+        "inspection_date": "2024-12-31",
+        "active": true,
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      }
+    },
+    
+    "create_gas13": {
+      "endpoint": "POST /api/v1/variants/",
+      "description": "Create gas refill service variant",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "product_id": "{{product_id}}",
+        "sku": "GAS13",
+        "status": "FULL",
+        "scenario": "XCH",
+        "tare_weight_kg": null,
+        "capacity_kg": null,
+        "gross_weight_kg": null,
+        "deposit": null,
+        "inspection_date": null,
+        "active": true,
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      }
+    },
+    
+    "create_dep13": {
+      "endpoint": "POST /api/v1/variants/",
+      "description": "Create deposit variant",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "product_id": "{{product_id}}",
+        "sku": "DEP13",
+        "status": "FULL",
+        "scenario": "OUT",
+        "tare_weight_kg": null,
+        "capacity_kg": null,
+        "gross_weight_kg": null,
+        "deposit": "1500.00",
+        "inspection_date": null,
+        "active": true,
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      }
+    },
+    
+    "create_kit13_outright": {
+      "endpoint": "POST /api/v1/variants/",
+      "description": "Create outright kit bundle variant",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "product_id": "{{product_id}}",
+        "sku": "KIT13-OUTRIGHT",
+        "status": "FULL",
+        "scenario": "OUT",
+        "tare_weight_kg": null,
+        "capacity_kg": null,
+        "gross_weight_kg": null,
+        "deposit": null,
+        "inspection_date": null,
+        "active": true,
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      }
+    },
+    
+    "update_variant": {
+      "endpoint": "PUT /api/v1/variants/{variant_id}",
+      "description": "Update variant details",
+      "request": {
+        "deposit": "1600.00",
+        "active": true,
+        "updated_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      }
+    },
+    
+    "get_variants": {
+      "endpoint": "GET /api/v1/variants/?tenant_id=332072c1-5405-4f09-a56f-a631defa911b&limit=10&offset=0",
+      "description": "Get all variants for tenant"
+    },
+    
+    "get_variants_by_product": {
+      "endpoint": "GET /api/v1/variants/?product_id={{product_id}}",
+      "description": "Get variants by product"
+    },
+    
+    "get_physical_variants": {
+      "endpoint": "GET /api/v1/variants/by-type/physical?tenant_id=332072c1-5405-4f09-a56f-a631defa911b",
+      "description": "Get physical variants (CYL*)"
+    },
+    
+    "get_gas_services": {
+      "endpoint": "GET /api/v1/variants/by-type/gas-services?tenant_id=332072c1-5405-4f09-a56f-a631defa911b",
+      "description": "Get gas service variants (GAS*)"
+    },
+    
+    "get_deposit_variants": {
+      "endpoint": "GET /api/v1/variants/by-type/deposits?tenant_id=332072c1-5405-4f09-a56f-a631defa911b",
+      "description": "Get deposit variants (DEP*)"
+    },
+    
+    "get_bundle_variants": {
+      "endpoint": "GET /api/v1/variants/by-type/bundles?tenant_id=332072c1-5405-4f09-a56f-a631defa911b",
+      "description": "Get bundle variants (KIT*)"
+    }
+  },
+  
+  "lpg_business_logic": {
+    "process_order_line_gas_exchange": {
+      "endpoint": "POST /api/v1/variants/process-order-line",
+      "description": "Process gas exchange order line",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "sku": "GAS13",
+        "quantity": 3,
+        "returned_empties": 3,
+        "customer_id": "cb93d0a0-6dd4-4a9b-a305-635c308586b1"
+      },
+      "expected_response": {
+        "original_sku": "GAS13",
+        "original_quantity": 3,
+        "line_items": [
+          {
+            "sku": "GAS13",
+            "quantity": 3,
+            "component_type": "GAS_SERVICE",
+            "affects_inventory": false
+          }
+        ],
+        "inventory_requirements": [
+          {
+            "sku": "CYL13-FULL",
+            "quantity_required": 3,
+            "operation": "OUTBOUND"
+          },
+          {
+            "sku": "CYL13-EMPTY",
+            "quantity_required": 3,
+            "operation": "INBOUND"
+          }
+        ],
+        "exchange_details": {
+          "exchange_required": true,
+          "gas_quantity": 3,
+          "empties_required": 3,
+          "empties_provided": 3,
+          "cylinder_shortage": 0,
+          "cylinder_excess": 0
+        }
+      }
+    },
+    
+    "process_order_line_gas_shortage": {
+      "endpoint": "POST /api/v1/variants/process-order-line",
+      "description": "Process gas order with cylinder shortage",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "sku": "GAS13",
+        "quantity": 5,
+        "returned_empties": 2,
+        "customer_id": "cb93d0a0-6dd4-4a9b-a305-635c308586b1"
+      },
+      "expected_response": {
+        "original_sku": "GAS13",
+        "original_quantity": 5,
+        "line_items": [
+          {
+            "sku": "GAS13",
+            "quantity": 5,
+            "component_type": "GAS_SERVICE",
+            "affects_inventory": false
+          },
+          {
+            "sku": "DEP13",
+            "quantity": 3,
+            "component_type": "DEPOSIT_ADJUSTMENT",
+            "reason": "CYLINDER_SHORTAGE"
+          }
+        ],
+        "exchange_details": {
+          "exchange_required": true,
+          "gas_quantity": 5,
+          "empties_required": 5,
+          "empties_provided": 2,
+          "cylinder_shortage": 3,
+          "cylinder_excess": 0,
+          "additional_items": [
+            {
+              "sku": "DEP13",
+              "quantity": 3,
+              "reason": "CYLINDER_SHORTAGE"
+            }
+          ]
+        }
+      }
+    },
+    
+    "process_order_line_bundle": {
+      "endpoint": "POST /api/v1/variants/process-order-line",
+      "description": "Process bundle order (KIT13-OUTRIGHT)",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "sku": "KIT13-OUTRIGHT",
+        "quantity": 2,
+        "returned_empties": 0,
+        "customer_id": "cb93d0a0-6dd4-4a9b-a305-635c308586b1"
+      },
+      "expected_response": {
+        "original_sku": "KIT13-OUTRIGHT",
+        "original_quantity": 2,
+        "line_items": [
+          {
+            "sku": "CYL13-FULL",
+            "quantity": 2,
+            "component_type": "PHYSICAL",
+            "affects_inventory": true,
+            "parent_bundle": "KIT13-OUTRIGHT"
+          },
+          {
+            "sku": "DEP13",
+            "quantity": 2,
+            "component_type": "DEPOSIT",
+            "affects_inventory": false,
+            "parent_bundle": "KIT13-OUTRIGHT"
+          }
+        ],
+        "inventory_requirements": [
+          {
+            "sku": "CYL13-FULL",
+            "quantity_required": 2,
+            "operation": "OUTBOUND"
+          }
+        ],
+        "business_validations": [
+          "Bundle KIT13-OUTRIGHT exploded into 2 components"
+        ]
+      }
+    },
+    
+    "process_order_line_deposit_refund": {
+      "endpoint": "POST /api/v1/variants/process-order-line",
+      "description": "Process deposit refund order",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "sku": "DEP13",
+        "quantity": -2,
+        "returned_empties": 0,
+        "customer_id": "cb93d0a0-6dd4-4a9b-a305-635c308586b1"
+      },
+      "expected_response": {
+        "original_sku": "DEP13",
+        "original_quantity": -2,
+        "line_items": [
+          {
+            "sku": "DEP13",
+            "quantity": -2,
+            "component_type": "DEPOSIT",
+            "affects_inventory": false
+          }
+        ],
+        "inventory_requirements": [],
+        "business_validations": [
+          "Refunding deposit for 2 cylinders"
+        ]
+      }
+    },
+    
+    "validate_complete_order": {
+      "endpoint": "POST /api/v1/variants/validate-order",
+      "description": "Validate complete order with multiple lines",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "order_lines": [
+          {
+            "sku": "GAS13",
+            "quantity": 3,
+            "returned_empties": 2,
+            "customer_id": "cb93d0a0-6dd4-4a9b-a305-635c308586b1"
+          },
+          {
+            "sku": "KIT13-OUTRIGHT",
+            "quantity": 1,
+            "returned_empties": 0,
+            "customer_id": "cb93d0a0-6dd4-4a9b-a305-635c308586b1"
+          }
+        ]
+      },
+      "expected_response": {
+        "order_valid": true,
+        "total_lines_processed": 4,
+        "inventory_summary": {
+          "CYL13-FULL": {
+            "INBOUND": 0,
+            "OUTBOUND": 4
+          },
+          "CYL13-EMPTY": {
+            "INBOUND": 2,
+            "OUTBOUND": 0
+          }
+        },
+        "business_validations": [
+          "Customer keeping 1 cylinders - deposits added",
+          "Bundle KIT13-OUTRIGHT exploded into 2 components"
+        ]
+      }
+    },
+    
+    "calculate_exchange_requirements": {
+      "endpoint": "POST /api/v1/variants/calculate-exchange",
+      "description": "Calculate gas exchange requirements",
+      "request": {
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "gas_sku": "GAS13",
+        "order_quantity": 5,
+        "returned_empties": 2
+      },
+      "expected_response": {
+        "exchange_required": true,
+        "gas_quantity": 5,
+        "empties_required": 5,
+        "empties_provided": 2,
+        "cylinder_shortage": 3,
+        "cylinder_excess": 0,
+        "additional_items": [
+          {
+            "sku": "DEP13",
+            "quantity": 3,
+            "reason": "CYLINDER_SHORTAGE",
+            "description": "Deposit for 3 cylinders not returned"
+          }
+        ],
+        "full_cylinders_out": 5,
+        "empty_cylinders_in": 2
+      }
+    },
+    
+    "get_bundle_components": {
+      "endpoint": "GET /api/v1/variants/{variant_id}/bundle-components",
+      "description": "Get bundle components breakdown",
+      "expected_response": {
+        "bundle_sku": "KIT13-OUTRIGHT",
+        "components": [
+          {
+            "sku": "CYL13-FULL",
+            "quantity": 1,
+            "component_type": "PHYSICAL",
+            "affects_inventory": true
+          },
+          {
+            "sku": "DEP13",
+            "quantity": 1,
+            "component_type": "DEPOSIT",
+            "affects_inventory": false
+          }
+        ]
+      }
+    },
+    
+    "validate_business_rules": {
+      "endpoint": "GET /api/v1/variants/{variant_id}/validate-business-rules",
+      "description": "Validate variant business rules",
+      "expected_response": {
+        "variant_sku": "CYL13-FULL",
+        "is_valid": true,
+        "validation_errors": [],
+        "business_rules_passed": [
+          "Physical items must have tare_weight_kg",
+          "Full cylinders must have gross_weight_kg",
+          "Physical cylinders should have inspection_date for safety compliance"
+        ]
+      }
+    },
+    
+    "get_variant_relationships": {
+      "endpoint": "GET /api/v1/variants/{variant_id}/relationships",
+      "description": "Get related variants for a SKU",
+      "expected_response": {
+        "base_variant": {
+          "sku": "CYL13-FULL",
+          "status": "FULL",
+          "scenario": "XCH"
+        },
+        "relationships": {
+          "empty_version": "CYL13-EMPTY",
+          "gas_service": "GAS13",
+          "deposit": "DEP13"
+        },
+        "related_variants": [
+          {
+            "relationship": "empty_version",
+            "variant": {
+              "sku": "CYL13-EMPTY",
+              "status": "EMPTY"
+            }
+          },
+          {
+            "relationship": "gas_service",
+            "variant": {
+              "sku": "GAS13",
+              "status": "FULL"
+            }
+          },
+          {
+            "relationship": "deposit",
+            "variant": {
+              "sku": "DEP13",
+              "deposit": "1500.00"
+            }
+          }
+        ]
+      }
+    }
+  },
+  
+  "testing_sequence": {
+    "step_1_create_products": [
+      "Create 13kg LPG Cylinder product",
+      "Create 19kg LPG Cylinder product"
+    ],
+    "step_2_create_variants": [
+      "Create CYL13-FULL variant",
+      "Create CYL13-EMPTY variant", 
+      "Create GAS13 variant",
+      "Create DEP13 variant",
+      "Create KIT13-OUTRIGHT variant"
+    ],
+    "step_3_test_business_logic": [
+      "Test gas exchange with full return",
+      "Test gas exchange with cylinder shortage",
+      "Test bundle explosion",
+      "Test deposit refund",
+      "Test complete order validation",
+      "Test exchange calculations",
+      "Test bundle components",
+      "Test business rule validation",
+      "Test variant relationships"
+    ],
+    "step_4_test_api_endpoints": [
+      "Get all products",
+      "Get products by category",
+      "Get all variants",
+      "Get variants by product",
+      "Get physical variants",
+      "Get gas services",
+      "Get deposit variants",
+      "Get bundle variants"
+    ]
+  },
+  
+  "notes": {
+    "authentication": "All endpoints require Bearer token authentication",
+    "tenant_isolation": "All operations are scoped to the tenant_id",
+    "business_logic": "The system automatically handles complex LPG business scenarios",
+    "inventory_tracking": "Only physical items (CYL*) affect inventory levels",
+    "deposit_tracking": "Deposits are tracked separately for customer liability",
+    "bundle_explosion": "Bundles automatically explode into their components",
+    "exchange_logic": "Gas orders require cylinder exchange unless deposits are added"
+  }
+} 

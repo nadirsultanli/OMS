@@ -96,6 +96,15 @@ class CustomerService:
         customer = await self.get_customer_by_id(customer_id)
         customer.owner_sales_rep_id = new_owner_sales_rep_id
         customer.updated_by = reassigned_by
+        return await self.customer_repository.update_customer(customer_id, customer)
+    
+    async def update_customer_with_user(self, customer_id: str, updated_by: UUID, **kwargs) -> Optional[Customer]:
+        """Update customer with proper updated_by tracking"""
+        customer = await self.get_customer_by_id(customer_id)
+        for key, value in kwargs.items():
+            if hasattr(customer, key) and value is not None:
+                setattr(customer, key, value)
+        customer.updated_by = updated_by
         return await self.customer_repository.update_customer(customer_id, customer) 
 
     async def inactivate_customer(self, customer_id: str, inactivated_by: UUID) -> Optional[Customer]:

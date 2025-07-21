@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from decouple import config
 from supabase import create_client, Client
 from app.infrastucture.logs.logger import default_logger
@@ -152,7 +152,7 @@ class DirectDatabaseConnection:
         self._sessionmaker = async_sessionmaker(self._engine, expire_on_commit=False, class_=AsyncSession)
         default_logger.info("Direct SQLAlchemy connection configured", url=url[:20] + "...")
 
-    async def get_session(self) -> AsyncSession:
+    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         if not self._sessionmaker:
             raise ValueError("Direct database not configured. Call configure() first.")
         async with self._sessionmaker() as session:
