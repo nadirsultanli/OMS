@@ -348,10 +348,19 @@ async def accept_invitation(
         if user.status != UserStatus.ACTIVE:
             await user_service.activate_user(str(user.id))
         
+        # IMPORTANT: Sign out the user so they have to login manually
+        # This prevents automatic login after password setup
+        try:
+            supabase.auth.sign_out()
+            default_logger.info(f"User signed out after invitation acceptance to force manual login")
+        except Exception as signout_error:
+            default_logger.warning(f"Failed to sign out user after invitation: {str(signout_error)}")
+            # Continue anyway, this is not critical
+        
         default_logger.info(f"Invitation accepted successfully for user: {user.id}")
         
         return ResetPasswordResponse(
-            message="Account setup completed successfully.",
+            message="Account setup completed successfully. Please login with your new credentials.",
             user_id=str(user.id),
             email=user.email
         )
