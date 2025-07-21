@@ -1,60 +1,116 @@
 from typing import Optional, List
 from app.domain.entities.customers import Customer, CustomerStatus
 from app.domain.repositories.customer_repository import CustomerRepository as CustomerRepositoryInterface
-from app.infrastucture.database.repositories import SupabaseRepository
+from app.infrastucture.database.models.customers import Customer as CustomerORM
+from sqlalchemy.future import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+from datetime import datetime
 
+class CustomerRepository(CustomerRepositoryInterface):
+    """Customer repository using direct SQLAlchemy connection"""
+    def __init__(self, session: AsyncSession):
+        self._session = session
 
-class CustomerRepository(SupabaseRepository[Customer], CustomerRepositoryInterface):
-    """Customer repository implementation"""
-    
-    def __init__(self):
-        super().__init__("customers", Customer)
-    
     async def get_by_id(self, customer_id: str) -> Optional[Customer]:
-        """Get customer by ID"""
-        return await super().get_by_id(customer_id)
-    
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+        obj = result.scalar_one_or_none()
+        return self._to_entity(obj) if obj else None
+
     async def get_by_email(self, email: str) -> Optional[Customer]:
-        """Get customer by email"""
-        customers = await self.find_by({"email": email}, limit=1)
-        return customers[0] if customers else None
-    
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.email == email))
+        obj = result.scalar_one_or_none()
+        return self._to_entity(obj) if obj else None
+
     async def get_by_tax_id(self, tax_id: str) -> Optional[Customer]:
-        """Get customer by tax ID"""
-        customers = await self.find_by({"tax_id": tax_id}, limit=1)
-        return customers[0] if customers else None
-    
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.tax_id == tax_id))
+        obj = result.scalar_one_or_none()
+        return self._to_entity(obj) if obj else None
+
     async def get_all(self, limit: int = 100, offset: int = 0) -> List[Customer]:
-        """Get all customers with pagination"""
-        return await super().get_all(limit, offset)
-    
+        result = await self._session.execute(select(CustomerORM).offset(offset).limit(limit))
+        objs = result.scalars().all()
+        return [self._to_entity(obj) for obj in objs]
+
     async def get_active_customers(self) -> List[Customer]:
-        """Get all active customers"""
-        return await self.find_by({"status": CustomerStatus.ACTIVE.value})
-    
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.status == "active"))
+        objs = result.scalars().all()
+        return [self._to_entity(obj) for obj in objs]
+
     async def get_by_status(self, status: CustomerStatus) -> List[Customer]:
-        """Get customers by status"""
-        return await self.find_by({"status": status.value})
-    
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.status == status.value))
+        objs = result.scalars().all()
+        return [self._to_entity(obj) for obj in objs]
+
     async def create_customer(self, customer: Customer) -> Customer:
-        """Create a new customer"""
-        data = customer.to_dict()
-        return await self.create(data)
-    
+        obj = CustomerORM(
+            id=customer.id,
+            full_name=customer.full_name,
+            email=customer.email,
+            phone_number=customer.phone_number,
+            tax_id=customer.tax_id,
+            credit_terms_day=customer.credit_terms_day,
+            status=customer.status.value,
+            created_at=customer.created_at,
+            updated_at=customer.updated_at
+        )
+        self._session.add(obj)
+        await self._session.commit()
+        await self._session.refresh(obj)
+        return self._to_entity(obj)
+
     async def update_customer(self, customer_id: str, customer: Customer) -> Optional[Customer]:
-        """Update customer"""
-        # Only include non-None values
-        update_data = {k: v for k, v in customer.to_dict().items() if v is not None}
-        return await self.update(customer_id, update_data)
-    
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+        obj = result.scalar_one_or_none()
+        if not obj:
+            return None
+        for field in ["full_name", "email", "phone_number", "tax_id", "credit_terms_day", "status", "updated_at"]:
+            setattr(obj, field, getattr(customer, field))
+        obj.updated_at = datetime.now()
+        await self._session.commit()
+        await self._session.refresh(obj)
+        return self._to_entity(obj)
+
     async def delete_customer(self, customer_id: str) -> bool:
-        """Delete customer"""
-        return await super().delete(customer_id)
-    
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+        obj = result.scalar_one_or_none()
+        if not obj:
+            return False
+        await self._session.delete(obj)
+        await self._session.commit()
+        return True
+
     async def activate_customer(self, customer_id: str) -> Optional[Customer]:
-        """Activate customer"""
-        return await self.update(customer_id, {"status": CustomerStatus.ACTIVE.value})
-    
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+        obj = result.scalar_one_or_none()
+        if not obj:
+            return None
+        obj.status = "active"
+        obj.updated_at = datetime.now()
+        await self._session.commit()
+        await self._session.refresh(obj)
+        return self._to_entity(obj)
+
     async def deactivate_customer(self, customer_id: str) -> Optional[Customer]:
-        """Deactivate customer"""
-        return await self.update(customer_id, {"status": CustomerStatus.INACTIVE.value}) 
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id)))
+        obj = result.scalar_one_or_none()
+        if not obj:
+            return None
+        obj.status = "inactive"
+        obj.updated_at = datetime.now()
+        await self._session.commit()
+        await self._session.refresh(obj)
+        return self._to_entity(obj)
+
+    def _to_entity(self, obj: CustomerORM) -> Customer:
+        return Customer(
+            id=obj.id,
+            full_name=obj.full_name,
+            email=obj.email,
+            phone_number=obj.phone_number,
+            tax_id=obj.tax_id,
+            credit_terms_day=obj.credit_terms_day,
+            status=CustomerStatus(obj.status),
+            created_at=obj.created_at,
+            updated_at=obj.updated_at
+        ) 
