@@ -1,4 +1,4 @@
-from .users import User, UserRole
+from .users import User, UserRoleType
 from .customers import Customer
 
-__all__ = ["User", "UserRole", "Customer"] 
+__all__ = ["User", "UserRoleType", "Customer"] 

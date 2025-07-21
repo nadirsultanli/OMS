@@ -8,7 +8,9 @@ from app.core.logging_config import setup_logging, get_request_logger
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import init_database, init_direct_database, direct_db_connection
 from app.presentation.api.users import auth_router, user_router, verification_router
-from app.presentation.api.customers import customer_router
+from app.presentation.api.customers.customer import router as customer_router
+from app.presentation.api.tenants.tenant import router as tenant_router
+from app.presentation.api.addresses.address import router as address_router
 import sqlalchemy
 
 # Get configuration from environment
@@ -84,6 +86,8 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(verification_router, prefix='/api/v1')
 app.include_router(customer_router, prefix="/api/v1")
+app.include_router(tenant_router, prefix="/api/v1")
+app.include_router(address_router, prefix="/api/v1")
 
 
 def custom_openapi():
@@ -118,6 +122,13 @@ def custom_openapi():
         
         if path.startswith("/api/v1/customers"):
             # All customer endpoints need authentication
+            for method in openapi_schema["paths"][path]:
+                if method in ["get", "put", "delete", "post"]:
+                    if "security" not in openapi_schema["paths"][path][method]:
+                        openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+                        
+        if path.startswith("/api/v1/tenants"):
+            # All tenant endpoints need authentication
             for method in openapi_schema["paths"][path]:
                 if method in ["get", "put", "delete", "post"]:
                     if "security" not in openapi_schema["paths"][path][method]:

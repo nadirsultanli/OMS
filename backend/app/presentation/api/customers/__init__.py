@@ -1,4 +1,4 @@
 # Customer API package
-from .customer import customer_router
+from .customer import router as customer_router
 
 __all__ = ["customer_router"] 

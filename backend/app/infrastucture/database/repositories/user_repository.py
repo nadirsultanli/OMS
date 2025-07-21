@@ -1,5 +1,5 @@
 from typing import Optional, List
-from app.domain.entities.users import User, UserRole
+from app.domain.entities.users import User, UserRoleType, UserStatus
 from app.domain.repositories.user_repository import UserRepository as UserRepositoryInterface
 from app.infrastucture.database.models.users import User as UserORM
 from sqlalchemy.future import select
@@ -8,7 +8,6 @@ from uuid import UUID
 from datetime import datetime
 
 class UserRepository(UserRepositoryInterface):
-    """User repository using direct SQLAlchemy connection"""
     def __init__(self, session: AsyncSession):
         self._session = session
 
@@ -28,11 +27,11 @@ class UserRepository(UserRepositoryInterface):
         return [self._to_entity(obj) for obj in objs]
 
     async def get_active_users(self) -> List[User]:
-        result = await self._session.execute(select(UserORM).where(UserORM.is_active == True))
+        result = await self._session.execute(select(UserORM).where(UserORM.status == UserStatus.ACTIVE.value))
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
 
-    async def get_by_role(self, role: UserRole) -> List[User]:
+    async def get_by_role(self, role: UserRoleType) -> List[User]:
         result = await self._session.execute(select(UserORM).where(UserORM.role == role.value))
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
@@ -40,15 +39,18 @@ class UserRepository(UserRepositoryInterface):
     async def create_user(self, user: User) -> User:
         obj = UserORM(
             id=user.id,
+            tenant_id=user.tenant_id,
             email=user.email,
-            name=user.name,
+            full_name=user.full_name,
             role=user.role.value,
-            is_active=user.is_active,
+            status=user.status.value,
+            last_login=user.last_login,
             created_at=user.created_at,
+            created_by=user.created_by,
             updated_at=user.updated_at,
-            auth_user_id=user.auth_user_id,
-            phone_number=user.phone_number,
-            driver_license_number=user.driver_license_number
+            updated_by=user.updated_by,
+            deleted_at=user.deleted_at,
+            deleted_by=user.deleted_by
         )
         self._session.add(obj)
         await self._session.commit()
@@ -60,7 +62,10 @@ class UserRepository(UserRepositoryInterface):
         obj = result.scalar_one_or_none()
         if not obj:
             return None
-        for field in ["email", "name", "role", "is_active", "updated_at", "auth_user_id", "phone_number", "driver_license_number"]:
+        for field in [
+            "tenant_id", "email", "full_name", "role", "status", "last_login",
+            "updated_at", "updated_by", "deleted_at", "deleted_by"
+        ]:
             setattr(obj, field, getattr(user, field))
         obj.updated_at = datetime.now()
         await self._session.commit()
@@ -81,7 +86,7 @@ class UserRepository(UserRepositoryInterface):
         obj = result.scalar_one_or_none()
         if not obj:
             return None
-        obj.is_active = True
+        obj.status = UserStatus.ACTIVE.value
         obj.updated_at = datetime.now()
         await self._session.commit()
         await self._session.refresh(obj)
@@ -92,7 +97,7 @@ class UserRepository(UserRepositoryInterface):
         obj = result.scalar_one_or_none()
         if not obj:
             return None
-        obj.is_active = False
+        obj.status = UserStatus.DEACTIVATED.value
         obj.updated_at = datetime.now()
         await self._session.commit()
         await self._session.refresh(obj)
@@ -101,13 +106,17 @@ class UserRepository(UserRepositoryInterface):
     def _to_entity(self, obj: UserORM) -> User:
         return User(
             id=obj.id,
+            tenant_id=obj.tenant_id,
             email=obj.email,
-            name=obj.name,
-            role=UserRole(obj.role),
-            is_active=obj.is_active,
+            full_name=obj.full_name,
+            role=UserRoleType(obj.role),
+            status=UserStatus(obj.status),
+            last_login=obj.last_login,
             created_at=obj.created_at,
+            created_by=obj.created_by,
             updated_at=obj.updated_at,
-            auth_user_id=obj.auth_user_id,
-            phone_number=obj.phone_number,
-            driver_license_number=obj.driver_license_number
+            updated_by=obj.updated_by,
+            deleted_at=obj.deleted_at,
+            deleted_by=obj.deleted_by,
+            auth_user_id=obj.auth_user_id
         ) 
