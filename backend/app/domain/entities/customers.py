@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from enum import Enum
 from uuid import UUID, uuid4
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+from app.domain.entities.addresses import Address
 
 class CustomerStatus(str, Enum):
     PENDING = "pending"
@@ -33,6 +34,7 @@ class Customer:
     updated_by: Optional[UUID]
     deleted_at: Optional[datetime]
     deleted_by: Optional[UUID]
+    addresses: List[Address] = None
 
     @staticmethod
     def create(tenant_id: UUID, customer_type: CustomerType, name: str, created_by: Optional[UUID] = None, **kwargs) -> "Customer":
@@ -75,7 +77,8 @@ class Customer:
             "updated_at": self.updated_at.isoformat(),
             "updated_by": str(self.updated_by) if self.updated_by else None,
             "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
-            "deleted_by": str(self.deleted_by) if self.deleted_by else None
+            "deleted_by": str(self.deleted_by) if self.deleted_by else None,
+            "addresses": [a.to_dict() for a in self.addresses] if self.addresses else []
         }
 
     @classmethod

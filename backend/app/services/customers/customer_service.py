@@ -2,6 +2,7 @@ from typing import Optional, List
 from uuid import UUID
 from app.domain.entities.customers import Customer, CustomerStatus, CustomerType
 from app.domain.repositories.customer_repository import CustomerRepository
+from app.services.addresses.address_service import AddressService
 
 class CustomerNotFoundError(Exception):
     pass
@@ -9,20 +10,25 @@ class CustomerAlreadyExistsError(Exception):
     pass
 
 class CustomerService:
-    def __init__(self, customer_repository: CustomerRepository):
+    def __init__(self, customer_repository: CustomerRepository, address_service: AddressService):
         self.customer_repository = customer_repository
+        self.address_service = address_service
 
     async def get_customer_by_id(self, customer_id: str) -> Customer:
         customer = await self.customer_repository.get_by_id(customer_id)
         if not customer:
             raise CustomerNotFoundError(customer_id)
+        customer.addresses = await self.address_service.get_addresses_by_customer(customer_id)
         return customer
 
     async def get_customer_by_name(self, name: str) -> Customer:
         raise NotImplementedError
 
     async def get_all_customers(self, limit: int = 100, offset: int = 0) -> List[Customer]:
-        return await self.customer_repository.get_all(limit, offset)
+        customers = await self.customer_repository.get_all(limit, offset)
+        for customer in customers:
+            customer.addresses = await self.address_service.get_addresses_by_customer(str(customer.id))
+        return customers
 
     async def get_active_customers(self) -> List[Customer]:
         return await self.customer_repository.get_active_customers()
