@@ -64,10 +64,11 @@ class UserService:
             import string
             password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
             
-            # Create user in Supabase Auth (Supabase will send verification email automatically)
+            # Create user in Supabase Auth (with email confirmation disabled for admin creation)
             auth_response = supabase.auth.admin.create_user({
                 "email": email,
                 "password": password,
+                "email_confirm": False,
                 "user_metadata": {
                     "full_name": full_name,
                     "role": role.value
@@ -86,7 +87,8 @@ class UserService:
                 full_name=full_name,
                 role=role,
                 tenant_id=UUID(tenant_id),
-                created_by=UUID(created_by) if created_by else None
+                created_by=UUID(created_by) if created_by else None,
+                auth_user_id=UUID(auth_user_id)
             )
             created_user = await self.user_repository.create_user(user)
             

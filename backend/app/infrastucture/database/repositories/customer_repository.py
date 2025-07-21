@@ -113,6 +113,54 @@ class CustomerRepository(CustomerRepositoryInterface):
         await self._session.refresh(obj)
         return self._to_entity(obj)
 
+    async def approve_customer(self, customer_id: str, approved_by: UUID) -> Optional[Customer]:
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
+        obj = result.scalar_one_or_none()
+        if not obj:
+            return None
+        obj.status = CustomerStatus.ACTIVE.value
+        obj.updated_by = approved_by
+        obj.updated_at = datetime.now()
+        await self._session.commit()
+        await self._session.refresh(obj)
+        return self._to_entity(obj)
+
+    async def reject_customer(self, customer_id: str, rejected_by: UUID) -> Optional[Customer]:
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
+        obj = result.scalar_one_or_none()
+        if not obj:
+            return None
+        obj.status = CustomerStatus.REJECTED.value
+        obj.updated_by = rejected_by
+        obj.updated_at = datetime.now()
+        await self._session.commit()
+        await self._session.refresh(obj)
+        return self._to_entity(obj)
+
+    async def reassign_owner(self, customer_id: str, new_owner_sales_rep_id: UUID, reassigned_by: UUID) -> Optional[Customer]:
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
+        obj = result.scalar_one_or_none()
+        if not obj:
+            return None
+        obj.owner_sales_rep_id = new_owner_sales_rep_id
+        obj.updated_by = reassigned_by
+        obj.updated_at = datetime.now()
+        await self._session.commit()
+        await self._session.refresh(obj)
+        return self._to_entity(obj)
+
+    async def inactivate_customer(self, customer_id: str, inactivated_by: UUID) -> Optional[Customer]:
+        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
+        obj = result.scalar_one_or_none()
+        if not obj:
+            return None
+        obj.status = CustomerStatus.INACTIVE.value
+        obj.updated_by = inactivated_by
+        obj.updated_at = datetime.now()
+        await self._session.commit()
+        await self._session.refresh(obj)
+        return self._to_entity(obj)
+
     def _to_entity(self, obj: CustomerORM) -> Customer:
         return Customer(
             id=obj.id,

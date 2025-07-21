@@ -5,13 +5,12 @@ from app.services.addresses.address_service import AddressService, AddressNotFou
 from app.presentation.schemas.addresses.input_schemas import CreateAddressRequest, UpdateAddressRequest
 from app.presentation.schemas.addresses.output_schemas import AddressResponse, AddressListResponse
 from app.services.dependencies.addresses import get_address_service
-from app.services.dependencies.common import get_current_user
 
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
 
 @router.post("/", response_model=AddressResponse, status_code=status.HTTP_201_CREATED)
-async def create_address(request: CreateAddressRequest, address_service: AddressService = Depends(get_address_service), current_user=Depends(get_current_user)):
-    address = await address_service.create_address(**request.dict(), created_by=current_user.id)
+async def create_address(request: CreateAddressRequest, address_service: AddressService = Depends(get_address_service)):
+    address = await address_service.create_address(**request.dict())
     return AddressResponse(**address.to_dict())
 
 @router.get("/{address_id}", response_model=AddressResponse)
@@ -26,20 +25,20 @@ async def get_addresses(limit: int = Query(100, ge=1, le=1000), offset: int = Qu
     return AddressListResponse(addresses=address_responses, total=len(address_responses), limit=limit, offset=offset)
 
 @router.put("/{address_id}", response_model=AddressResponse)
-async def update_address(address_id: str, request: UpdateAddressRequest, address_service: AddressService = Depends(get_address_service), current_user=Depends(get_current_user)):
-    address = await address_service.update_address(address_id, **request.dict(exclude_unset=True), updated_by=current_user.id)
+async def update_address(address_id: str, request: UpdateAddressRequest, address_service: AddressService = Depends(get_address_service)):
+    address = await address_service.update_address(address_id, **request.dict(exclude_unset=True))
     return AddressResponse(**address.to_dict())
 
 @router.delete("/{address_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_address(address_id: str, address_service: AddressService = Depends(get_address_service), current_user=Depends(get_current_user)):
-    success = await address_service.delete_address(address_id, deleted_by=current_user.id)
+async def delete_address(address_id: str, address_service: AddressService = Depends(get_address_service)):
+    success = await address_service.delete_address(address_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Address with ID {address_id} not found")
     return None
 
 @router.post("/{address_id}/set_default", status_code=status.HTTP_200_OK)
-async def set_default_address(address_id: str, customer_id: str, address_service: AddressService = Depends(get_address_service), current_user=Depends(get_current_user)):
-    success = await address_service.set_default_address(customer_id, address_id, updated_by=current_user.id)
+async def set_default_address(address_id: str, customer_id: str, address_service: AddressService = Depends(get_address_service)):
+    success = await address_service.set_default_address(customer_id, address_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Address with ID {address_id} not found or could not be set as default")
     return {"success": True} 

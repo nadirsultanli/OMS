@@ -36,8 +36,13 @@ class CustomerService:
             status = CustomerStatus.ACTIVE
         else:
             status = CustomerStatus.PENDING
-        # Set owner_sales_rep_id to created_by
-        owner_sales_rep_id = created_by
+        
+        # Extract owner_sales_rep_id from kwargs if provided, otherwise use created_by
+        owner_sales_rep_id = kwargs.pop('owner_sales_rep_id', created_by)
+        
+        # Remove created_by from kwargs if it exists to avoid duplicate
+        kwargs.pop('created_by', None)
+        
         customer = Customer.create(
             tenant_id=tenant_id,
             customer_type=customer_type,
@@ -67,16 +72,16 @@ class CustomerService:
 
     async def approve_customer(self, customer_id: str, approved_by: UUID) -> Optional[Customer]:
         customer = await self.get_customer_by_id(customer_id)
-        if customer.customer_type != CustomerType.CREDIT or customer.status != CustomerStatus.PENDING:
-            raise ValueError("Only pending credit customers can be approved.")
+        if customer.status != CustomerStatus.PENDING:
+            raise ValueError("Only pending customers can be approved.")
         customer.status = CustomerStatus.ACTIVE
         customer.updated_by = approved_by
         return await self.customer_repository.update_customer(customer_id, customer)
 
     async def reject_customer(self, customer_id: str, rejected_by: UUID) -> Optional[Customer]:
         customer = await self.get_customer_by_id(customer_id)
-        if customer.customer_type != CustomerType.CREDIT or customer.status != CustomerStatus.PENDING:
-            raise ValueError("Only pending credit customers can be rejected.")
+        if customer.status != CustomerStatus.PENDING:
+            raise ValueError("Only pending customers can be rejected.")
         customer.status = CustomerStatus.REJECTED
         customer.updated_by = rejected_by
         return await self.customer_repository.update_customer(customer_id, customer)
@@ -86,3 +91,6 @@ class CustomerService:
         customer.owner_sales_rep_id = new_owner_sales_rep_id
         customer.updated_by = reassigned_by
         return await self.customer_repository.update_customer(customer_id, customer) 
+
+    async def inactivate_customer(self, customer_id: str, inactivated_by: UUID) -> Optional[Customer]:
+        return await self.customer_repository.inactivate_customer(customer_id, inactivated_by) 
