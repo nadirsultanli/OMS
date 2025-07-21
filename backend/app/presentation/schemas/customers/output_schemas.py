@@ -13,7 +13,6 @@ class CustomerResponse(BaseModel):
     incorporation_doc: Optional[str]
     credit_days: Optional[int]
     credit_limit: Optional[float]
-    sales_rep_id: Optional[UUID]
     owner_sales_rep_id: Optional[UUID]
     created_at: str
     created_by: Optional[UUID]

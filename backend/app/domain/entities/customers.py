@@ -26,7 +26,6 @@ class Customer:
     incorporation_doc: Optional[str]
     credit_days: Optional[int]
     credit_limit: Optional[float]
-    sales_rep_id: Optional[UUID]
     owner_sales_rep_id: Optional[UUID]
     created_at: datetime
     created_by: Optional[UUID]
@@ -49,7 +48,6 @@ class Customer:
             incorporation_doc=kwargs.get("incorporation_doc"),
             credit_days=kwargs.get("credit_days"),
             credit_limit=kwargs.get("credit_limit"),
-            sales_rep_id=kwargs.get("sales_rep_id"),
             owner_sales_rep_id=kwargs.get("owner_sales_rep_id"),
             created_at=now,
             created_by=created_by,
@@ -70,7 +68,6 @@ class Customer:
             "incorporation_doc": self.incorporation_doc,
             "credit_days": self.credit_days,
             "credit_limit": self.credit_limit,
-            "sales_rep_id": str(self.sales_rep_id) if self.sales_rep_id else None,
             "owner_sales_rep_id": str(self.owner_sales_rep_id) if self.owner_sales_rep_id else None,
             "created_at": self.created_at.isoformat(),
             "created_by": str(self.created_by) if self.created_by else None,
@@ -93,7 +90,6 @@ class Customer:
             incorporation_doc=data.get("incorporation_doc"),
             credit_days=data.get("credit_days"),
             credit_limit=float(data["credit_limit"]) if data.get("credit_limit") is not None else None,
-            sales_rep_id=UUID(data["sales_rep_id"]) if data.get("sales_rep_id") else None,
             owner_sales_rep_id=UUID(data["owner_sales_rep_id"]) if data.get("owner_sales_rep_id") else None,
             created_at=datetime.fromisoformat(data["created_at"]),
             created_by=UUID(data["created_by"]) if data.get("created_by") else None,
