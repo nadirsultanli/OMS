@@ -11,6 +11,8 @@ from app.presentation.api.users import auth_router, user_router, verification_ro
 from app.presentation.api.customers.customer import router as customer_router
 from app.presentation.api.tenants.tenant import router as tenant_router
 from app.presentation.api.addresses.address import router as address_router
+from app.presentation.api.products.product import router as product_router
+from app.presentation.api.products.variant import router as variant_router
 import sqlalchemy
 
 # Get configuration from environment
@@ -65,6 +67,14 @@ app = FastAPI(
         {
             "name": "Customers",
             "description": "Customer management operations"
+        },
+        {
+            "name": "Products",
+            "description": "Product management operations"
+        },
+        {
+            "name": "Variants",
+            "description": "Variant management and LPG business logic operations"
         }
     ]
 )
@@ -88,6 +98,8 @@ app.include_router(verification_router, prefix='/api/v1')
 app.include_router(customer_router, prefix="/api/v1")
 app.include_router(tenant_router, prefix="/api/v1")
 app.include_router(address_router, prefix="/api/v1")
+app.include_router(product_router, prefix="/api/v1")
+app.include_router(variant_router, prefix="/api/v1")
 
 
 def custom_openapi():
@@ -129,6 +141,20 @@ def custom_openapi():
                         
         if path.startswith("/api/v1/tenants"):
             # All tenant endpoints need authentication
+            for method in openapi_schema["paths"][path]:
+                if method in ["get", "put", "delete", "post"]:
+                    if "security" not in openapi_schema["paths"][path][method]:
+                        openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+                        
+        if path.startswith("/api/v1/products"):
+            # All product endpoints need authentication
+            for method in openapi_schema["paths"][path]:
+                if method in ["get", "put", "delete", "post"]:
+                    if "security" not in openapi_schema["paths"][path][method]:
+                        openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+                        
+        if path.startswith("/api/v1/variants"):
+            # All variant endpoints need authentication
             for method in openapi_schema["paths"][path]:
                 if method in ["get", "put", "delete", "post"]:
                     if "security" not in openapi_schema["paths"][path][method]:

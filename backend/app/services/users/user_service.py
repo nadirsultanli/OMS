@@ -36,6 +36,10 @@ class UserService:
             raise UserNotFoundError(email=email)
         return user
     
+    async def get_user_by_auth_id(self, auth_user_id: str) -> Optional[User]:
+        """Get user by Supabase auth_user_id"""
+        return await self.user_repository.get_by_auth_id(auth_user_id)
+    
     async def get_all_users(self, limit: int = 100, offset: int = 0) -> List[User]:
         """Get all users with pagination"""
         return await self.user_repository.get_all(limit, offset)
@@ -220,4 +224,29 @@ class UserService:
         user = await self.get_user_by_id(user_id)
         if user.status != UserStatus.ACTIVE:
             raise UserInactiveError(user_id)
-        return user 
+        return user
+    
+    async def update_last_login(self, user_id: str) -> User:
+        """Update user's last login time"""
+        from datetime import datetime
+        user = await self.get_user_by_id(user_id)
+        user.last_login = datetime.utcnow()
+        user.updated_at = datetime.utcnow()
+        # Note: updated_by is not set for login updates as it's the same user
+        return await self.user_repository.update_user(str(user.id), user)
+    
+    async def update_user_with_audit(self, user_id: str, updated_by: UUID, **kwargs) -> User:
+        """Update user with proper audit trail"""
+        from datetime import datetime
+        user = await self.get_user_by_id(user_id)
+        
+        # Update fields
+        for key, value in kwargs.items():
+            if hasattr(user, key) and value is not None:
+                setattr(user, key, value)
+        
+        # Update audit fields
+        user.updated_at = datetime.utcnow()
+        user.updated_by = updated_by
+        
+        return await self.user_repository.update_user(str(user.id), user) 

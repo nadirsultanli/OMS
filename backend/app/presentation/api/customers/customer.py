@@ -32,7 +32,7 @@ async def update_customer(customer_id: str, request: UpdateCustomerRequest, cust
     if current_user and current_user.role != "accounts":
         raise HTTPException(status_code=403, detail="Only Accounts can edit customers.")
     updated_by = UUID(current_user.id) if current_user else None
-    customer = await customer_service.update_customer(customer_id, **request.dict(exclude_unset=True), updated_by=updated_by)
+    customer = await customer_service.update_customer_with_user(customer_id, updated_by, **request.dict(exclude_unset=True))
     return CustomerResponse(**customer.to_dict())
 
 @router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT)
