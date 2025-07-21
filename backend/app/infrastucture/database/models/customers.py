@@ -25,7 +25,6 @@ class Customer(Base):
     incorporation_doc = Column(String, nullable=True)
     credit_days = Column(Integer, nullable=True)
     credit_limit = Column(Numeric, nullable=True, server_default=text("0"))
-    sales_rep_id = Column(SAUUID(as_uuid=True), nullable=True)
     owner_sales_rep_id = Column(SAUUID(as_uuid=True), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
     created_by = Column(SAUUID(as_uuid=True), nullable=True)

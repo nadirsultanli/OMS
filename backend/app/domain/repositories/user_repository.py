@@ -37,6 +37,11 @@ class UserRepository(ABC):
         pass
     
     @abstractmethod
+    async def get_users_without_auth(self) -> List[User]:
+        """Get all users that don't have auth_user_id set"""
+        pass
+    
+    @abstractmethod
     async def create_user(self, user: User) -> User:
         """Create a new user"""
         pass
