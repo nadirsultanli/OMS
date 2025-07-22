@@ -60,9 +60,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
             list_price=model.list_price,
             manual_unit_price=model.manual_unit_price,
             final_price=model.final_price,
-            created_at=model.created_at,
+            created_at=getattr(model, 'created_at', datetime.utcnow()),  # Use default if missing
             created_by=model.created_by,
-            updated_at=model.updated_at,
+            updated_at=getattr(model, 'updated_at', datetime.utcnow()),  # Use default if missing
             updated_by=model.updated_by
         )
 
@@ -98,9 +98,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
             list_price=entity.list_price,
             manual_unit_price=entity.manual_unit_price,
             final_price=entity.final_price,
-            created_at=entity.created_at,
             created_by=entity.created_by,
-            updated_at=entity.updated_at,
             updated_by=entity.updated_by
         )
 
