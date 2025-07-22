@@ -6,6 +6,8 @@ import Verification from './pages/Verification';
 import PasswordReset from './pages/PasswordReset';
 import AcceptInvitation from './pages/AcceptInvitation';
 import Users from './pages/Users';
+import Customers from './pages/Customers';
+import CustomerDetail from './pages/CustomerDetail';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import authService from './services/authService';
@@ -69,6 +71,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Users />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/customers" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Customers />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/customers/:customerId" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <CustomerDetail />
                 </Layout>
               </ProtectedRoute>
             } 

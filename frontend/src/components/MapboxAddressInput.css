@@ -1,0 +1,204 @@
+.mapbox-address-input {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.geocoder-container {
+  width: 100%;
+}
+
+/* Customize the Mapbox Geocoder styles */
+.geocoder-container .mapboxgl-ctrl-geocoder {
+  width: 100% !important;
+  max-width: none !important;
+  box-shadow: none !important;
+  border: 2px solid #e0e0e0 !important;
+  border-radius: 8px !important;
+  font-family: inherit !important;
+  font-size: 16px !important;
+}
+
+.geocoder-container .mapboxgl-ctrl-geocoder--input {
+  padding: 12px 16px !important;
+  font-size: 16px !important;
+  color: #333 !important;
+  background-color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+}
+
+.geocoder-container .mapboxgl-ctrl-geocoder--input:focus {
+  outline: none !important;
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2) !important;
+}
+
+.geocoder-container .mapboxgl-ctrl-geocoder--input::placeholder {
+  color: #999 !important;
+}
+
+.geocoder-container .mapboxgl-ctrl-geocoder--icon-search {
+  fill: #667eea !important;
+}
+
+.geocoder-container .mapboxgl-ctrl-geocoder--icon-close {
+  fill: #666 !important;
+}
+
+/* Suggestions dropdown */
+.geocoder-container .suggestions {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid #e0e0e0 !important;
+  margin-top: 4px !important;
+  max-height: 200px !important;
+  overflow-y: auto !important;
+}
+
+.geocoder-container .suggestions > li {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s !important;
+}
+
+.geocoder-container .suggestions > li:hover,
+.geocoder-container .suggestions > .active {
+  background-color: #f8f9fa !important;
+}
+
+.geocoder-container .suggestions > li:last-child {
+  border-bottom: none !important;
+}
+
+/* Map container styles */
+.map-container {
+  margin-top: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.map-header {
+  padding: 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.map-header h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.map-header p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.map {
+  width: 100%;
+  position: relative;
+}
+
+/* Mapbox GL controls customization */
+.mapboxgl-ctrl-group {
+  border-radius: 6px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.mapboxgl-ctrl button {
+  border-radius: 0 !important;
+}
+
+.mapboxgl-ctrl-group button:first-child {
+  border-radius: 6px 6px 0 0 !important;
+}
+
+.mapboxgl-ctrl-group button:last-child {
+  border-radius: 0 0 6px 6px !important;
+}
+
+.mapboxgl-ctrl-group button:only-child {
+  border-radius: 6px !important;
+}
+
+/* Custom marker styles */
+.mapboxgl-marker {
+  cursor: grab;
+}
+
+.mapboxgl-marker:active {
+  cursor: grabbing;
+}
+
+/* Selected address display */
+.selected-address {
+  padding: 16px;
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+}
+
+.selected-address strong {
+  color: #333;
+  font-size: 14px;
+}
+
+.selected-address p {
+  margin: 4px 0 8px 0;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.selected-address small {
+  color: #999;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+/* Loading and error states */
+.mapbox-address-input .loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+.mapbox-address-input .error {
+  padding: 12px;
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .map {
+    height: 250px !important;
+  }
+  
+  .map-header {
+    padding: 12px;
+  }
+  
+  .map-header h4 {
+    font-size: 14px;
+  }
+  
+  .map-header p {
+    font-size: 13px;
+  }
+  
+  .selected-address {
+    padding: 12px;
+  }
+}

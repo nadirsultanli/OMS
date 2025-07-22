@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import userService from '../services/userService';
 import Logo from '../assets/Logo.svg';
+import { Search } from 'lucide-react';
 import './Users.css';
 
 const Users = () => {
@@ -22,7 +23,6 @@ const Users = () => {
     email: '',
     name: '',
     role: '',
-    phone_number: '',
     driver_license_number: ''
   });
 
@@ -73,8 +73,7 @@ const Users = () => {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(user =>
         user.full_name?.toLowerCase().includes(searchTerm) ||
-        user.email?.toLowerCase().includes(searchTerm) ||
-        user.phone_number?.toLowerCase().includes(searchTerm)
+        user.email?.toLowerCase().includes(searchTerm)
       );
     }
 
@@ -181,6 +180,11 @@ const Users = () => {
         role: formData.role,
         tenant_id: currentUser.tenant_id || "332072c1-5405-4f09-a56f-a631defa911b" // Default to Circl Team for now
       };
+
+      // Include driver license number if provided (for drivers)
+      if (formData.driver_license_number && formData.driver_license_number.trim()) {
+        userData.driver_license_number = formData.driver_license_number.trim();
+      }
       
       // Create user
       const createResult = await userService.createUser(userData);
@@ -193,7 +197,6 @@ const Users = () => {
           email: '',
           name: '',
           role: '',
-          phone_number: '',
           driver_license_number: ''
         });
         setShowCreateForm(false);
@@ -295,22 +298,20 @@ const Users = () => {
       {/* Filters */}
       <div className="filters-section">
         <div className="filters-row">
-          <div className="filter-group">
-            <label htmlFor="search" className="filter-label">Search</label>
+          <div className="search-group">
+            <Search className="search-icon" size={20} />
             <input
               type="text"
-              id="search"
               name="search"
+              placeholder="Search by name or email..."
               value={filters.search}
               onChange={handleFilterChange}
-              placeholder="Search by name, email, or phone..."
-              className="filter-input"
+              className="search-input"
             />
           </div>
+
           <div className="filter-group">
-            <label htmlFor="role" className="filter-label">Role</label>
             <select
-              id="role"
               name="role"
               value={filters.role}
               onChange={handleFilterChange}
@@ -341,7 +342,6 @@ const Users = () => {
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
-                <th>Phone Number</th>
                 <th>Status</th>
                 <th>Created</th>
                 <th>Actions</th>
@@ -358,7 +358,6 @@ const Users = () => {
                         {getRoleDisplayName(user.role)}
                       </span>
                     </td>
-                    <td>{user.phone_number || '-'}</td>
                     <td>
                       <span className={getStatusBadgeClass(user.status)}>
                         {getStatusDisplayName(user.status)}
@@ -381,7 +380,7 @@ const Users = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="empty-state">
+                  <td colSpan="6" className="empty-state">
                     {filters.search || filters.role ? 'No users found matching your filters.' : 'No users found.'}
                   </td>
                 </tr>
@@ -460,19 +459,6 @@ const Users = () => {
                   {errors.role && <span className="error-text">{errors.role}</span>}
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="phone_number" className="form-label">Phone Number</label>
-                  <input
-                    type="tel"
-                    id="phone_number"
-                    name="phone_number"
-                    value={formData.phone_number}
-                    onChange={handleInputChange}
-                    className="form-input"
-                    placeholder="Enter phone number"
-                    disabled={loading}
-                  />
-                </div>
               </div>
 
               {/* Driver License field - only show for drivers */}
