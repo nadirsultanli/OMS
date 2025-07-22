@@ -1,0 +1,11 @@
+# Handle React Router (SPA) routing
+/*    /index.html   200
+
+# API proxy rules (adjust URL to your backend)
+/api/*  https://your-backend-url.com/api/:splat  200
+
+# Handle specific API endpoints if needed
+/auth/*  https://your-backend-url.com/auth/:splat  200
+
+# Fallback for any other routes
+/*    /index.html   404
