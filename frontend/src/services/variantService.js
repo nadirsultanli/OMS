@@ -1,5 +1,6 @@
 import api from './api';
 import authService from './authService';
+import { extractErrorMessage } from '../utils/errorUtils';
 
 const variantService = {
   // Get all variants
@@ -25,7 +26,7 @@ const variantService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching variants:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to fetch variants' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to fetch variants' };
     }
   },
 
@@ -36,7 +37,7 @@ const variantService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching variant:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to fetch variant' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to fetch variant' };
     }
   },
 
@@ -47,7 +48,7 @@ const variantService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error creating variant:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to create variant' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to create variant' };
     }
   },
 
@@ -58,7 +59,7 @@ const variantService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error creating cylinder set:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to create cylinder set' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to create cylinder set' };
     }
   },
 
@@ -69,7 +70,7 @@ const variantService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error creating gas service:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to create gas service' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to create gas service' };
     }
   },
 
@@ -80,7 +81,7 @@ const variantService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error creating deposit:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to create deposit' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to create deposit' };
     }
   },
 
@@ -91,7 +92,7 @@ const variantService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error creating bundle:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to create bundle' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to create bundle' };
     }
   },
 
@@ -102,7 +103,7 @@ const variantService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error creating complete set:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to create complete set' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to create complete set' };
     }
   },
 
@@ -113,7 +114,7 @@ const variantService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error updating variant:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to update variant' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to update variant' };
     }
   },
 
@@ -124,7 +125,7 @@ const variantService = {
       return { success: true };
     } catch (error) {
       console.error('Error deleting variant:', error);
-      return { success: false, error: error.response?.data?.detail || 'Failed to delete variant' };
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to delete variant' };
     }
   },
 

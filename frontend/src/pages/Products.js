@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import productService from '../services/productService';
+import { extractErrorMessage } from '../utils/errorUtils';
 import { Search, Plus, Edit2, Trash2, Package } from 'lucide-react';
 import './Products.css';
 
@@ -49,22 +50,30 @@ const Products = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
+      console.log('Fetching products...');
       const result = await productService.getProducts(null, {
         limit: pagination.limit,
         offset: pagination.offset
       });
 
+      console.log('Product fetch result:', result);
+
       if (result.success) {
+        console.log('Products fetched successfully:', result.data);
         setProducts(result.data.products || []);
         setPagination(prev => ({
           ...prev,
           total: result.data.total || 0
         }));
       } else {
-        setErrors({ general: result.error });
+        console.error('Product fetch failed:', result.error);
+        const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
+        setErrors({ general: errorMessage || 'Failed to load products' });
       }
     } catch (error) {
-      setErrors({ general: 'Failed to load products.' });
+      console.error('Product fetch exception:', error);
+      const errorMessage = extractErrorMessage(error.response?.data) || 'Failed to load products.';
+      setErrors({ general: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -168,19 +177,26 @@ const Products = () => {
         density_kg_per_l: formData.density_kg_per_l ? parseFloat(formData.density_kg_per_l) : null
       };
       
+      console.log('Creating product with data:', productData);
       const result = await productService.createProduct(productData);
+      console.log('Product creation result:', result);
       
       if (result.success) {
+        console.log('Product created successfully, refreshing product list...');
         setMessage('Product created successfully!');
         resetForm();
         setShowCreateForm(false);
-        fetchProducts();
+        await fetchProducts();
+        console.log('Product list refresh completed');
       } else {
-        setErrors({ general: result.error });
+        console.error('Product creation failed:', result.error);
+        const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
+        setErrors({ general: errorMessage || 'Failed to create product' });
       }
     } catch (error) {
       console.error('Product creation error:', error);
-      setErrors({ general: 'An unexpected error occurred. Please try again.' });
+      const errorMessage = extractErrorMessage(error.response?.data) || 'An unexpected error occurred. Please try again.';
+      setErrors({ general: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -215,11 +231,13 @@ const Products = () => {
         setSelectedProduct(null);
         fetchProducts();
       } else {
-        setErrors({ general: result.error });
+        const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
+        setErrors({ general: errorMessage || 'Failed to update product' });
       }
     } catch (error) {
       console.error('Product update error:', error);
-      setErrors({ general: 'An unexpected error occurred. Please try again.' });
+      const errorMessage = extractErrorMessage(error.response?.data) || 'An unexpected error occurred. Please try again.';
+      setErrors({ general: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -238,10 +256,12 @@ const Products = () => {
         setMessage('Product deleted successfully!');
         fetchProducts();
       } else {
-        setErrors({ general: result.error });
+        const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
+        setErrors({ general: errorMessage || 'Failed to delete product' });
       }
     } catch (error) {
-      setErrors({ general: 'Failed to delete product.' });
+      const errorMessage = extractErrorMessage(error.response?.data) || 'Failed to delete product.';
+      setErrors({ general: errorMessage });
     } finally {
       setLoading(false);
     }
