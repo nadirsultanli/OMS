@@ -1,5 +1,4 @@
-from fastapi import Depends, HTTPException, status
-from typing import Optional
+from typing import AsyncGenerator
 from app.infrastucture.database.connection import get_supabase_client, direct_db_connection
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,25 +8,6 @@ async def get_database():
     return await get_supabase_client()
 
 
-async def get_db_session() -> AsyncSession:
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async for session in direct_db_connection.get_session():
-        yield session
-
-
-# TODO: Add authentication dependency for protected routes
-def get_current_user():
-    """Dependency to get current authenticated user"""
-    # This will be implemented when JWT authentication is added
-    pass
-
-
-def require_admin_role():
-    """Dependency to require admin role"""
-    # This will be implemented when role-based access control is added
-    pass
-
-
-def require_driver_role():
-    """Dependency to require driver role"""
-    # This will be implemented when role-based access control is added
-    pass 
+        yield session 

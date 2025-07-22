@@ -153,6 +153,7 @@ class DirectDatabaseConnection:
         default_logger.info("Direct SQLAlchemy connection configured", url=url[:20] + "...")
 
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Get async database session with proper lifecycle management"""
         if not self._sessionmaker:
             raise ValueError("Direct database not configured. Call configure() first.")
         async with self._sessionmaker() as session:

@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Request
 from typing import Optional
 from app.infrastucture.database.connection import get_supabase_client_sync
 from app.domain.entities.users import User, UserStatus
@@ -7,7 +7,7 @@ from app.services.dependencies.users import get_user_service
 
 
 async def get_current_user(
-    authorization: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None, include_in_schema=False),
     user_service: UserService = Depends(get_user_service)
 ) -> User:
     """Dependency to get current authenticated user from Supabase JWT token"""
@@ -65,6 +65,12 @@ async def get_current_user(
         )
 
 
+# Simple dependency that can be used with Depends() - no parameters needed
+def get_current_user_simple() -> User:
+    """Simple dependency that returns the current user - use with Depends(get_current_user_simple)"""
+    return Depends(get_current_user)
+
+
 def require_admin_role():
     """Dependency to require admin role"""
     async def _require_admin_role(current_user: User = Depends(get_current_user)) -> User:
@@ -98,4 +104,4 @@ def require_sales_rep_role():
                 detail="Sales rep role required"
             )
         return current_user
-    return _require_sales_rep_role 
+    return _require_sales_rep_role

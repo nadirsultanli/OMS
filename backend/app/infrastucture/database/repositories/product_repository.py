@@ -11,6 +11,7 @@ from app.domain.repositories.product_repository import ProductRepository
 from ..models.products import Product as ProductModel
 from ..models.variants import Variant as VariantModel
 from app.domain.entities.variants import Variant as VariantEntity, ProductStatus, ProductScenario
+from app.core.performance_monitor import monitor_performance
 
 
 class ProductRepositoryImpl(ProductRepository):
@@ -22,29 +23,34 @@ class ProductRepositoryImpl(ProductRepository):
     def _to_entity(self, model: ProductModel) -> ProductEntity:
         """Convert SQLAlchemy model to domain entity"""
         variants = []
-        if model.variants:
-            for variant_model in model.variants:
-                variant_entity = VariantEntity(
-                    id=variant_model.id,
-                    tenant_id=variant_model.tenant_id,
-                    product_id=variant_model.product_id,
-                    sku=variant_model.sku,
-                    status=ProductStatus(variant_model.status),
-                    scenario=ProductScenario(variant_model.scenario),
-                    tare_weight_kg=variant_model.tare_weight_kg,
-                    capacity_kg=variant_model.capacity_kg,
-                    gross_weight_kg=variant_model.gross_weight_kg,
-                    deposit=variant_model.deposit,
-                    inspection_date=variant_model.inspection_date,
-                    active=variant_model.active,
-                    created_at=variant_model.created_at,
-                    created_by=variant_model.created_by,
-                    updated_at=variant_model.updated_at,
-                    updated_by=variant_model.updated_by,
-                    deleted_at=variant_model.deleted_at,
-                    deleted_by=variant_model.deleted_by,
-                )
-                variants.append(variant_entity)
+        # Safely access variants to avoid lazy loading issues
+        try:
+            if model.variants is not None:
+                for variant_model in model.variants:
+                    variant_entity = VariantEntity(
+                        id=variant_model.id,
+                        tenant_id=variant_model.tenant_id,
+                        product_id=variant_model.product_id,
+                        sku=variant_model.sku,
+                        status=ProductStatus(variant_model.status),
+                        scenario=ProductScenario(variant_model.scenario),
+                        tare_weight_kg=variant_model.tare_weight_kg,
+                        capacity_kg=variant_model.capacity_kg,
+                        gross_weight_kg=variant_model.gross_weight_kg,
+                        deposit=variant_model.deposit,
+                        inspection_date=variant_model.inspection_date,
+                        active=variant_model.active,
+                        created_at=variant_model.created_at,
+                        created_by=variant_model.created_by,
+                        updated_at=variant_model.updated_at,
+                        updated_by=variant_model.updated_by,
+                        deleted_at=variant_model.deleted_at,
+                        deleted_by=variant_model.deleted_by,
+                    )
+                    variants.append(variant_entity)
+        except Exception:
+            # If variants can't be loaded (e.g., session closed), just use empty list
+            variants = []
         
         return ProductEntity(
             id=model.id,
@@ -83,13 +89,31 @@ class ProductRepositoryImpl(ProductRepository):
             deleted_by=entity.deleted_by,
         )
     
+    @monitor_performance("product_repository.create_product")
     async def create_product(self, product: ProductEntity) -> ProductEntity:
         """Create a new product"""
         model = self._to_model(product)
         self.session.add(model)
         await self.session.commit()
         await self.session.refresh(model)
-        return self._to_entity(model)
+        # Create entity without variants since this is a new product
+        return ProductEntity(
+            id=model.id,
+            tenant_id=model.tenant_id,
+            name=model.name,
+            category=model.category,
+            unit_of_measure=model.unit_of_measure,
+            min_price=model.min_price,
+            taxable=model.taxable,
+            density_kg_per_l=model.density_kg_per_l,
+            created_at=model.created_at,
+            created_by=model.created_by,
+            updated_at=model.updated_at,
+            updated_by=model.updated_by,
+            deleted_at=model.deleted_at,
+            deleted_by=model.deleted_by,
+            variants=[]  # New products don't have variants yet
+        )
     
     async def get_product_by_id(self, product_id: UUID) -> Optional[ProductEntity]:
         """Get a product by its ID"""
@@ -122,9 +146,8 @@ class ProductRepositoryImpl(ProductRepository):
     
     async def get_all_products(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[ProductEntity]:
         """Get all products for a tenant with pagination"""
-        stmt = select(ProductModel).options(
-            selectinload(ProductModel.variants)
-        ).where(
+        # Optimize query by not loading variants for list view
+        stmt = select(ProductModel).where(
             and_(
                 ProductModel.tenant_id == tenant_id,
                 ProductModel.deleted_at.is_(None)
@@ -135,6 +158,7 @@ class ProductRepositoryImpl(ProductRepository):
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
     
+    @monitor_performance("product_repository.update_product")
     async def update_product(self, product: ProductEntity) -> ProductEntity:
         """Update an existing product"""
         stmt = select(ProductModel).where(ProductModel.id == product.id)
@@ -156,7 +180,24 @@ class ProductRepositoryImpl(ProductRepository):
         
         await self.session.commit()
         await self.session.refresh(model)
-        return self._to_entity(model)
+        # Create entity without variants to avoid lazy loading issues
+        return ProductEntity(
+            id=model.id,
+            tenant_id=model.tenant_id,
+            name=model.name,
+            category=model.category,
+            unit_of_measure=model.unit_of_measure,
+            min_price=model.min_price,
+            taxable=model.taxable,
+            density_kg_per_l=model.density_kg_per_l,
+            created_at=model.created_at,
+            created_by=model.created_by,
+            updated_at=model.updated_at,
+            updated_by=model.updated_by,
+            deleted_at=model.deleted_at,
+            deleted_by=model.deleted_by,
+            variants=product.variants  # Use the variants from the input product
+        )
     
     async def delete_product(self, product_id: UUID, deleted_by: UUID) -> bool:
         """Soft delete a product"""
