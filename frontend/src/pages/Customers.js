@@ -76,7 +76,12 @@ const Customers = () => {
           total: result.data.total || 0
         }));
       } else {
-        setErrors({ general: result.error });
+        const errorMessage = typeof result.error === 'string' 
+          ? result.error 
+          : (result.error && typeof result.error === 'object')
+            ? JSON.stringify(result.error)
+            : 'Failed to load customers.';
+        setErrors({ general: errorMessage });
       }
     } catch (error) {
       setErrors({ general: 'Failed to load customers.' });
@@ -234,9 +239,16 @@ const Customers = () => {
         // Refresh customers list
         fetchCustomers();
       } else {
-        setErrors({ general: result.error });
+        // Ensure error is always a string
+        const errorMessage = typeof result.error === 'string' 
+          ? result.error 
+          : (result.error && typeof result.error === 'object')
+            ? JSON.stringify(result.error)
+            : 'Failed to create customer.';
+        setErrors({ general: errorMessage });
       }
     } catch (error) {
+      console.error('Customer creation error:', error);
       setErrors({ general: 'An unexpected error occurred. Please try again.' });
     } finally {
       setLoading(false);
@@ -341,7 +353,7 @@ const Customers = () => {
 
       {errors.general && (
         <div className="message error-message">
-          {errors.general}
+          {typeof errors.general === 'string' ? errors.general : JSON.stringify(errors.general)}
         </div>
       )}
 
