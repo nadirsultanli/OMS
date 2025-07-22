@@ -4,6 +4,7 @@ from app.domain.entities.users import User
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.services.users.user_service import UserService
 from app.services.dependencies.users import get_user_service
+from app.services.dependencies.railway_users import get_railway_user_service, should_use_railway_mode
 
 
 # Routes that don't require authentication
@@ -29,8 +30,7 @@ EXCLUDED_PATHS = {
 
 async def conditional_auth(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
-    user_service: UserService = Depends(get_user_service)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))
 ) -> Optional[User]:
     """
     Conditional authentication:
@@ -49,6 +49,26 @@ async def conditional_auth(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Get appropriate user service based on environment  
+    from app.infrastucture.logs.logger import default_logger
+    
+    if should_use_railway_mode():
+        default_logger.info("Auth middleware using Railway mode (Supabase SDK)")
+        user_service = get_railway_user_service()
+    else:
+        # Create standard user service for local development
+        try:
+            from app.services.dependencies.common import get_db_session
+            from app.infrastucture.database.repositories.user_repository import UserRepository
+            
+            session_gen = get_db_session()
+            session = await session_gen.__anext__()
+            user_repo = UserRepository(session=session)
+            user_service = UserService(user_repo)
+        except Exception as e:
+            # Fallback to Railway mode if standard mode fails
+            user_service = get_railway_user_service()
+    
     try:
         from app.infrastucture.database.connection import get_supabase_client_sync
         
@@ -65,14 +85,19 @@ async def conditional_auth(
         
         # Get user from our database using the auth_user_id
         auth_user_id = auth_response.user.id
+        default_logger.info(f"Auth middleware looking up user by auth_id: {auth_user_id}")
+        
         user = await user_service.get_user_by_auth_id(auth_user_id)
         
         if not user:
+            default_logger.warning(f"User not found in database for auth_id: {auth_user_id}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found in database",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        
+        default_logger.info(f"Auth middleware found user: {user.email}")
         
         from app.domain.entities.users import UserStatus
         if user.status != UserStatus.ACTIVE:
