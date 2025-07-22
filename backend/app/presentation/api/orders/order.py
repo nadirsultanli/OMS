@@ -150,12 +150,14 @@ async def get_orders(
         for order in orders:
             order_summaries.append(OrderSummaryResponse(
                 id=str(order.id),
+                tenant_id=order.tenant_id,
                 order_no=order.order_no,
                 customer_id=str(order.customer_id),
                 order_status=order.order_status.value,
                 total_amount=float(order.total_amount),
                 requested_date=order.requested_date,
-                created_at=order.created_at
+                created_at=order.created_at,
+                updated_at=order.updated_at
             ))
         
         return OrderSummaryListResponse(
@@ -183,12 +185,14 @@ async def get_orders_by_customer(
         for order in orders:
             order_summaries.append(OrderSummaryResponse(
                 id=str(order.id),
+                tenant_id=order.tenant_id,
                 order_no=order.order_no,
                 customer_id=str(order.customer_id),
                 order_status=order.order_status.value,
                 total_amount=float(order.total_amount),
                 requested_date=order.requested_date,
-                created_at=order.created_at
+                created_at=order.created_at,
+                updated_at=order.updated_at
             ))
         
         return OrderSummaryListResponse(
@@ -222,12 +226,14 @@ async def get_orders_by_status(
         for order in orders:
             order_summaries.append(OrderSummaryResponse(
                 id=str(order.id),
+                tenant_id=order.tenant_id,
                 order_no=order.order_no,
                 customer_id=str(order.customer_id),
                 order_status=order.order_status.value,
                 total_amount=float(order.total_amount),
                 requested_date=order.requested_date,
-                created_at=order.created_at
+                created_at=order.created_at,
+                updated_at=order.updated_at
             ))
         
         return OrderSummaryListResponse(
@@ -611,12 +617,14 @@ async def search_orders(
         for order in orders:
             order_summaries.append(OrderSummaryResponse(
                 id=str(order.id),
+                tenant_id=order.tenant_id,
                 order_no=order.order_no,
                 customer_id=str(order.customer_id),
                 order_status=order.order_status.value,
                 total_amount=float(order.total_amount),
                 requested_date=order.requested_date,
-                created_at=order.created_at
+                created_at=order.created_at,
+                updated_at=order.updated_at
             ))
         
         return OrderSearchResponse(

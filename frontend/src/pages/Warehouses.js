@@ -34,6 +34,7 @@ const Warehouses = () => {
   });
   const [createLoading, setCreateLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     fetchWarehouses();
@@ -48,7 +49,8 @@ const Warehouses = () => {
         status: filterStatus
       };
       const response = await warehouseService.getWarehouses(currentPage, warehousesPerPage, filters);
-      setWarehouses(response.data || []);
+      console.log('Warehouses fetched:', response); // Debug log
+      setWarehouses(response.warehouses || []);
       setTotalPages(Math.ceil((response.total || 0) / warehousesPerPage));
     } catch (error) {
       console.error('Error fetching warehouses:', error);
@@ -62,6 +64,7 @@ const Warehouses = () => {
     e.preventDefault();
     setCreateLoading(true);
     setError('');
+    setSuccessMessage('');
 
     try {
       // Get current user for tenant_id
@@ -116,7 +119,7 @@ const Warehouses = () => {
         warehouseData.unlimited_stock = false;
       }
 
-      await warehouseService.createWarehouse(warehouseData);
+      const result = await warehouseService.createWarehouse(warehouseData);
       setIsCreateModalOpen(false);
       setNewWarehouse({
         name: '',
@@ -134,7 +137,13 @@ const Warehouses = () => {
           longitude: null
         }
       });
-      fetchWarehouses();
+      setSuccessMessage(`Warehouse "${warehouseData.name}" created successfully!`);
+      await fetchWarehouses(); // Ensure warehouse list is refreshed
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 5000);
     } catch (error) {
       console.error('Error creating warehouse:', error);
       setError(extractErrorMessage(error.response?.data) || 'Failed to create warehouse');
@@ -269,6 +278,12 @@ const Warehouses = () => {
       {error && (
         <div className="error-message">
           {typeof error === 'string' ? error : JSON.stringify(error)}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="success-message">
+          {successMessage}
         </div>
       )}
 
