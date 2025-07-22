@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Verification from './pages/Verification';
 import PasswordReset from './pages/PasswordReset';
 import AcceptInvitation from './pages/AcceptInvitation';
+import AuthCallback from './pages/AuthCallback';
 import Users from './pages/Users';
 import Customers from './pages/Customers';
 import CustomerDetail from './pages/CustomerDetail';
@@ -15,6 +16,9 @@ import PriceLists from './pages/PriceLists';
 import PriceListDetail from './pages/PriceListDetail';
 import Variants from './pages/Variants';
 import Orders from './pages/Orders';
+import StockDashboard from './pages/StockDashboard';
+import StockLevels from './pages/StockLevels';
+import StockDocuments from './pages/StockDocuments';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import authService from './services/authService';
@@ -152,6 +156,46 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/stock"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <StockDashboard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stock-dashboard"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <StockDashboard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stock-levels"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <StockLevels />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stock-documents"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <StockDocuments />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
           <Route 
             path="/price-lists" 
             element={
@@ -173,12 +217,16 @@ function App() {
             } 
           />
           
+          {/* Auth callback route - handles Supabase redirects */}
+          <Route 
+            path="/auth/callback" 
+            element={<AuthCallback />} 
+          />
+          
           {/* Default redirect */}
           <Route 
             path="/" 
-            element={
-              <Navigate to={authService.isAuthenticated() ? "/dashboard" : "/login"} replace />
-            } 
+            element={<AuthCallback />}
           />
           
           {/* Catch all route */}
