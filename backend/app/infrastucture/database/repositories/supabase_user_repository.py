@@ -21,6 +21,28 @@ class SupabaseUserRepository(UserRepositoryInterface):
         """Convert Supabase response to User entity"""
         if not data:
             return None
+        
+        def parse_datetime(dt_str):
+            """Parse datetime string with flexible microseconds handling"""
+            if not dt_str:
+                return None
+            try:
+                # Replace Z with timezone and handle microseconds
+                dt_str = dt_str.replace('Z', '+00:00')
+                
+                # Fix microseconds to 6 digits if needed
+                if '+00:00' in dt_str:
+                    dt_part, tz_part = dt_str.split('+00:00')
+                    if '.' in dt_part:
+                        base_part, micro_part = dt_part.split('.')
+                        # Pad microseconds to 6 digits
+                        micro_part = micro_part.ljust(6, '0')[:6]
+                        dt_str = f"{base_part}.{micro_part}+00:00"
+                
+                return datetime.fromisoformat(dt_str)
+            except Exception as e:
+                default_logger.warning(f"Failed to parse datetime '{dt_str}': {e}")
+                return None
             
         return User(
             id=UUID(data["id"]),
@@ -30,12 +52,12 @@ class SupabaseUserRepository(UserRepositoryInterface):
             role=UserRoleType(data["role"]),
             status=UserStatus(data["status"]),
             auth_user_id=UUID(data["auth_user_id"]) if data.get("auth_user_id") else None,
-            last_login=datetime.fromisoformat(data["last_login"].replace('Z', '+00:00')) if data.get("last_login") else None,
-            created_at=datetime.fromisoformat(data["created_at"].replace('Z', '+00:00')),
+            last_login=parse_datetime(data.get("last_login")),
+            created_at=parse_datetime(data["created_at"]),
             created_by=UUID(data["created_by"]) if data.get("created_by") else None,
-            updated_at=datetime.fromisoformat(data["updated_at"].replace('Z', '+00:00')) if data.get("updated_at") else None,
+            updated_at=parse_datetime(data["updated_at"]),
             updated_by=UUID(data["updated_by"]) if data.get("updated_by") else None,
-            deleted_at=datetime.fromisoformat(data["deleted_at"].replace('Z', '+00:00')) if data.get("deleted_at") else None,
+            deleted_at=parse_datetime(data.get("deleted_at")),
             deleted_by=UUID(data["deleted_by"]) if data.get("deleted_by") else None
         )
 
