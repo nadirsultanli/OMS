@@ -1,6 +1,7 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from datetime import datetime
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from decouple import config
@@ -11,7 +12,11 @@ from app.presentation.api.users import auth_router, user_router, verification_ro
 from app.presentation.api.customers.customer import router as customer_router
 from app.presentation.api.tenants.tenant import router as tenant_router
 from app.presentation.api.addresses.address import router as address_router
+from app.presentation.api.products.product import router as product_router
+from app.presentation.api.products.variant import router as variant_router
+from app.presentation.api.price_lists.price_list import router as price_list_router
 import sqlalchemy
+from app.core.auth_middleware import conditional_auth
 
 # Get configuration from environment
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")
@@ -53,6 +58,7 @@ app = FastAPI(
     description="Order Management System Backend API",
     version="1.0.0",
     lifespan=lifespan,
+    dependencies=[Depends(conditional_auth)],
     openapi_tags=[
         {
             "name": "Authentication",
@@ -65,6 +71,18 @@ app = FastAPI(
         {
             "name": "Customers",
             "description": "Customer management operations"
+        },
+        {
+            "name": "Products",
+            "description": "Product management operations"
+        },
+        {
+            "name": "Variants",
+            "description": "Variant management and LPG business logic operations"
+        },
+        {
+            "name": "Price Lists",
+            "description": "Price list management and pricing operations"
         }
     ]
 )
@@ -88,55 +106,30 @@ app.include_router(verification_router, prefix='/api/v1')
 app.include_router(customer_router, prefix="/api/v1")
 app.include_router(tenant_router, prefix="/api/v1")
 app.include_router(address_router, prefix="/api/v1")
+app.include_router(product_router, prefix="/api/v1")
+app.include_router(variant_router, prefix="/api/v1")
+app.include_router(price_list_router, prefix="/api/v1")
 
 
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
-    
     openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
+        title="OMS Backend",
+        version="1.0.0",
+        description="Order Management System Backend API",
         routes=app.routes,
     )
-    
-    # Add security scheme
     openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
+        "HTTPBearer": {
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "JWT",
-            "description": "Enter your Supabase JWT token"
         }
     }
-    
-    # Add security to all protected endpoints
-    for path in openapi_schema["paths"]:
-        if path.startswith("/api/v1/users") and path != "/api/v1/users/":
-            # All user endpoints except create user need authentication
-            for method in openapi_schema["paths"][path]:
-                if method in ["get", "put", "delete", "post"]:
-                    if "security" not in openapi_schema["paths"][path][method]:
-                        openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
-        
-        if path.startswith("/api/v1/customers"):
-            # All customer endpoints need authentication
-            for method in openapi_schema["paths"][path]:
-                if method in ["get", "put", "delete", "post"]:
-                    if "security" not in openapi_schema["paths"][path][method]:
-                        openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
-                        
-        if path.startswith("/api/v1/tenants"):
-            # All tenant endpoints need authentication
-            for method in openapi_schema["paths"][path]:
-                if method in ["get", "put", "delete", "post"]:
-                    if "security" not in openapi_schema["paths"][path][method]:
-                        openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
-    
+    openapi_schema["security"] = [{"HTTPBearer": []}]
     app.openapi_schema = openapi_schema
     return app.openapi_schema
-
 
 app.openapi = custom_openapi
 
@@ -153,6 +146,62 @@ async def health_check():
     return {
         "status": "healthy"
     }
+
+
+@app.get("/debug/env")
+async def debug_environment():
+    """Debug endpoint to check environment configuration (exclude sensitive values)"""
+    from decouple import config
+    
+    return {
+        "environment": ENVIRONMENT,
+        "log_level": LOG_LEVEL,
+        "supabase_url_configured": bool(config("SUPABASE_URL", default=None)),
+        "supabase_key_configured": bool(config("SUPABASE_KEY", default=None)),
+        "supabase_anon_key_configured": bool(config("SUPABASE_ANON_KEY", default=None)),
+        "database_url_configured": bool(config("DATABASE_URL", default=None)),
+        "port": config("PORT", default="not_set"),
+        "python_version": os.sys.version,
+        "available_env_keys": [key for key in os.environ.keys() if "SUPABASE" in key or "DATABASE" in key or "PORT" in key]
+    }
+
+
+@app.get("/debug/supabase")
+async def debug_supabase():
+    """Debug endpoint to test Supabase connection and auth"""
+    try:
+        from app.infrastucture.database.connection import get_supabase_client_sync
+        
+        # Test Supabase client creation
+        try:
+            supabase = get_supabase_client_sync()
+            client_status = "✓ Client created successfully"
+        except Exception as e:
+            return {
+                "client_creation": f"✗ Failed: {str(e)}",
+                "error_type": type(e).__name__
+            }
+        
+        # Test a simple auth call
+        try:
+            # Try to get current session (should return null if no session)
+            session_info = supabase.auth.get_session()
+            auth_status = "✓ Auth API accessible"
+        except Exception as e:
+            auth_status = f"✗ Auth API failed: {str(e)}"
+        
+        return {
+            "client_creation": client_status,
+            "auth_api": auth_status,
+            "timestamp": str(datetime.now())
+        }
+        
+    except Exception as e:
+        default_logger.error(f"Supabase debug failed: {str(e)}", exc_info=True)
+        return {
+            "error": f"Debug failed: {str(e)}",
+            "error_type": type(e).__name__
+        }
 
 @app.get("/logs/test")
 async def test_logging(request: Request):
