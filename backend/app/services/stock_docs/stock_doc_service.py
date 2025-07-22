@@ -3,9 +3,10 @@ from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from app.domain.entities.stock_docs import StockDoc, StockDocLine, StockDocType, StockDocStatus
+from app.domain.entities.stock_docs import StockDoc, StockDocLine, StockDocType, StockDocStatus, StockStatus
 from app.domain.entities.users import User
 from app.domain.repositories.stock_doc_repository import StockDocRepository
+from app.domain.repositories.stock_level_repository import StockLevelRepository
 from app.domain.exceptions.stock_docs.stock_doc_exceptions import (
     StockDocNotFoundError,
     StockDocLineNotFoundError,
@@ -35,8 +36,13 @@ from app.domain.exceptions.stock_docs.stock_doc_exceptions import (
 class StockDocService:
     """Service for stock document business logic with role-based permissions"""
 
-    def __init__(self, stock_doc_repository: StockDocRepository):
+    def __init__(
+        self, 
+        stock_doc_repository: StockDocRepository,
+        stock_level_repository: Optional[StockLevelRepository] = None
+    ):
         self.stock_doc_repository = stock_doc_repository
+        self.stock_level_repository = stock_level_repository
 
     # ============================================================================
     # STOCK DOCUMENT CRUD OPERATIONS WITH BUSINESS LOGIC
@@ -241,7 +247,8 @@ class StockDocService:
         if stock_doc.doc_status != StockDocStatus.SHIPPED:
             raise StockDocStatusTransitionError(stock_doc.doc_status.value, StockDocStatus.POSTED.value, doc_id)
 
-        return await self.stock_doc_repository.receive_transfer(doc_id, user.id)
+        # Post the document and update stock levels
+        return await self.post_stock_document(user, doc_id)
 
     # ============================================================================
     # QUERY OPERATIONS
@@ -394,6 +401,144 @@ class StockDocService:
                     gas_type=line.gas_type,
                     required_qty=float(line.quantity)
                 )
+
+    # ============================================================================
+    # STOCK DOCUMENT POSTING WITH INVENTORY UPDATES
+    # ============================================================================
+
+    async def post_stock_document(self, user: User, doc_id: str) -> bool:
+        """Post stock document and update inventory levels"""
+        stock_doc = await self.get_stock_doc_by_id(doc_id, user.tenant_id)
+        
+        # Validate document can be posted
+        if stock_doc.doc_status == StockDocStatus.POSTED:
+            raise StockDocStatusTransitionError(
+                stock_doc.doc_status.value, StockDocStatus.POSTED.value, doc_id
+            )
+        
+        if not stock_doc.can_transition_to(StockDocStatus.POSTED):
+            raise StockDocStatusTransitionError(
+                stock_doc.doc_status.value, StockDocStatus.POSTED.value, doc_id
+            )
+
+        # Update stock levels if stock level repository is available
+        if self.stock_level_repository:
+            try:
+                await self._update_stock_levels_for_posting(user, stock_doc)
+            except Exception as e:
+                raise StockDocPostingError(doc_id, f"Failed to update stock levels: {str(e)}")
+
+        # Update document status to POSTED
+        success = await self.stock_doc_repository.update_stock_doc_status(
+            doc_id, StockDocStatus.POSTED, user.id, datetime.utcnow()
+        )
+        
+        if not success:
+            raise StockDocPostingError(doc_id, "Failed to update document status")
+        
+        return success
+
+    async def _update_stock_levels_for_posting(self, user: User, stock_doc: StockDoc) -> None:
+        """Update stock levels based on document type and lines"""
+        if not self.stock_level_repository:
+            return
+
+        for line in stock_doc.doc_lines:
+            if not line.variant_id:
+                continue  # Skip lines without variant (e.g., gas-only lines)
+
+            # Apply stock updates based on document type
+            await self._apply_stock_update_for_doc_type(
+                user, stock_doc, line
+            )
+
+    async def _apply_stock_update_for_doc_type(
+        self, 
+        user: User, 
+        stock_doc: StockDoc, 
+        line: StockDocLine
+    ) -> None:
+        """Apply stock updates based on document type"""
+        doc_type = stock_doc.doc_type
+        quantity = line.quantity
+        unit_cost = line.unit_cost or Decimal('0')
+
+        if doc_type == StockDocType.REC_FIL:
+            # Receipt: Increase ON_HAND stock
+            await self.stock_level_repository.update_stock_quantity(
+                user.tenant_id, stock_doc.dest_wh_id, line.variant_id, 
+                StockStatus.ON_HAND, quantity, unit_cost
+            )
+
+        elif doc_type == StockDocType.ISS_FIL:
+            # Issue: Decrease ON_HAND stock
+            await self.stock_level_repository.update_stock_quantity(
+                user.tenant_id, stock_doc.source_wh_id, line.variant_id, 
+                StockStatus.ON_HAND, -quantity
+            )
+
+        elif doc_type == StockDocType.XFER:
+            # Transfer: Move from IN_TRANSIT to ON_HAND at destination
+            await self.stock_level_repository.transfer_stock_between_statuses(
+                user.tenant_id, stock_doc.dest_wh_id, line.variant_id,
+                StockStatus.IN_TRANSIT, StockStatus.ON_HAND, quantity
+            )
+
+        elif doc_type == StockDocType.CONV_FIL:
+            # Conversion: This handles EMPTY <-> FULL conversion
+            # This is complex and needs separate handling
+            await self._handle_conversion_posting(user, stock_doc, line)
+
+        elif doc_type == StockDocType.LOAD_MOB:
+            # Load mobile: Move from ON_HAND to TRUCK_STOCK
+            await self.stock_level_repository.transfer_stock_between_statuses(
+                user.tenant_id, stock_doc.source_wh_id, line.variant_id,
+                StockStatus.ON_HAND, StockStatus.TRUCK_STOCK, quantity
+            )
+
+        elif doc_type == StockDocType.UNLD_MOB:
+            # Unload mobile: Move from TRUCK_STOCK to ON_HAND
+            await self.stock_level_repository.transfer_stock_between_statuses(
+                user.tenant_id, stock_doc.dest_wh_id, line.variant_id,
+                StockStatus.TRUCK_STOCK, StockStatus.ON_HAND, quantity
+            )
+
+    async def _handle_conversion_posting(
+        self, 
+        user: User, 
+        stock_doc: StockDoc, 
+        line: StockDocLine
+    ) -> None:
+        """Handle variant conversion posting (EMPTY <-> FULL)"""
+        # This is where we would implement the atomic SKU conversion logic
+        # For now, skip conversion logic as it requires variant state analysis
+        pass
+
+    async def ship_transfer_with_stock_update(self, user: User, doc_id: str) -> bool:
+        """Ship transfer document and move stock to IN_TRANSIT"""
+        stock_doc = await self.get_stock_doc_by_id(doc_id, user.tenant_id)
+        
+        if stock_doc.doc_type != StockDocType.XFER:
+            raise StockDocTransferError("Only transfer documents can be shipped")
+        
+        if stock_doc.doc_status != StockDocStatus.OPEN:
+            raise StockDocStatusTransitionError(
+                stock_doc.doc_status.value, StockDocStatus.SHIPPED.value, doc_id
+            )
+
+        # Move stock to IN_TRANSIT status if stock level repository is available
+        if self.stock_level_repository:
+            for line in stock_doc.doc_lines:
+                if line.variant_id:
+                    await self.stock_level_repository.transfer_stock_between_statuses(
+                        user.tenant_id, stock_doc.source_wh_id, line.variant_id,
+                        StockStatus.ON_HAND, StockStatus.IN_TRANSIT, line.quantity
+                    )
+
+        # Update document status to SHIPPED
+        return await self.stock_doc_repository.update_stock_doc_status(
+            doc_id, StockDocStatus.SHIPPED, user.id
+        )
 
     # ============================================================================
     # UTILITY METHODS

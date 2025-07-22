@@ -15,6 +15,9 @@ import PriceLists from './pages/PriceLists';
 import PriceListDetail from './pages/PriceListDetail';
 import Variants from './pages/Variants';
 import Orders from './pages/Orders';
+import StockDashboard from './pages/StockDashboard';
+import StockLevels from './pages/StockLevels';
+import StockDocuments from './pages/StockDocuments';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import authService from './services/authService';
@@ -148,6 +151,46 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Orders />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stock"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <StockDashboard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stock-dashboard"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <StockDashboard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stock-levels"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <StockLevels />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stock-documents"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <StockDocuments />
                   </Layout>
                 </ProtectedRoute>
               }
