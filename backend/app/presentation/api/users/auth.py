@@ -320,34 +320,56 @@ async def reset_password(
     request: ResetPasswordRequest,
     user_service: UserService = Depends(get_user_service)
 ):
-    """Reset password using Supabase token"""
+    """Reset password using Supabase token (legacy method)"""
     try:
+        default_logger.info(f"Starting password reset process with token: {request.token[:20]}...")
+        
         # Use Supabase's built-in password reset functionality
         # The token comes from the password reset email sent by Supabase
         supabase = get_supabase_client_sync()
         
         # Update the user's password using Supabase Auth
-        auth_response = supabase.auth.update_user({
-            "password": request.password
-        }, access_token=request.token)
-        
-        if not auth_response.user:
+        try:
+            auth_response = supabase.auth.update_user({
+                "password": request.password
+            }, access_token=request.token)
+            
+            if not auth_response.user:
+                default_logger.error("Password reset failed - no user returned from Supabase")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or expired password reset token"
+                )
+            
+            default_logger.info(f"Supabase password update successful for user: {auth_response.user.email}")
+            
+        except Exception as auth_error:
+            default_logger.error(f"Supabase password update failed: {str(auth_error)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired password reset token"
+                detail=f"Failed to update password: {str(auth_error)}"
             )
         
         # Get user from our database using the email from auth response
-        user = await user_service.get_user_by_email(auth_response.user.email)
+        try:
+            user = await user_service.get_user_by_email(auth_response.user.email)
+            default_logger.info(f"Found user in database: {user.id}, status: {user.status.value}")
+        except Exception as db_error:
+            default_logger.error(f"Failed to find user in database: {str(db_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User account not found in system"
+            )
         
         # Check if user is active
         if user.status != UserStatus.ACTIVE:
+            default_logger.warning(f"Password reset attempted for inactive user: {user.id}, status: {user.status.value}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Account is inactive"
+                detail="Account is inactive. Please contact your administrator."
             )
         
-        default_logger.info(f"Password reset successfully for user: {user.id}")
+        default_logger.info(f"Password reset completed successfully for user: {user.id}")
         
         return ResetPasswordResponse(
             message="Password reset successfully.",
@@ -358,10 +380,104 @@ async def reset_password(
     except HTTPException:
         raise
     except Exception as e:
-        default_logger.error(f"Password reset failed: {str(e)}")
+        default_logger.error(f"Unexpected error in password reset: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to reset password"
+            detail="Failed to reset password. Please try again."
+        )
+
+
+@auth_router.post("/reset-password-simple", response_model=ResetPasswordResponse)
+async def reset_password_simple(
+    request: dict,
+    user_service: UserService = Depends(get_user_service)
+):
+    """Simple password reset without tokens - just email and new password"""
+    try:
+        email = request.get("email")
+        password = request.get("password")
+        confirm_password = request.get("confirm_password")
+        
+        if not email or not password or not confirm_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email, password, and confirm_password are required"
+            )
+        
+        if password != confirm_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Passwords do not match"
+            )
+        
+        if len(password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 8 characters long"
+            )
+        
+        default_logger.info(f"Starting simple password reset for email: {email}")
+        
+        # Get user from our database
+        try:
+            user = await user_service.get_user_by_email(email)
+            default_logger.info(f"Found user in database: {user.id}, status: {user.status.value}")
+        except Exception as db_error:
+            default_logger.error(f"Failed to find user in database: {str(db_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User account not found"
+            )
+        
+        # Check if user is active
+        if user.status != UserStatus.ACTIVE:
+            default_logger.warning(f"Password reset attempted for inactive user: {user.id}, status: {user.status.value}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account is inactive. Please contact your administrator."
+            )
+        
+        # Use Supabase admin client to update password directly
+        supabase = get_supabase_admin_client_sync()
+        
+        try:
+            # Update password using admin client (no token needed)
+            auth_response = supabase.auth.admin.update_user_by_id(
+                str(user.auth_user_id),
+                {"password": password}
+            )
+            
+            if not auth_response.user:
+                default_logger.error("Password update failed - no user returned from Supabase")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Failed to update password"
+                )
+            
+            default_logger.info(f"Password updated successfully for user: {user.email}")
+            
+        except Exception as auth_error:
+            default_logger.error(f"Supabase password update failed: {str(auth_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to update password: {str(auth_error)}"
+            )
+        
+        default_logger.info(f"Simple password reset completed successfully for user: {user.id}")
+        
+        return ResetPasswordResponse(
+            message="Password reset successfully.",
+            user_id=str(user.id),
+            email=user.email
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        default_logger.error(f"Unexpected error in simple password reset: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to reset password. Please try again."
         )
 
 
