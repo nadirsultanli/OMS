@@ -5,7 +5,7 @@ from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import (
     Column, String, DateTime, Boolean, Numeric, Date, Text, 
-    ForeignKey, CheckConstraint, UniqueConstraint, TIMESTAMP, Enum as SQLAlchemyEnum
+    ForeignKey, CheckConstraint, UniqueConstraint, TIMESTAMP, Enum as SQLAlchemyEnum, text
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -28,7 +28,7 @@ class OrderModel(Base):
     
     # Order details
     order_no: Mapped[str] = mapped_column(Text, nullable=False)
-    order_status: Mapped[OrderStatus] = mapped_column(SQLAlchemyEnum(OrderStatus, name="order_status", create_constraint=True, native_enum=False), nullable=False, default=OrderStatus.DRAFT)
+    order_status: Mapped[str] = mapped_column(SQLAlchemyEnum(OrderStatus, name="order_status", create_constraint=True, native_enum=True, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=OrderStatus.DRAFT)
     requested_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     delivery_instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     payment_terms: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -39,7 +39,9 @@ class OrderModel(Base):
     
     # Audit fields
     created_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
     updated_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
     deleted_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     
@@ -84,7 +86,9 @@ class OrderLineModel(Base):
     
     # Audit fields
     created_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
     updated_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
     
     # Relationships
     order: Mapped["OrderModel"] = relationship("OrderModel", back_populates="order_lines")
