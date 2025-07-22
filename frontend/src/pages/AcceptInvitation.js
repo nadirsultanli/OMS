@@ -61,19 +61,9 @@ const AcceptInvitation = () => {
       setToken(finalToken);
       console.log('AcceptInvitation - Token set successfully');
       
-      // Try to decode the token to get user email (optional, for display)
-      try {
-        const tokenParts = finalToken.split('.');
-        if (tokenParts.length === 3) {
-          const payload = JSON.parse(atob(tokenParts[1]));
-          console.log('AcceptInvitation - Token payload:', { email: payload.email, sub: payload.sub });
-          if (payload.email) {
-            setUserEmail(payload.email);
-          }
-        }
-      } catch (e) {
-        console.log('AcceptInvitation - Could not decode token for email extraction:', e);
-      }
+      // For verification tokens, we can't decode them to get email
+      // The email will be available after the invitation is accepted
+      console.log('AcceptInvitation - Verification token detected, email will be available after acceptance');
     } else {
       console.warn('AcceptInvitation - No valid invitation token found');
       console.warn('AcceptInvitation - Expected: token with type=invite or just token parameter');
@@ -157,7 +147,7 @@ const AcceptInvitation = () => {
           isLoading={isLoading}
           errors={errors}
           title="Welcome to LPG-OMS"
-          description={userEmail ? `Set up your password for ${userEmail}` : 'Set up your password to complete your account'}
+          description="Set up your password to complete your account"
           buttonText="Complete Account Setup"
           loadingText="Setting Up Account..."
         />
