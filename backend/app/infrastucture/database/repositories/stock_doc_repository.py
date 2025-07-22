@@ -698,14 +698,14 @@ class SQLAlchemyStockDocRepository(StockDocRepository):
         return count == 0
 
     async def get_pending_transfers_by_warehouse(self, warehouse_id: UUID, tenant_id: UUID) -> List[StockDoc]:
-        """Get pending transfer documents (shipped but not received) for a warehouse"""
+        """Get pending transfer documents (open transfers) for a warehouse"""
         stmt = (
             select(StockDocModel)
             .options(selectinload(StockDocModel.stock_doc_lines))
             .where(
                 and_(
-                    StockDocModel.doc_type == StockDocType.XFER,
-                    StockDocModel.doc_status == StockDocStatus.SHIPPED,
+                    StockDocModel.doc_type == StockDocType.TRF_WH,
+                    StockDocModel.doc_status == StockDocStatus.OPEN,
                     StockDocModel.dest_wh_id == warehouse_id,
                     StockDocModel.tenant_id == tenant_id,
                     StockDocModel.deleted_at.is_(None)
@@ -819,8 +819,8 @@ class SQLAlchemyStockDocRepository(StockDocRepository):
 
     # Transfer-specific operations
     async def ship_transfer(self, doc_id: str, updated_by: Optional[UUID] = None) -> bool:
-        """Mark a transfer document as shipped"""
-        return await self.update_stock_doc_status(doc_id, StockDocStatus.SHIPPED, updated_by)
+        """Mark a transfer document as posted (shipped)"""
+        return await self.update_stock_doc_status(doc_id, StockDocStatus.POSTED, updated_by)
 
     async def receive_transfer(self, doc_id: str, updated_by: Optional[UUID] = None) -> bool:
         """Mark a transfer document as received (posted)"""

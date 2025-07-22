@@ -192,7 +192,7 @@ class StockDocService:
             raise StockDocPostingError(doc_id, f"Document cannot be posted in status {stock_doc.doc_status}")
 
         # Validate stock availability for issue operations
-        if stock_doc.doc_type in [StockDocType.ISS_FIL, StockDocType.XFER, StockDocType.LOAD_MOB]:
+        if stock_doc.doc_type in [StockDocType.ISS_LOAD, StockDocType.ISS_SALE, StockDocType.TRF_WH, StockDocType.TRF_TRUCK]:
             await self._validate_stock_availability(stock_doc)
 
         # Update status to posted
@@ -220,11 +220,11 @@ class StockDocService:
         """Ship transfer document"""
         stock_doc = await self.get_stock_doc_by_id(doc_id, user.tenant_id)
         
-        if stock_doc.doc_type != StockDocType.XFER:
+        if stock_doc.doc_type != StockDocType.TRF_WH:
             raise StockDocTransferError("Only transfer documents can be shipped")
         
         if stock_doc.doc_status != StockDocStatus.OPEN:
-            raise StockDocStatusTransitionError(stock_doc.doc_status.value, StockDocStatus.SHIPPED.value, doc_id)
+            raise StockDocStatusTransitionError(stock_doc.doc_status.value, "posted", doc_id)
 
         # Validate stock availability
         await self._validate_stock_availability(stock_doc)
@@ -235,10 +235,10 @@ class StockDocService:
         """Receive transfer document"""
         stock_doc = await self.get_stock_doc_by_id(doc_id, user.tenant_id)
         
-        if stock_doc.doc_type != StockDocType.XFER:
+        if stock_doc.doc_type != StockDocType.TRF_WH:
             raise StockDocTransferError("Only transfer documents can be received")
         
-        if stock_doc.doc_status != StockDocStatus.SHIPPED:
+        if stock_doc.doc_status != StockDocStatus.OPEN:
             raise StockDocStatusTransitionError(stock_doc.doc_status.value, StockDocStatus.POSTED.value, doc_id)
 
         return await self.stock_doc_repository.receive_transfer(doc_id, user.id)
@@ -338,12 +338,12 @@ class StockDocService:
             if not has_dest_permission:
                 raise StockDocPermissionError(f"No permission for destination warehouse {stock_doc.dest_wh_id}")
 
-        # Validate conversion rules for CONV_FIL documents
-        if stock_doc.doc_type == StockDocType.CONV_FIL:
+        # Validate conversion rules for adjustment documents
+        if stock_doc.doc_type in [StockDocType.ADJ_SCRAP, StockDocType.ADJ_VARIANCE]:
             await self._validate_conversion_rules(stock_doc)
 
         # Validate truck operation rules
-        if stock_doc.doc_type in [StockDocType.LOAD_MOB, StockDocType.UNLD_MOB]:
+        if stock_doc.doc_type == StockDocType.TRF_TRUCK:
             await self._validate_truck_operation_rules(stock_doc)
 
     async def _validate_conversion_rules(self, stock_doc: StockDoc) -> None:
@@ -357,21 +357,22 @@ class StockDocService:
             if not line.is_variant_line():
                 raise StockDocConversionError("Conversion lines must reference variants, not gas types")
 
-        # Ensure quantities match (1:1 conversion for now)
-        quantities = [line.quantity for line in stock_doc.stock_doc_lines]
+        # Ensure quantities are opposite (negative for source, positive for target)
+        quantities = [abs(line.quantity) for line in stock_doc.stock_doc_lines]
         if len(set(quantities)) > 1:
             raise StockDocConversionError("Conversion quantities must match for both variants")
+        
+        # Ensure one is negative and one is positive
+        signs = [line.quantity > 0 for line in stock_doc.stock_doc_lines]
+        if len(set(signs)) != 2:  # Should have both True and False
+            raise StockDocConversionError("Conversion must have one negative (source) and one positive (target) quantity")
 
     async def _validate_truck_operation_rules(self, stock_doc: StockDoc) -> None:
         """Validate truck operation business rules"""
-        if stock_doc.doc_type == StockDocType.LOAD_MOB:
-            if not stock_doc.source_wh_id:
-                raise StockDocTruckOperationError("Load operation requires source warehouse")
+        if stock_doc.doc_type == StockDocType.TRF_TRUCK:
+            if not stock_doc.source_wh_id and not stock_doc.dest_wh_id:
+                raise StockDocTruckOperationError("Truck transfers require either source or destination warehouse")
             # Could add truck capacity validation here
-        
-        elif stock_doc.doc_type == StockDocType.UNLD_MOB:
-            if not stock_doc.dest_wh_id:
-                raise StockDocTruckOperationError("Unload operation requires destination warehouse")
 
     async def _validate_stock_availability(self, stock_doc: StockDoc) -> None:
         """Validate stock availability for issue operations"""

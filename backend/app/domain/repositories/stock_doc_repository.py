@@ -207,7 +207,7 @@ class StockDocRepository(ABC):
 
     @abstractmethod
     async def get_pending_transfers_by_warehouse(self, warehouse_id: UUID, tenant_id: UUID) -> List[StockDoc]:
-        """Get pending transfer documents (shipped but not received) for a warehouse"""
+        """Get pending transfer documents (open transfers) for a warehouse"""
         pass
 
     @abstractmethod
@@ -236,7 +236,7 @@ class StockDocRepository(ABC):
     # Transfer-specific operations
     @abstractmethod
     async def ship_transfer(self, doc_id: str, updated_by: Optional[UUID] = None) -> bool:
-        """Mark a transfer document as shipped"""
+        """Mark a transfer document as posted (shipped)"""
         pass
 
     @abstractmethod

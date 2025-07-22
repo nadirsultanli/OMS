@@ -67,6 +67,92 @@ router = APIRouter(prefix="/stock-docs", tags=["Stock Documents"])
 # STOCK DOCUMENT CRUD ENDPOINTS
 # ============================================================================
 
+# Move specific routes before parameterized routes to avoid conflicts
+@router.get("/count", response_model=StockDocCountResponse)
+async def get_stock_doc_count(
+    doc_type: Optional[StockDocType] = Query(None, description="Filter by document type"),
+    status: Optional[StockDocStatus] = Query(None, description="Filter by document status"),
+    stock_doc_service: StockDocService = Depends(get_stock_doc_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Get stock document count"""
+    try:
+        count = await stock_doc_service.get_document_count(
+            tenant_id=current_user.tenant_id,
+            doc_type=doc_type,
+            status=status
+        )
+
+        return StockDocCountResponse(
+            total=count,
+            doc_type=doc_type,
+            status=status,
+            tenant_id=current_user.tenant_id
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/generate-number/{doc_type}", response_model=DocumentNumberResponse)
+async def generate_doc_number(
+    doc_type: StockDocType,
+    stock_doc_service: StockDocService = Depends(get_stock_doc_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate document number for a document type"""
+    try:
+        doc_no = await stock_doc_service.generate_doc_number(current_user.tenant_id, doc_type)
+        
+        return DocumentNumberResponse(
+            doc_no=doc_no,
+            doc_type=doc_type,
+            tenant_id=current_user.tenant_id
+        )
+
+    except StockDocNumberGenerationError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/movements/summary", response_model=StockMovementsSummaryResponse)
+async def get_stock_movements_summary(
+    warehouse_id: Optional[UUID] = Query(None, description="Filter by warehouse"),
+    variant_id: Optional[UUID] = Query(None, description="Filter by variant"),
+    gas_type: Optional[str] = Query(None, description="Filter by gas type"),
+    start_date: Optional[datetime] = Query(None, description="Start date"),
+    end_date: Optional[datetime] = Query(None, description="End date"),
+    stock_doc_service: StockDocService = Depends(get_stock_doc_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Get stock movements summary"""
+    try:
+        summary = await stock_doc_service.get_stock_movements_summary(
+            tenant_id=current_user.tenant_id,
+            warehouse_id=warehouse_id,
+            variant_id=variant_id,
+            gas_type=gas_type,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        total_docs = sum(data.get('document_count', 0) for data in summary.values())
+        total_qty = sum(data.get('total_quantity', 0) for data in summary.values())
+
+        return StockMovementsSummaryResponse(
+            period_start=start_date,
+            period_end=end_date,
+            warehouse_id=warehouse_id,
+            variant_id=variant_id,
+            gas_type=gas_type,
+            movements_by_type=summary,
+            total_documents=total_docs,
+            total_quantity=total_qty
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.post("/", response_model=StockDocResponse, status_code=status.HTTP_201_CREATED)
 async def create_stock_doc(
     request: CreateStockDocRequest,
@@ -638,90 +724,6 @@ async def create_truck_unload(
 # ============================================================================
 # UTILITY ENDPOINTS
 # ============================================================================
-
-@router.get("/count", response_model=StockDocCountResponse)
-async def get_stock_doc_count(
-    doc_type: Optional[StockDocType] = Query(None, description="Filter by document type"),
-    status: Optional[StockDocStatus] = Query(None, description="Filter by document status"),
-    stock_doc_service: StockDocService = Depends(get_stock_doc_service),
-    current_user: User = Depends(get_current_user)
-):
-    """Get stock document count"""
-    try:
-        count = await stock_doc_service.get_document_count(
-            tenant_id=current_user.tenant_id,
-            doc_type=doc_type,
-            status=status
-        )
-
-        return StockDocCountResponse(
-            total=count,
-            doc_type=doc_type,
-            status=status,
-            tenant_id=current_user.tenant_id
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-
-
-@router.get("/generate-number/{doc_type}", response_model=DocumentNumberResponse)
-async def generate_doc_number(
-    doc_type: StockDocType,
-    stock_doc_service: StockDocService = Depends(get_stock_doc_service),
-    current_user: User = Depends(get_current_user)
-):
-    """Generate document number for a document type"""
-    try:
-        doc_no = await stock_doc_service.generate_doc_number(current_user.tenant_id, doc_type)
-        
-        return DocumentNumberResponse(
-            doc_no=doc_no,
-            doc_type=doc_type,
-            tenant_id=current_user.tenant_id
-        )
-
-    except StockDocNumberGenerationError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-
-
-@router.get("/movements/summary", response_model=StockMovementsSummaryResponse)
-async def get_stock_movements_summary(
-    warehouse_id: Optional[UUID] = Query(None, description="Filter by warehouse"),
-    variant_id: Optional[UUID] = Query(None, description="Filter by variant"),
-    gas_type: Optional[str] = Query(None, description="Filter by gas type"),
-    start_date: Optional[datetime] = Query(None, description="Start date"),
-    end_date: Optional[datetime] = Query(None, description="End date"),
-    stock_doc_service: StockDocService = Depends(get_stock_doc_service),
-    current_user: User = Depends(get_current_user)
-):
-    """Get stock movements summary"""
-    try:
-        summary = await stock_doc_service.get_stock_movements_summary(
-            tenant_id=current_user.tenant_id,
-            warehouse_id=warehouse_id,
-            variant_id=variant_id,
-            gas_type=gas_type,
-            start_date=start_date,
-            end_date=end_date
-        )
-
-        total_docs = sum(data.get('document_count', 0) for data in summary.values())
-        total_qty = sum(data.get('total_quantity', 0) for data in summary.values())
-
-        return StockMovementsSummaryResponse(
-            period_start=start_date,
-            period_end=end_date,
-            warehouse_id=warehouse_id,
-            variant_id=variant_id,
-            gas_type=gas_type,
-            movements_by_type=summary,
-            total_documents=total_docs,
-            total_quantity=total_qty
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get("/{doc_id}/business-rules", response_model=StockDocBusinessRulesResponse)

@@ -7,19 +7,21 @@ from dataclasses import dataclass, field
 
 
 class StockDocType(str, Enum):
-    """Stock document type enumeration"""
-    REC_FIL = "rec_fil"      # External Receipt - Filling Warehouse
-    ISS_FIL = "iss_fil"      # External Issue - Filling Warehouse
-    XFER = "xfer"            # Internal Transfer between warehouses
-    CONV_FIL = "conv_fil"    # Variant Conversion - Filling Warehouse
-    LOAD_MOB = "load_mob"    # Load truck from warehouse
-    UNLD_MOB = "unld_mob"    # Unload truck to warehouse
+    """Stock document type enumeration - Updated to match database schema"""
+    REC_SUPP = "REC_SUPP"      # External Receipt - Supplier
+    REC_RET = "REC_RET"        # External Receipt - Return
+    ISS_LOAD = "ISS_LOAD"      # External Issue - Load
+    ISS_SALE = "ISS_SALE"      # External Issue - Sale
+    ADJ_SCRAP = "ADJ_SCRAP"    # Adjustment - Scrap
+    ADJ_VARIANCE = "ADJ_VARIANCE"  # Adjustment - Variance
+    REC_FILL = "REC_FILL"      # External Receipt - Filling Warehouse
+    TRF_WH = "TRF_WH"          # Internal Transfer between warehouses
+    TRF_TRUCK = "TRF_TRUCK"    # Transfer to/from truck
 
 
 class StockDocStatus(str, Enum):
-    """Stock document status enumeration"""
+    """Stock document status enumeration - Updated to match database schema"""
     OPEN = "open"           # Initial state, can be modified
-    SHIPPED = "shipped"     # For transfers - shipped but not received
     POSTED = "posted"       # Finalized, stock movements applied
     CANCELLED = "cancelled" # Cancelled before posting
 
@@ -65,9 +67,9 @@ class StockDocLine:
         if self.variant_id is None and self.gas_type is None:
             raise ValueError("Must have either variant_id or gas_type")
         
-        # Quantity must be positive
-        if self.quantity <= 0:
-            raise ValueError("Quantity must be positive")
+        # Quantity cannot be zero
+        if self.quantity == 0:
+            raise ValueError("Quantity cannot be zero")
 
     def calculate_line_value(self) -> Decimal:
         """Calculate the total value of this line"""
@@ -193,8 +195,7 @@ class StockDoc:
     def _validate_status_transition(self, new_status: StockDocStatus):
         """Validate that the status transition is allowed"""
         valid_transitions = {
-            StockDocStatus.OPEN: [StockDocStatus.SHIPPED, StockDocStatus.POSTED, StockDocStatus.CANCELLED],
-            StockDocStatus.SHIPPED: [StockDocStatus.POSTED, StockDocStatus.CANCELLED],
+            StockDocStatus.OPEN: [StockDocStatus.POSTED, StockDocStatus.CANCELLED],
             StockDocStatus.POSTED: [],  # Posted documents cannot change status
             StockDocStatus.CANCELLED: []  # Cancelled documents cannot change status
         }
@@ -221,24 +222,32 @@ class StockDoc:
 
     def _validate_warehouse_requirements(self):
         """Validate warehouse requirements based on document type"""
-        if self.doc_type in [StockDocType.REC_FIL, StockDocType.ISS_FIL, StockDocType.CONV_FIL]:
-            # External receipts/issues and conversions require destination warehouse only
+        if self.doc_type in [StockDocType.REC_FILL, StockDocType.REC_SUPP, StockDocType.REC_RET]:
+            # External receipts require destination warehouse only
             if not self.dest_wh_id:
                 raise ValueError(f"{self.doc_type} requires destination warehouse")
             
-        elif self.doc_type == StockDocType.XFER:
+        elif self.doc_type in [StockDocType.ISS_LOAD, StockDocType.ISS_SALE]:
+            # External issues require source warehouse only
+            if not self.source_wh_id:
+                raise ValueError(f"{self.doc_type} requires source warehouse")
+                
+        elif self.doc_type == StockDocType.TRF_WH:
             # Transfers require both source and destination
             if not self.source_wh_id or not self.dest_wh_id:
                 raise ValueError("Transfers require both source and destination warehouses")
             if self.source_wh_id == self.dest_wh_id:
                 raise ValueError("Source and destination warehouses must be different")
                 
-        elif self.doc_type in [StockDocType.LOAD_MOB, StockDocType.UNLD_MOB]:
-            # Truck operations require source for load, destination for unload
-            if self.doc_type == StockDocType.LOAD_MOB and not self.source_wh_id:
-                raise ValueError("Load operations require source warehouse")
-            if self.doc_type == StockDocType.UNLD_MOB and not self.dest_wh_id:
-                raise ValueError("Unload operations require destination warehouse")
+        elif self.doc_type == StockDocType.TRF_TRUCK:
+            # Truck transfers require either source or destination warehouse
+            if not self.source_wh_id and not self.dest_wh_id:
+                raise ValueError("Truck transfers require either source or destination warehouse")
+                
+        elif self.doc_type in [StockDocType.ADJ_SCRAP, StockDocType.ADJ_VARIANCE]:
+            # Adjustments require destination warehouse
+            if not self.dest_wh_id:
+                raise ValueError(f"{self.doc_type} requires destination warehouse")
 
     def can_be_modified(self) -> bool:
         """Check if the document can be modified"""
@@ -246,31 +255,31 @@ class StockDoc:
 
     def can_be_posted(self) -> bool:
         """Check if the document can be posted"""
-        return self.doc_status in [StockDocStatus.OPEN, StockDocStatus.SHIPPED]
+        return self.doc_status == StockDocStatus.OPEN
 
     def can_be_cancelled(self) -> bool:
         """Check if the document can be cancelled"""
-        return self.doc_status in [StockDocStatus.OPEN, StockDocStatus.SHIPPED]
+        return self.doc_status == StockDocStatus.OPEN
 
     def is_transfer(self) -> bool:
         """Check if this is a transfer document"""
-        return self.doc_type == StockDocType.XFER
+        return self.doc_type == StockDocType.TRF_WH
 
     def is_external_receipt(self) -> bool:
         """Check if this is an external receipt"""
-        return self.doc_type == StockDocType.REC_FIL
+        return self.doc_type in [StockDocType.REC_FILL, StockDocType.REC_SUPP, StockDocType.REC_RET]
 
     def is_external_issue(self) -> bool:
         """Check if this is an external issue"""
-        return self.doc_type == StockDocType.ISS_FIL
+        return self.doc_type in [StockDocType.ISS_LOAD, StockDocType.ISS_SALE]
 
     def is_conversion(self) -> bool:
         """Check if this is a conversion document"""
-        return self.doc_type == StockDocType.CONV_FIL
+        return self.doc_type in [StockDocType.ADJ_SCRAP, StockDocType.ADJ_VARIANCE]
 
     def is_truck_operation(self) -> bool:
         """Check if this is a truck operation"""
-        return self.doc_type in [StockDocType.LOAD_MOB, StockDocType.UNLD_MOB]
+        return self.doc_type == StockDocType.TRF_TRUCK
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation"""

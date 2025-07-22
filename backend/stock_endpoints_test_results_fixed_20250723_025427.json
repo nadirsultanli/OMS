@@ -1,0 +1,220 @@
+{
+  "test_timestamp": "2025-07-23T02:54:27.513148",
+  "base_url": "http://localhost:8000",
+  "results": [
+    {
+      "endpoint": "/stock-docs/",
+      "method": "POST",
+      "status_code": 422,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"Stock document integrity error: Failed to create stock document: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InvalidTextRepresentationError'>: invalid input value for enum stock_doc_status: \\\"OPEN\\\"\\n[SQL: INSERT INTO stock_docs (id, tenant_id, source_wh_id, dest_wh_id, doc_no, doc_type, doc_status, ref_doc_id, ref_doc_type, posted_date, total_qty, notes, created_by, updated_by, deleted_at, deleted_by) VALUES ($1::UUID, $2::UUID, $3::UUID, $4::UUID, $5::VARCHAR, $6, $7, $8::UUID, $9::VARCHAR, $10::TIMESTAMP WITH TIME ZONE, $11::NUMERIC(12, 3), $12::VARCHAR, $13::UUID, $14::UUID, $15::TIMESTAMP WITH TIME ZONE, $16::UUID) RETURNING stock_docs.created_at, stock_docs.updated_at]\\n[parameters: (UUID('f341a8b1-38b9-4252-958a-6544e4b81911'), UUID('332072c1-5405-4f09-a56f-a631defa911b'), UUID('5bde8036-01d3-46dd-a150-ccb2951463ce'), UUID('c1ea1cf5-45b1-4c71-b113-86445467b592'), 'TRF_WH-000001', 'TRF_WH', 'OPEN', None, None, None, Decimal('10.0'), 'Test transfer document', UUID('572c619c-32e4-45dc-9027-8c594a9d0612'), None, None, None)]\\n(Background on this error at: https://sqlalche.me/e/20/dbapi)\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/{doc_id}",
+      "method": "GET",
+      "status_code": 0,
+      "success": false,
+      "response_data": null,
+      "error_message": "No document ID available from create test",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/by-number/{doc_no}",
+      "method": "GET",
+      "status_code": 0,
+      "success": false,
+      "response_data": null,
+      "error_message": "No document number available from create test",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "stock_docs": [],
+        "total": 0,
+        "limit": 10,
+        "offset": 0
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/type/TRF_WH",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": [],
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/status/open",
+      "method": "GET",
+      "status_code": 500,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"(sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InvalidTextRepresentationError'>: invalid input value for enum stock_doc_status: \\\"OPEN\\\"\\n[SQL: SELECT stock_docs.id, stock_docs.tenant_id, stock_docs.source_wh_id, stock_docs.dest_wh_id, stock_docs.doc_no, stock_docs.doc_type, stock_docs.doc_status, stock_docs.ref_doc_id, stock_docs.ref_doc_type, stock_docs.posted_date, stock_docs.total_qty, stock_docs.notes, stock_docs.created_at, stock_docs.created_by, stock_docs.updated_at, stock_docs.updated_by, stock_docs.deleted_at, stock_docs.deleted_by \\nFROM stock_docs \\nWHERE stock_docs.doc_status = $1 AND stock_docs.tenant_id = $2::UUID AND stock_docs.deleted_at IS NULL ORDER BY stock_docs.created_at DESC]\\n[parameters: ('OPEN', UUID('332072c1-5405-4f09-a56f-a631defa911b'))]\\n(Background on this error at: https://sqlalche.me/e/20/dbapi)\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/warehouse/5bde8036-01d3-46dd-a150-ccb2951463ce",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": [],
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/warehouse/5bde8036-01d3-46dd-a150-ccb2951463ce/pending-transfers",
+      "method": "GET",
+      "status_code": 500,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"SHIPPED\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/{doc_id}/post",
+      "method": "POST",
+      "status_code": 0,
+      "success": false,
+      "response_data": null,
+      "error_message": "No document ID available from create test",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/{doc_id}/cancel",
+      "method": "POST",
+      "status_code": 0,
+      "success": false,
+      "response_data": null,
+      "error_message": "No document ID available from create test",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/{doc_id}/ship",
+      "method": "POST",
+      "status_code": 0,
+      "success": false,
+      "response_data": null,
+      "error_message": "No document ID available from create test",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/{doc_id}/receive",
+      "method": "POST",
+      "status_code": 0,
+      "success": false,
+      "response_data": null,
+      "error_message": "No document ID available from create test",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/conversions",
+      "method": "POST",
+      "status_code": 500,
+      "success": false,
+      "response_data": null,
+      "error_message": "Internal Server Error",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/transfers",
+      "method": "POST",
+      "status_code": 422,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"Stock document integrity error: Failed to create stock document: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InvalidTextRepresentationError'>: invalid input value for enum stock_doc_status: \\\"OPEN\\\"\\n[SQL: INSERT INTO stock_docs (id, tenant_id, source_wh_id, dest_wh_id, doc_no, doc_type, doc_status, ref_doc_id, ref_doc_type, posted_date, total_qty, notes, created_by, updated_by, deleted_at, deleted_by) VALUES ($1::UUID, $2::UUID, $3::UUID, $4::UUID, $5::VARCHAR, $6, $7, $8::UUID, $9::VARCHAR, $10::TIMESTAMP WITH TIME ZONE, $11::NUMERIC(12, 3), $12::VARCHAR, $13::UUID, $14::UUID, $15::TIMESTAMP WITH TIME ZONE, $16::UUID) RETURNING stock_docs.created_at, stock_docs.updated_at]\\n[parameters: (UUID('fee76918-ecbe-4f3d-8f77-d04a47c1ba5f'), UUID('332072c1-5405-4f09-a56f-a631defa911b'), UUID('5bde8036-01d3-46dd-a150-ccb2951463ce'), UUID('c1ea1cf5-45b1-4c71-b113-86445467b592'), 'TRF_WH-000001', 'TRF_WH', 'OPEN', None, None, None, Decimal('3.0'), 'Test transfer', UUID('572c619c-32e4-45dc-9027-8c594a9d0612'), None, None, None)]\\n(Background on this error at: https://sqlalche.me/e/20/dbapi)\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/truck-loads",
+      "method": "POST",
+      "status_code": 422,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"Stock document integrity error: Failed to create stock document: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InvalidTextRepresentationError'>: invalid input value for enum stock_doc_status: \\\"OPEN\\\"\\n[SQL: INSERT INTO stock_docs (id, tenant_id, source_wh_id, dest_wh_id, doc_no, doc_type, doc_status, ref_doc_id, ref_doc_type, posted_date, total_qty, notes, created_by, updated_by, deleted_at, deleted_by) VALUES ($1::UUID, $2::UUID, $3::UUID, $4::UUID, $5::VARCHAR, $6, $7, $8::UUID, $9::VARCHAR, $10::TIMESTAMP WITH TIME ZONE, $11::NUMERIC(12, 3), $12::VARCHAR, $13::UUID, $14::UUID, $15::TIMESTAMP WITH TIME ZONE, $16::UUID) RETURNING stock_docs.created_at, stock_docs.updated_at]\\n[parameters: (UUID('2b4289d9-2ed3-4011-a59a-46590e9d9b88'), UUID('332072c1-5405-4f09-a56f-a631defa911b'), UUID('5bde8036-01d3-46dd-a150-ccb2951463ce'), None, 'TRF_TRUCK-000001', 'TRF_TRUCK', 'OPEN', None, None, None, Decimal('2.0'), 'Truck: TRUCK-001\\\\nTest truck load', UUID('572c619c-32e4-45dc-9027-8c594a9d0612'), None, None, None)]\\n(Background on this error at: https://sqlalche.me/e/20/dbapi)\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/truck-unloads",
+      "method": "POST",
+      "status_code": 422,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"Stock document integrity error: Failed to create stock document: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InvalidTextRepresentationError'>: invalid input value for enum stock_doc_status: \\\"OPEN\\\"\\n[SQL: INSERT INTO stock_docs (id, tenant_id, source_wh_id, dest_wh_id, doc_no, doc_type, doc_status, ref_doc_id, ref_doc_type, posted_date, total_qty, notes, created_by, updated_by, deleted_at, deleted_by) VALUES ($1::UUID, $2::UUID, $3::UUID, $4::UUID, $5::VARCHAR, $6, $7, $8::UUID, $9::VARCHAR, $10::TIMESTAMP WITH TIME ZONE, $11::NUMERIC(12, 3), $12::VARCHAR, $13::UUID, $14::UUID, $15::TIMESTAMP WITH TIME ZONE, $16::UUID) RETURNING stock_docs.created_at, stock_docs.updated_at]\\n[parameters: (UUID('27cf19c4-4c41-4e96-997e-a62e4222966f'), UUID('332072c1-5405-4f09-a56f-a631defa911b'), None, UUID('c1ea1cf5-45b1-4c71-b113-86445467b592'), 'TRF_TRUCK-000001', 'TRF_TRUCK', 'OPEN', None, None, None, Decimal('2.0'), 'Truck: TRUCK-001\\\\nTest truck unload', UUID('572c619c-32e4-45dc-9027-8c594a9d0612'), None, None, None)]\\n(Background on this error at: https://sqlalche.me/e/20/dbapi)\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/count",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "total": 0,
+        "doc_type": null,
+        "status": null,
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b"
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/generate-number/TRF_WH",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "doc_no": "TRF_WH-000001",
+        "doc_type": "TRF_WH",
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b"
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/movements/summary",
+      "method": "GET",
+      "status_code": 500,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"(sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InvalidTextRepresentationError'>: invalid input value for enum stock_doc_status: \\\"POSTED\\\"\\n[SQL: SELECT stock_docs.doc_type, count(stock_docs.id) AS document_count, sum(stock_docs.total_qty) AS total_quantity \\nFROM stock_docs \\nWHERE stock_docs.tenant_id = $1::UUID AND stock_docs.doc_status = $2 AND stock_docs.deleted_at IS NULL GROUP BY stock_docs.doc_type]\\n[parameters: (UUID('332072c1-5405-4f09-a56f-a631defa911b'), 'POSTED')]\\n(Background on this error at: https://sqlalche.me/e/20/dbapi)\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/{doc_id}/business-rules",
+      "method": "GET",
+      "status_code": 0,
+      "success": false,
+      "response_data": null,
+      "error_message": "No document ID available from create test",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/{doc_id}",
+      "method": "PUT",
+      "status_code": 0,
+      "success": false,
+      "response_data": null,
+      "error_message": "No document ID available from create test",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/{doc_id}",
+      "method": "DELETE",
+      "status_code": 0,
+      "success": false,
+      "response_data": null,
+      "error_message": "No document ID available from create test",
+      "expected_failure": false
+    }
+  ],
+  "created_doc_id": null,
+  "created_doc_no": null
+}
