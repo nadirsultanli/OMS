@@ -131,7 +131,6 @@ class PriceListService:
         # Validate that either variant_id or gas_type is provided
         if not variant_id and not gas_type:
             raise ValueError("Either variant_id or gas_type must be provided")
-        
         if variant_id and gas_type:
             raise ValueError("Cannot specify both variant_id and gas_type")
         

@@ -316,6 +316,15 @@ class UserService:
         # Note: updated_by is not set for login updates as it's the same user
         return await self.user_repository.update_user(str(user.id), user)
     
+    async def update_user_auth_id(self, user_id: str, auth_user_id: str) -> User:
+        """Update user's auth_user_id for Supabase integration"""
+        from datetime import datetime
+        user = await self.get_user_by_id(user_id)
+        from uuid import UUID
+        user.auth_user_id = UUID(auth_user_id)
+        user.updated_at = datetime.utcnow()
+        return await self.user_repository.update_user(str(user.id), user)
+    
     async def update_user_with_audit(self, user_id: str, updated_by: UUID, **kwargs) -> User:
         """Update user with proper audit trail"""
         from datetime import datetime

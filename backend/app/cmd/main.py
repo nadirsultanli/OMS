@@ -36,16 +36,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         default_logger.error(f"Failed to initialize database: {str(e)}")
     
-    # Initialize direct SQLAlchemy connection (one-time)
-    try:
-        await init_direct_database()
-        # Test a one-time connection using async context manager
-        if direct_db_connection._engine:
-            async with direct_db_connection._engine.connect() as conn:
-                await conn.execute(sqlalchemy.text("SELECT 1"))
-            default_logger.info("Direct SQLAlchemy one-time connection successful")
-    except Exception as e:
-        default_logger.error(f"Failed to initialize direct SQLAlchemy connection: {str(e)}")
+    # Initialize direct SQLAlchemy connection (only for local development)
+    from app.services.dependencies.railway_users import should_use_railway_mode
+    if not should_use_railway_mode():
+        try:
+            await init_direct_database()
+            # Test a one-time connection using async context manager
+            if direct_db_connection._engine:
+                async with direct_db_connection._engine.connect() as conn:
+                    await conn.execute(sqlalchemy.text("SELECT 1"))
+                default_logger.info("Direct SQLAlchemy connection successful (local development)")
+        except Exception as e:
+            default_logger.error(f"Failed to initialize direct SQLAlchemy connection: {str(e)}")
+    else:
+        default_logger.info("Skipping direct SQLAlchemy connection (Railway mode enabled)")
     
     yield
     
@@ -202,6 +206,70 @@ async def debug_supabase():
             "error": f"Debug failed: {str(e)}",
             "error_type": type(e).__name__
         }
+
+
+@app.get("/debug/database")
+async def debug_database():
+    """Debug endpoint to test database connectivity"""
+    from decouple import config
+    
+    try:
+        database_url = config("DATABASE_URL", default=None)
+        
+        if not database_url:
+            return {"error": "DATABASE_URL not configured"}
+        
+        # Test direct connection
+        try:
+            from app.infrastucture.database.connection import direct_db_connection
+            
+            if direct_db_connection._engine is None:
+                return {"error": "Database engine not initialized"}
+            
+            # Try to get a session and execute a simple query
+            async with direct_db_connection._engine.connect() as conn:
+                result = await conn.execute(sqlalchemy.text("SELECT 1 as test"))
+                row = result.fetchone()
+                return {
+                    "database_url_configured": True,
+                    "database_url_format": database_url[:50] + "..." if len(database_url) > 50 else database_url,
+                    "connection_test": "✓ Success",
+                    "test_query_result": dict(row) if row else None,
+                    "timestamp": str(datetime.now())
+                }
+                
+        except Exception as e:
+            return {
+                "database_url_configured": True,
+                "database_url_format": database_url[:50] + "..." if len(database_url) > 50 else database_url,
+                "connection_test": f"✗ Failed: {str(e)}",
+                "error_type": type(e).__name__,
+                "timestamp": str(datetime.now())
+            }
+            
+    except Exception as e:
+        default_logger.error(f"Database debug failed: {str(e)}", exc_info=True)
+        return {
+            "error": f"Debug failed: {str(e)}",
+            "error_type": type(e).__name__
+        }
+
+
+@app.get("/debug/railway")
+async def debug_railway_mode():
+    """Debug endpoint to check Railway mode detection"""
+    from app.services.dependencies.railway_users import should_use_railway_mode
+    from decouple import config
+    
+    return {
+        "railway_mode": should_use_railway_mode(),
+        "environment": config("ENVIRONMENT", default="development"),
+        "use_railway_mode_var": config("USE_RAILWAY_MODE", default="false"),
+        "railway_environment": config("RAILWAY_ENVIRONMENT", default=None),
+        "railway_project_id": config("RAILWAY_PROJECT_ID", default=None),
+        "railway_service_id": config("RAILWAY_SERVICE_ID", default=None),
+        "timestamp": str(datetime.now())
+    }
 
 @app.get("/logs/test")
 async def test_logging(request: Request):
