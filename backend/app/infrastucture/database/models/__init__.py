@@ -6,6 +6,7 @@ from .adresses import Address
 from .products import Product
 from .variants import Variant
 from .price_lists import PriceListModel, PriceListLineModel
+from .orders import OrderModel, OrderLineModel, OrderStatus
 
 __all__ = [
     "Base",
@@ -16,5 +17,8 @@ __all__ = [
     "Product",
     "Variant",
     "PriceListModel",
-    "PriceListLineModel"
+    "PriceListLineModel",
+    "OrderModel",
+    "OrderLineModel",
+    "OrderStatus"
 ] 
