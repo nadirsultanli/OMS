@@ -94,7 +94,7 @@ class OrderSummaryListResponse(BaseModel):
 class OrderStatusResponse(BaseModel):
     """Schema for order status update response"""
     order_id: str = Field(..., description="Order ID")
-    status: str = Field(..., description="New order status")
+    status: OrderStatus = Field(..., description="New order status")
     message: Optional[str] = Field(None, description="Additional message")
 
     class Config:
