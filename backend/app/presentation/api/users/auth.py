@@ -382,43 +382,43 @@ async def accept_invitation(
         auth_response = None
         
         try:
-            # Method 1: Try to verify the token by setting session with it
-            # For invitation tokens, we set session first to authenticate, then update password
-            default_logger.info("Attempting to set session with invitation token")
-            session_response = supabase.auth.set_session(request.token, request.token)
-            
-            if not session_response.user:
-                raise Exception("Session creation failed - no user returned")
-                
-            default_logger.info(f"Session created successfully for user: {session_response.user.email}")
-            
-            # Now that we have an authenticated session, update the password
+            # Method 1: Try direct password update with access_token first (most reliable for invitations)
+            default_logger.info("Attempting direct password update with invitation token")
             auth_response = supabase.auth.update_user({
                 "password": request.password
-            })
+            }, access_token=request.token)
             
             if not auth_response.user:
-                raise Exception("Password update failed - no user returned")
+                raise Exception("Direct password update failed - no user returned")
                 
-            default_logger.info(f"Password updated successfully for user: {auth_response.user.email}")
+            default_logger.info(f"Direct password update successful for user: {auth_response.user.email}")
             
-        except Exception as session_error:
-            default_logger.error(f"Session-based invitation acceptance failed: {str(session_error)}")
+        except Exception as direct_error:
+            default_logger.error(f"Direct password update failed: {str(direct_error)}")
             
-            # Method 2: Try direct password update with token as access_token
+            # Method 2: Try setting session first, then updating password
             try:
-                default_logger.info("Attempting direct password update with token")
+                default_logger.info("Attempting session-based password update with invitation token")
+                # For invitation tokens, we should not set refresh token to the same value
+                session_response = supabase.auth.set_session(request.token, None)
+                
+                if not session_response.user:
+                    raise Exception("Session creation failed - no user returned")
+                    
+                default_logger.info(f"Session created successfully for user: {session_response.user.email}")
+                
+                # Now update the password in the established session
                 auth_response = supabase.auth.update_user({
                     "password": request.password
-                }, access_token=request.token)
+                })
                 
                 if not auth_response.user:
-                    raise Exception("Direct password update failed - no user returned")
+                    raise Exception("Password update failed - no user returned")
                     
-                default_logger.info(f"Direct password update successful for user: {auth_response.user.email}")
+                default_logger.info(f"Session-based password update successful for user: {auth_response.user.email}")
                 
-            except Exception as direct_error:
-                default_logger.error(f"Direct password update also failed: {str(direct_error)}")
+            except Exception as session_error:
+                default_logger.error(f"Session-based password update also failed: {str(session_error)}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid or expired invitation token. Please request a new invitation."
@@ -443,6 +443,30 @@ async def accept_invitation(
             except Exception as auth_id_error:
                 default_logger.error(f"Failed to update auth_user_id: {str(auth_id_error)}")
                 # Continue anyway, this might not be critical
+        
+        # Verify the password was actually set by testing sign-in
+        # This ensures we only activate users who can actually log in
+        try:
+            default_logger.info("Verifying password was set correctly by testing sign-in")
+            test_auth = supabase.auth.sign_in_with_password({
+                "email": auth_response.user.email,
+                "password": request.password
+            })
+            
+            if not test_auth.user:
+                raise Exception("Password verification failed - sign-in unsuccessful")
+                
+            default_logger.info("Password verification successful - user can sign in")
+            
+            # Sign out the test session immediately
+            supabase.auth.sign_out()
+            
+        except Exception as verify_error:
+            default_logger.error(f"Password verification failed: {str(verify_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password update failed. Please try again with a new invitation link."
+            )
         
         # Activate the user if they're not already active (THIS IS THE KEY STEP)
         if user.status != UserStatus.ACTIVE:
