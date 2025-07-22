@@ -32,7 +32,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
             tenant_id=model.tenant_id,
             order_no=model.order_no,
             customer_id=model.customer_id,
-            order_status=OrderStatus(model.order_status) if isinstance(model.order_status, str) else model.order_status,  # Convert string to enum if needed
+            order_status=OrderStatus(model.order_status),  # Convert string to enum
             requested_date=model.requested_date,
             delivery_instructions=model.delivery_instructions,
             payment_terms=model.payment_terms,
@@ -73,7 +73,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
             tenant_id=entity.tenant_id,
             order_no=entity.order_no,
             customer_id=entity.customer_id,
-            order_status=entity.order_status.value,  # Convert enum to string
+            order_status=entity.order_status,  # Use enum directly
             requested_date=entity.requested_date,
             delivery_instructions=entity.delivery_instructions,
             payment_terms=entity.payment_terms,
