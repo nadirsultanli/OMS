@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -163,6 +164,44 @@ async def debug_environment():
         "python_version": os.sys.version,
         "available_env_keys": [key for key in os.environ.keys() if "SUPABASE" in key or "DATABASE" in key or "PORT" in key]
     }
+
+
+@app.get("/debug/supabase")
+async def debug_supabase():
+    """Debug endpoint to test Supabase connection and auth"""
+    try:
+        from app.infrastucture.database.connection import get_supabase_client_sync
+        
+        # Test Supabase client creation
+        try:
+            supabase = get_supabase_client_sync()
+            client_status = "✓ Client created successfully"
+        except Exception as e:
+            return {
+                "client_creation": f"✗ Failed: {str(e)}",
+                "error_type": type(e).__name__
+            }
+        
+        # Test a simple auth call
+        try:
+            # Try to get current session (should return null if no session)
+            session_info = supabase.auth.get_session()
+            auth_status = "✓ Auth API accessible"
+        except Exception as e:
+            auth_status = f"✗ Auth API failed: {str(e)}"
+        
+        return {
+            "client_creation": client_status,
+            "auth_api": auth_status,
+            "timestamp": str(datetime.now())
+        }
+        
+    except Exception as e:
+        default_logger.error(f"Supabase debug failed: {str(e)}", exc_info=True)
+        return {
+            "error": f"Debug failed: {str(e)}",
+            "error_type": type(e).__name__
+        }
 
 @app.get("/logs/test")
 async def test_logging(request: Request):
