@@ -846,6 +846,31 @@ class SQLAlchemyStockDocRepository(StockDocRepository):
         required_quantity: float = 0
     ) -> bool:
         """Validate stock availability for issue operations"""
-        # This would typically check against a stock levels table
-        # For now, return True as placeholder
-        return True
+        # Import here to avoid circular dependency
+        from app.infrastucture.database.models.stock_levels import StockLevelModel
+        from app.domain.entities.stock_docs import StockStatus
+        from sqlalchemy import select, and_
+        from decimal import Decimal
+        
+        if not variant_id or required_quantity <= 0:
+            return True  # Skip validation for invalid inputs
+        
+        # Check available stock in ON_HAND status
+        stmt = (
+            select(StockLevelModel.available_qty)
+            .where(
+                and_(
+                    StockLevelModel.warehouse_id == warehouse_id,
+                    StockLevelModel.variant_id == variant_id,
+                    StockLevelModel.stock_status == StockStatus.ON_HAND
+                )
+            )
+        )
+        
+        result = await self.session.execute(stmt)
+        available_qty = result.scalar()
+        
+        if available_qty is None:
+            return False  # No stock record means no stock available
+        
+        return available_qty >= Decimal(str(required_quantity))

@@ -1,5 +1,7 @@
+from typing import List
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Enum
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.orm import relationship, Mapped
 from sqlalchemy.sql import func
 from app.infrastucture.database.models.base import Base
 from app.domain.entities.warehouses import WarehouseType
@@ -19,5 +21,10 @@ class WarehouseModel(Base):
     updated_by = Column(PostgresUUID(as_uuid=True), nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     deleted_by = Column(PostgresUUID(as_uuid=True), nullable=True)
+    
+    # Relationships
+    # Note: stock_levels relationship removed to avoid circular import issues
+    # Access stock levels through the repository layer instead
+    
     def __repr__(self):
         return f"<WarehouseModel(id={self.id}, code='{self.code}', name='{self.name}', tenant_id={self.tenant_id})>" 

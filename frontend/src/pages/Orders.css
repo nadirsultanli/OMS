@@ -352,6 +352,11 @@
   color: #dc2626;
 }
 
+.action-icon-btn.cancel:hover:not(:disabled) {
+  background: #fef3c7;
+  color: #d97706;
+}
+
 .action-icon-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

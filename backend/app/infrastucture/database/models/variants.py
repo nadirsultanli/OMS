@@ -1,11 +1,11 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from sqlalchemy import Column, DateTime, Date, Numeric, String, Text, Boolean, ForeignKey, Enum as SQLEnum, JSON
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
 
 from .base import Base
 from app.domain.entities.variants import SKUType, StateAttribute, RevenueCategory
