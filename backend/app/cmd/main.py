@@ -9,6 +9,7 @@ from app.core.logging_config import setup_logging, get_request_logger
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import init_database, init_direct_database, direct_db_connection
 from app.presentation.api.users import auth_router, user_router, verification_router
+from app.presentation.api.users.auth_fallback import auth_fallback_router
 from app.presentation.api.customers.customer import router as customer_router
 from app.presentation.api.tenants.tenant import router as tenant_router
 from app.presentation.api.addresses.address import router as address_router
@@ -101,6 +102,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(auth_fallback_router, prefix="/api/v1")  # Fallback for Railway
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(verification_router, prefix='/api/v1')
 app.include_router(customer_router, prefix="/api/v1")
@@ -198,6 +200,53 @@ async def debug_supabase():
         
     except Exception as e:
         default_logger.error(f"Supabase debug failed: {str(e)}", exc_info=True)
+        return {
+            "error": f"Debug failed: {str(e)}",
+            "error_type": type(e).__name__
+        }
+
+
+@app.get("/debug/database")
+async def debug_database():
+    """Debug endpoint to test database connectivity"""
+    from decouple import config
+    
+    try:
+        database_url = config("DATABASE_URL", default=None)
+        
+        if not database_url:
+            return {"error": "DATABASE_URL not configured"}
+        
+        # Test direct connection
+        try:
+            from app.infrastucture.database.connection import direct_db_connection
+            
+            if direct_db_connection._engine is None:
+                return {"error": "Database engine not initialized"}
+            
+            # Try to get a session and execute a simple query
+            async with direct_db_connection._engine.connect() as conn:
+                result = await conn.execute(sqlalchemy.text("SELECT 1 as test"))
+                row = result.fetchone()
+                return {
+                    "database_url_configured": True,
+                    "database_url_format": database_url[:50] + "..." if len(database_url) > 50 else database_url,
+                    "connection_test": "✓ Success",
+                    "test_query_result": dict(row) if row else None,
+                    "timestamp": str(datetime.now())
+                }
+                
+        except Exception as e:
+            return {
+                "database_url_configured": True,
+                "database_url_format": database_url[:50] + "..." if len(database_url) > 50 else database_url,
+                "connection_test": f"✗ Failed: {str(e)}",
+                "error_type": type(e).__name__,
+                "timestamp": str(datetime.now())
+            }
+            
+    except Exception as e:
+        default_logger.error(f"Database debug failed: {str(e)}", exc_info=True)
         return {
             "error": f"Debug failed: {str(e)}",
             "error_type": type(e).__name__
