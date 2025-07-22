@@ -2,7 +2,7 @@
 nixPkgs = ["python311", "postgresql"]
 
 [phases.install]
-cmds = ["pip install --no-cache-dir -r requirements.txt"]
+cmds = ["pip install --no-cache-dir -r requirements-dev.txt"]
 
 [phases.build]
 cmds = ["echo 'Build completed'"]
