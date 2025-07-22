@@ -42,10 +42,12 @@ class OrderModificationError(Exception):
 
 class OrderCancellationError(Exception):
     """Raised when trying to cancel an order that cannot be cancelled"""
-    def __init__(self, order_id: str, current_status: str):
-        self.order_id = order_id
+    def __init__(self, order_no: str, current_status: str):
+        self.order_no = order_no
         self.current_status = current_status
-        super().__init__(f"Order {order_id} cannot be cancelled in status {current_status}")
+        # Format status for better readability
+        formatted_status = current_status.replace('_', ' ').title()
+        super().__init__(f"Order '{order_no}' cannot be cancelled in status '{formatted_status}'")
 
 
 class OrderLineValidationError(Exception):

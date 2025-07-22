@@ -64,7 +64,7 @@ class OrderListResponse(BaseModel):
 class OrderSummaryResponse(BaseModel):
     """Schema for order summary (without order lines)"""
     id: UUID = Field(..., description="Order ID")
-    tenant_id: UUID = Field(..., description="Tenant ID")
+    tenant_id: Optional[UUID] = Field(None, description="Tenant ID")
     order_no: str = Field(..., description="Order number")
     customer_id: UUID = Field(..., description="Customer ID")
     order_status: OrderStatus = Field(..., description="Order status")
@@ -76,7 +76,7 @@ class OrderSummaryResponse(BaseModel):
     created_by: Optional[UUID] = Field(None, description="User who created the order")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_by: Optional[UUID] = Field(None, description="User who last updated the order")
-    updated_at: datetime = Field(..., description="Last update timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
     class Config:
         from_attributes = True
@@ -103,7 +103,6 @@ class OrderStatusResponse(BaseModel):
 
 class OrderLineQuantityUpdateResponse(BaseModel):
     """Schema for order line quantity update response"""
-    success: bool = Field(..., description="Whether the quantity update was successful")
     order_line_id: str = Field(..., description="Order line ID")
     qty_allocated: Optional[float] = Field(None, description="Updated allocated quantity")
     qty_delivered: Optional[float] = Field(None, description="Updated delivered quantity")
@@ -126,8 +125,7 @@ class OrderSearchResponse(BaseModel):
 class OrderCountResponse(BaseModel):
     """Schema for order count response"""
     total_orders: int = Field(..., description="Total number of orders")
-    orders_by_status: dict = Field(..., description="Count of orders by status")
-    tenant_id: UUID = Field(..., description="Tenant ID")
+    status_filter: Optional[str] = Field(None, description="Status filter used")
 
 
 class OrderLineAddResponse(BaseModel):

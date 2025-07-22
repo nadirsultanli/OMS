@@ -40,6 +40,7 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/users', label: 'Users', icon: UserPlus },
     { path: '/customers', label: 'Customers', icon: Users },
+    { path: '/orders', label: 'Orders', icon: FileText },
     { path: '/products', label: 'Products', icon: Package },
     { path: '/variants', label: 'Variants', icon: Package },
     { path: '/price-lists', label: 'Price Lists', icon: DollarSign },

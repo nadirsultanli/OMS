@@ -14,6 +14,7 @@ import Products from './pages/Products';
 import PriceLists from './pages/PriceLists';
 import PriceListDetail from './pages/PriceListDetail';
 import Variants from './pages/Variants';
+import Orders from './pages/Orders';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import authService from './services/authService';
@@ -137,6 +138,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Variants />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Orders />
                   </Layout>
                 </ProtectedRoute>
               }
