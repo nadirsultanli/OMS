@@ -107,6 +107,12 @@ async def get_order(
 ):
     """Get order by ID"""
     try:
+        # Validate UUID format
+        try:
+            UUID(order_id)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order ID format")
+        
         order = await order_service.get_order_by_id(order_id, current_user.tenant_id)
         return OrderResponse(**order.to_dict())
     
@@ -114,6 +120,8 @@ async def get_order(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except OrderTenantMismatchError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -150,12 +158,14 @@ async def get_orders(
         for order in orders:
             order_summaries.append(OrderSummaryResponse(
                 id=str(order.id),
+                tenant_id=str(order.tenant_id),
                 order_no=order.order_no,
                 customer_id=str(order.customer_id),
                 order_status=order.order_status.value,
                 total_amount=float(order.total_amount),
                 requested_date=order.requested_date,
-                created_at=order.created_at
+                created_at=order.created_at,
+                updated_at=order.updated_at
             ))
         
         return OrderSummaryListResponse(
@@ -183,12 +193,14 @@ async def get_orders_by_customer(
         for order in orders:
             order_summaries.append(OrderSummaryResponse(
                 id=str(order.id),
+                tenant_id=str(order.tenant_id),
                 order_no=order.order_no,
                 customer_id=str(order.customer_id),
                 order_status=order.order_status.value,
                 total_amount=float(order.total_amount),
                 requested_date=order.requested_date,
-                created_at=order.created_at
+                created_at=order.created_at,
+                updated_at=order.updated_at
             ))
         
         return OrderSummaryListResponse(
@@ -222,12 +234,14 @@ async def get_orders_by_status(
         for order in orders:
             order_summaries.append(OrderSummaryResponse(
                 id=str(order.id),
+                tenant_id=str(order.tenant_id),
                 order_no=order.order_no,
                 customer_id=str(order.customer_id),
                 order_status=order.order_status.value,
                 total_amount=float(order.total_amount),
                 requested_date=order.requested_date,
-                created_at=order.created_at
+                created_at=order.created_at,
+                updated_at=order.updated_at
             ))
         
         return OrderSummaryListResponse(
@@ -309,7 +323,7 @@ async def update_order_status(
         
         return OrderStatusResponse(
             order_id=order_id,
-            status=new_status.value,
+            status=new_status,
             message="Order status updated successfully"
         )
     
@@ -611,12 +625,14 @@ async def search_orders(
         for order in orders:
             order_summaries.append(OrderSummaryResponse(
                 id=str(order.id),
+                tenant_id=str(order.tenant_id),
                 order_no=order.order_no,
                 customer_id=str(order.customer_id),
                 order_status=order.order_status.value,
                 total_amount=float(order.total_amount),
                 requested_date=order.requested_date,
-                created_at=order.created_at
+                created_at=order.created_at,
+                updated_at=order.updated_at
             ))
         
         return OrderSearchResponse(
@@ -650,9 +666,16 @@ async def get_order_count(
         
         count = await order_service.get_orders_count(current_user.tenant_id, status_enum)
         
+        # Get counts by status
+        orders_by_status = {}
+        for status_value in OrderStatus:
+            status_count = await order_service.get_orders_count(current_user.tenant_id, status_value)
+            orders_by_status[status_value.value] = status_count
+        
         return OrderCountResponse(
             total_orders=count,
-            status_filter=status
+            orders_by_status=orders_by_status,
+            tenant_id=current_user.tenant_id
         )
     
     except HTTPException:
