@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import variantService from '../services/variantService';
 import productService from '../services/productService';
+import { extractErrorMessage } from '../utils/errorUtils';
 import { Search, Plus, Edit2, Trash2, Package, DollarSign, Box, Layers } from 'lucide-react';
 import './Variants.css';
 
@@ -68,10 +69,10 @@ const Variants = () => {
         }
         setVariants(filteredVariants);
       } else {
-        setError(result.error);
+        setError(extractErrorMessage(result.error));
       }
     } catch (error) {
-      setError('Failed to fetch variants');
+      setError(extractErrorMessage(error?.response?.data) || 'Failed to fetch variants');
     } finally {
       setLoading(false);
     }
@@ -211,10 +212,10 @@ const Variants = () => {
         setShowModal(false);
         fetchVariants();
       } else {
-        setError(result?.error || 'Failed to create variants');
+        setError(extractErrorMessage(result?.error) || 'Failed to create variants');
       }
     } catch (error) {
-      setError('Failed to create variants');
+      setError(extractErrorMessage(error?.response?.data) || 'Failed to create variants');
     } finally {
       setLoading(false);
     }
@@ -232,10 +233,10 @@ const Variants = () => {
         setMessage('Variant deleted successfully');
         fetchVariants();
       } else {
-        setError(result.error);
+        setError(extractErrorMessage(result.error));
       }
     } catch (error) {
-      setError('Failed to delete variant');
+      setError(extractErrorMessage(error?.response?.data) || 'Failed to delete variant');
     } finally {
       setLoading(false);
     }
