@@ -68,9 +68,10 @@ class PriceListEntity(BaseModel):
         return v.strip()
 
     @field_validator('effective_to')
-    def validate_effective_dates(cls, v, values):
-        if v and 'effective_from' in values and v <= values['effective_from']:
-            raise ValueError('Effective to date must be after effective from date')
+    def validate_effective_dates(cls, v, info):
+        effective_from = info.data.get('effective_from')
+        if v and effective_from and v < effective_from:
+            raise ValueError('Effective to date must be after or equal to effective from date')
         return v
 
     @field_validator('currency')

@@ -9,7 +9,6 @@ from app.core.logging_config import setup_logging, get_request_logger
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import init_database, init_direct_database, direct_db_connection
 from app.presentation.api.users import auth_router, user_router, verification_router
-from app.presentation.api.users.auth_fallback import auth_fallback_router
 from app.presentation.api.customers.customer import router as customer_router
 from app.presentation.api.tenants.tenant import router as tenant_router
 from app.presentation.api.addresses.address import router as address_router
@@ -102,7 +101,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1")
-app.include_router(auth_fallback_router, prefix="/api/v1")  # Fallback for Railway
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(verification_router, prefix='/api/v1')
 app.include_router(customer_router, prefix="/api/v1")

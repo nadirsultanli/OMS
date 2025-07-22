@@ -22,6 +22,11 @@ class PriceListModel(Base):
     active = Column(Boolean, nullable=False, default=True)
     currency = Column(String(3), nullable=False, default="KES")
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_by = Column(PostgresUUID(as_uuid=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    updated_by = Column(PostgresUUID(as_uuid=True), nullable=True)
+    deleted_by = Column(PostgresUUID(as_uuid=True), nullable=True)
     
     # Relationships
     lines = relationship("PriceListLineModel", back_populates="price_list", cascade="all, delete-orphan")
@@ -39,6 +44,12 @@ class PriceListLineModel(Base):
     variant_id = Column(PostgresUUID(as_uuid=True), ForeignKey("variants.id"), nullable=True)
     gas_type = Column(Text, nullable=True)
     min_unit_price = Column(Numeric(10, 2), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_by = Column(PostgresUUID(as_uuid=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    updated_by = Column(PostgresUUID(as_uuid=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(PostgresUUID(as_uuid=True), nullable=True)
     
     # Relationships
     price_list = relationship("PriceListModel", back_populates="lines")

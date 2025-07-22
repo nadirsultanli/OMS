@@ -125,22 +125,10 @@ def get_supabase_client_sync() -> Client:
             db_connection.configure(url, anon_key)
             
         try:
-            # Create client with timeout configuration for Railway deployment
+            # Create client with basic configuration
             db_connection._client = create_client(
                 db_connection._url, 
-                db_connection._anon_key,
-                options={
-                    "auth": {
-                        "auto_refresh_token": True,
-                        "persist_session": False,
-                        "detect_session_in_url": False
-                    },
-                    "global": {
-                        "headers": {
-                            "User-Agent": "OMS-Backend/1.0"
-                        }
-                    }
-                }
+                db_connection._anon_key
             )
             default_logger.info("Supabase sync client created successfully")
         except Exception as e:
