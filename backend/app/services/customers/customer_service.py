@@ -14,10 +14,15 @@ class CustomerService:
         self.customer_repository = customer_repository
         self.address_service = address_service
 
-    async def get_customer_by_id(self, customer_id: str) -> Customer:
+    async def get_customer_by_id(self, customer_id: str, tenant_id: Optional[UUID] = None) -> Customer:
         customer = await self.customer_repository.get_by_id(customer_id)
         if not customer:
             raise CustomerNotFoundError(customer_id)
+        
+        # Validate tenant if provided
+        if tenant_id and customer.tenant_id != tenant_id:
+            raise CustomerNotFoundError(customer_id)
+        
         customer.addresses = await self.address_service.get_addresses_by_customer(customer_id)
         return customer
 

@@ -16,6 +16,7 @@ from app.presentation.api.products.product import router as product_router
 from app.presentation.api.products.variant import router as variant_router
 from app.presentation.api.price_lists.price_list import router as price_list_router
 from app.presentation.api.warehouses.warehouse import router as warehouse_router
+from app.presentation.api.orders.order import router as order_router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
 
@@ -92,6 +93,10 @@ app = FastAPI(
         {
             "name": "Warehouses",
             "description": "Warehouse management and LPG storage facility operations"
+        },
+        {
+            "name": "Orders",
+            "description": "Order management and order line operations"
         }
     ]
 )
@@ -119,6 +124,7 @@ app.include_router(product_router, prefix="/api/v1")
 app.include_router(variant_router, prefix="/api/v1")
 app.include_router(price_list_router, prefix="/api/v1")
 app.include_router(warehouse_router, prefix="/api/v1")
+app.include_router(order_router, prefix="/api/v1")
 
 
 def custom_openapi():
