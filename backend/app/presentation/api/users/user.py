@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import Optional
 from app.services.users import UserService
-from app.domain.entities.users import UserRoleType, UserStatus
+from app.domain.entities.users import UserRoleType, UserStatus, User
 from app.domain.exceptions.users import (
     UserNotFoundError,
     UserAlreadyExistsError,
@@ -17,6 +17,7 @@ from app.presentation.schemas.users import (
     UserListResponse
 )
 from app.services.dependencies.users import get_user_service
+from app.core.user_context import UserContext, user_context
 
 user_router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -157,12 +158,14 @@ async def get_users(
 async def update_user(
     user_id: str,
     request: UpdateUserRequest,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_user_service),
+    context: UserContext = user_context
 ):
     """Update user"""
     try:
-        user = await user_service.update_user(
+        user = await user_service.update_user_with_audit(
             user_id=user_id,
+            updated_by=current_user.id,
             full_name=request.full_name,
             role=request.role,
             email=request.email

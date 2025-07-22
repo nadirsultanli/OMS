@@ -50,7 +50,7 @@ class AppLogger(AbstractLogger):
         """Setup logging handlers for console and file output"""
         
         # Create logs directory if it doesn't exist
-        logs_dir = Path("logs")
+        logs_dir = Path(__file__).parent.parent.parent.parent / "logs"
         logs_dir.mkdir(exist_ok=True)
         
         # Console handler with simple formatting

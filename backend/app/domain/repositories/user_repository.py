@@ -17,6 +17,11 @@ class UserRepository(ABC):
         pass
     
     @abstractmethod
+    async def get_by_auth_id(self, auth_user_id: str) -> Optional[User]:
+        """Get user by Supabase auth_user_id"""
+        pass
+    
+    @abstractmethod
     async def get_all(self, limit: int = 100, offset: int = 0) -> List[User]:
         """Get all users with pagination"""
         pass

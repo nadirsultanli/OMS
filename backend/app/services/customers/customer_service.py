@@ -36,18 +36,25 @@ class CustomerService:
     async def get_customers_by_status(self, status: CustomerStatus) -> List[Customer]:
         return await self.customer_repository.get_by_status(status)
 
-    async def create_customer(self, tenant_id: UUID, customer_type: CustomerType, name: str, created_by: Optional[UUID] = None, **kwargs) -> Customer:
-        # Set status based on customer_type
+    async def create_customer(self, tenant_id: UUID, customer_type: CustomerType, name: str, created_by: Optional[UUID] = None, user_role: Optional[str] = None, **kwargs) -> Customer:
+        # Set status based on customer_type and user role
         if customer_type == CustomerType.CASH:
-            status = CustomerStatus.ACTIVE
+            # Cash customers are always ACTIVE when created by sales_rep or tenant_admin
+            if user_role in ["sales_rep", "tenant_admin"]:
+                status = CustomerStatus.ACTIVE
+            else:
+                # For other roles, cash customers still need approval
+                status = CustomerStatus.PENDING
         else:
+            # Credit customers always start as PENDING regardless of role
             status = CustomerStatus.PENDING
         
         # Extract owner_sales_rep_id from kwargs if provided, otherwise use created_by
         owner_sales_rep_id = kwargs.pop('owner_sales_rep_id', created_by)
         
-        # Remove created_by from kwargs if it exists to avoid duplicate
+        # Remove created_by and user_role from kwargs to avoid duplicates
         kwargs.pop('created_by', None)
+        kwargs.pop('user_role', None)
         
         customer = Customer.create(
             tenant_id=tenant_id,
@@ -96,6 +103,15 @@ class CustomerService:
         customer = await self.get_customer_by_id(customer_id)
         customer.owner_sales_rep_id = new_owner_sales_rep_id
         customer.updated_by = reassigned_by
+        return await self.customer_repository.update_customer(customer_id, customer)
+    
+    async def update_customer_with_user(self, customer_id: str, updated_by: UUID, **kwargs) -> Optional[Customer]:
+        """Update customer with proper updated_by tracking"""
+        customer = await self.get_customer_by_id(customer_id)
+        for key, value in kwargs.items():
+            if hasattr(customer, key) and value is not None:
+                setattr(customer, key, value)
+        customer.updated_by = updated_by
         return await self.customer_repository.update_customer(customer_id, customer) 
 
     async def inactivate_customer(self, customer_id: str, inactivated_by: UUID) -> Optional[Customer]:

@@ -21,6 +21,11 @@ class UserRepository(UserRepositoryInterface):
         obj = result.scalar_one_or_none()
         return self._to_entity(obj) if obj else None
 
+    async def get_by_auth_id(self, auth_user_id: str) -> Optional[User]:
+        result = await self._session.execute(select(UserORM).where(UserORM.auth_user_id == UUID(auth_user_id)))
+        obj = result.scalar_one_or_none()
+        return self._to_entity(obj) if obj else None
+
     async def get_all(self, limit: int = 100, offset: int = 0) -> List[User]:
         result = await self._session.execute(select(UserORM).offset(offset).limit(limit))
         objs = result.scalars().all()

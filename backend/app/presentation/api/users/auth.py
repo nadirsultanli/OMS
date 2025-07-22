@@ -12,7 +12,8 @@ from app.presentation.schemas.users import (
     RefreshTokenRequest,
     RefreshTokenResponse,
     LogoutRequest,
-    SignupRequest
+    SignupRequest,
+    UserResponse
 )
 from app.presentation.schemas.users.password_reset_schemas import (
     ForgotPasswordRequest,
@@ -24,6 +25,7 @@ from app.services.dependencies.users import get_user_service
 from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
 from decouple import config
 from app.domain.entities.users import UserStatus
+from app.core.user_context import UserContext, user_context
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -87,14 +89,32 @@ async def login(
 ):
     """User login endpoint using Supabase Auth"""
     try:
+        default_logger.info(f"Login attempt started for email: {request.email}")
+        
         # Get Supabase client
-        supabase = get_supabase_client_sync()
+        try:
+            supabase = get_supabase_client_sync()
+            default_logger.info("Supabase client obtained successfully")
+        except Exception as e:
+            default_logger.error(f"Failed to get Supabase client: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Service unavailable"
+            )
         
         # Authenticate with Supabase Auth
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": request.email,
-            "password": request.password
-        })
+        try:
+            auth_response = supabase.auth.sign_in_with_password({
+                "email": request.email,
+                "password": request.password
+            })
+            default_logger.info(f"Supabase auth response received for: {request.email}")
+        except Exception as e:
+            default_logger.error(f"Supabase authentication failed: {str(e)}", email=request.email)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
         
         if auth_response.user is None:
             raise HTTPException(
@@ -106,6 +126,10 @@ async def login(
         try:
             user = await user_service.get_user_by_email(request.email)
             await user_service.validate_user_active(str(user.id))
+            
+            # Update last login time
+            user = await user_service.update_last_login(str(user.id))
+            
         except UserNotFoundError:
             # User exists in Supabase Auth but not in our database
             # This shouldn't happen in normal flow, but handle gracefully
@@ -122,23 +146,45 @@ async def login(
         
         default_logger.info(f"User logged in successfully", user_id=str(user.id), email=request.email)
         
-        return LoginResponse(
-            access_token=auth_response.session.access_token,
-            refresh_token=auth_response.session.refresh_token,
-            user_id=str(user.id),
-            email=user.email,
-            role=user.role.value,
-            full_name=user.full_name
-        )
+        try:
+            response = LoginResponse(
+                access_token=auth_response.session.access_token,
+                refresh_token=auth_response.session.refresh_token,
+                user_id=str(user.id),
+                email=user.email,
+                role=user.role.value,
+                full_name=user.full_name
+            )
+            default_logger.info("Login response created successfully")
+            return response
+        except Exception as e:
+            default_logger.error(f"Failed to create login response: {str(e)}", user_id=str(user.id))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create login response"
+            )
         
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except HTTPException as he:
+        # Re-raise HTTP exceptions with better logging
+        default_logger.warning(f"Login HTTP exception: {he.status_code} - {he.detail}", email=request.email)
         raise
+    except UserNotFoundError as e:
+        default_logger.warning(f"User not found during login: {str(e)}", email=request.email)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+    except UserInactiveError as e:
+        default_logger.warning(f"Inactive user login attempt: {str(e)}", email=request.email)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account is inactive, please activate your account or contact your administrator"
+        )
     except Exception as e:
-        default_logger.error(f"Login failed: {str(e)}", email=request.email)
+        default_logger.error(f"Unexpected login error: {str(e)} | Type: {type(e).__name__}", email=request.email, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed"
+            detail=f"Login failed: {str(e)}"
         )
 
 
@@ -451,4 +497,36 @@ async def handle_magic_link(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process magic link"
+        )
+
+
+@auth_router.get("/me", response_model=UserResponse)
+async def get_current_user_info(
+    context: UserContext = user_context
+):
+    """Get current authenticated user information from token"""
+    try:
+        # The user is already authenticated by our global auth middleware
+        # and the UserContext contains all user information
+        return UserResponse(
+            id=str(context.user_id),
+            tenant_id=str(context.tenant_id) if context.tenant_id else "",
+            email=context.email,
+            full_name=context.full_name,
+            role=context.role,
+            status=context.user.status,
+            last_login=str(context.user.last_login) if context.user.last_login else None,
+            created_at=str(context.user.created_at),
+            created_by=str(context.user.created_by) if context.user.created_by else None,
+            updated_at=str(context.user.updated_at),
+            updated_by=str(context.user.updated_by) if context.user.updated_by else None,
+            deleted_at=str(context.user.deleted_at) if context.user.deleted_at else None,
+            deleted_by=str(context.user.deleted_by) if context.user.deleted_by else None
+        )
+        
+    except Exception as e:
+        default_logger.error(f"Failed to get current user info: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user information"
         ) 

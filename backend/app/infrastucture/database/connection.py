@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from decouple import config
 from supabase import create_client, Client
 from app.infrastucture.logs.logger import default_logger
@@ -83,7 +83,8 @@ db_connection = DatabaseConnection()
 async def init_database() -> None:
     """Initialize database connection from environment variables"""
     url = config("SUPABASE_URL", default=None)
-    anon_key = config("SUPABASE_KEY", default=None)
+    # Try both SUPABASE_KEY and SUPABASE_ANON_KEY for compatibility
+    anon_key = config("SUPABASE_KEY", default=None) or config("SUPABASE_ANON_KEY", default=None)
     service_role_key = config("SUPABASE_SERVICE_ROLE_KEY", default=None)
     
     if not url or not anon_key:
@@ -109,11 +110,43 @@ def get_supabase_client_sync() -> Client:
             # Try to configure from environment variables
             from decouple import config
             url = config("SUPABASE_URL", default=None)
-            anon_key = config("SUPABASE_KEY", default=None)
-            if not url or not anon_key:
-                raise ValueError("Database not configured. Call configure() first.")
+            # Try both SUPABASE_KEY and SUPABASE_ANON_KEY for compatibility
+            anon_key = config("SUPABASE_KEY", default=None) or config("SUPABASE_ANON_KEY", default=None)
+            
+            default_logger.info(f"Attempting to configure Supabase client - URL: {'✓' if url else '✗'}, Key: {'✓' if anon_key else '✗'}")
+            
+            if not url:
+                default_logger.error("SUPABASE_URL environment variable not found")
+                raise ValueError("SUPABASE_URL environment variable is required")
+            if not anon_key:
+                default_logger.error("SUPABASE_KEY environment variable not found") 
+                raise ValueError("SUPABASE_KEY environment variable is required")
+                
             db_connection.configure(url, anon_key)
-        db_connection._client = create_client(db_connection._url, db_connection._anon_key)
+            
+        try:
+            # Create client with timeout configuration for Railway deployment
+            db_connection._client = create_client(
+                db_connection._url, 
+                db_connection._anon_key,
+                options={
+                    "auth": {
+                        "auto_refresh_token": True,
+                        "persist_session": False,
+                        "detect_session_in_url": False
+                    },
+                    "global": {
+                        "headers": {
+                            "User-Agent": "OMS-Backend/1.0"
+                        }
+                    }
+                }
+            )
+            default_logger.info("Supabase sync client created successfully")
+        except Exception as e:
+            default_logger.error(f"Failed to create Supabase sync client: {str(e)}")
+            raise
+            
     return db_connection._client
 
 
@@ -152,7 +185,8 @@ class DirectDatabaseConnection:
         self._sessionmaker = async_sessionmaker(self._engine, expire_on_commit=False, class_=AsyncSession)
         default_logger.info("Direct SQLAlchemy connection configured", url=url[:20] + "...")
 
-    async def get_session(self) -> AsyncSession:
+    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Get async database session with proper lifecycle management"""
         if not self._sessionmaker:
             raise ValueError("Direct database not configured. Call configure() first.")
         async with self._sessionmaker() as session:
