@@ -32,7 +32,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
             tenant_id=model.tenant_id,
             order_no=model.order_no,
             customer_id=model.customer_id,
-            order_status=OrderStatus(model.order_status),  # Convert string to enum
+            order_status=OrderStatus(model.order_status) if isinstance(model.order_status, str) else model.order_status,  # Convert string to enum if needed
             requested_date=model.requested_date,
             delivery_instructions=model.delivery_instructions,
             payment_terms=model.payment_terms,
@@ -254,7 +254,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
             .values(
                 order_no=order.order_no,
                 customer_id=order.customer_id,
-                order_status=order.order_status,
+                order_status=order.order_status.value if isinstance(order.order_status, OrderStatus) else order.order_status,
                 requested_date=order.requested_date,
                 delivery_instructions=order.delivery_instructions,
                 payment_terms=order.payment_terms,
@@ -280,7 +280,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
             update(OrderModel)
             .where(OrderModel.id == UUID(order_id))
             .values(
-                order_status=new_status,
+                order_status=new_status.value if isinstance(new_status, OrderStatus) else new_status,
                 updated_by=updated_by,
                 updated_at=datetime.utcnow()
             )

@@ -28,7 +28,7 @@ class OrderModel(Base):
     
     # Order details
     order_no: Mapped[str] = mapped_column(Text, nullable=False)
-    order_status: Mapped[str] = mapped_column(String, nullable=False, default="draft")
+    order_status: Mapped[OrderStatus] = mapped_column(SQLAlchemyEnum(OrderStatus, name="order_status", create_constraint=True, native_enum=False), nullable=False, default=OrderStatus.DRAFT)
     requested_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     delivery_instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     payment_terms: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
