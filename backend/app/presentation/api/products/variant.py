@@ -8,7 +8,11 @@ from app.presentation.schemas.variants.input_schemas import (
     UpdateVariantRequest,
     ProcessOrderLineRequest,
     ValidateOrderRequest,
-    ExchangeCalculationRequest
+    ExchangeCalculationRequest,
+    CreateCylinderVariantsRequest,
+    CreateGasServiceRequest,
+    CreateDepositRequest,
+    CreateBundleRequest
 )
 from app.presentation.schemas.variants.output_schemas import (
     VariantResponse, 
@@ -18,7 +22,8 @@ from app.presentation.schemas.variants.output_schemas import (
     BundleComponentsResponse,
     BusinessValidationResponse,
     DepositImpactResponse,
-    VariantRelationshipsResponse
+    VariantRelationshipsResponse,
+    AtomicVariantSetResponse
 )
 from app.services.dependencies.products import get_variant_service, get_lpg_business_service
 from app.core.auth_utils import current_user
@@ -343,3 +348,185 @@ async def get_bundle_variants(
         limit=len(variant_responses),
         offset=0
     )
+
+# New Atomic SKU Endpoints
+@router.post("/atomic/cylinder-set", response_model=AtomicVariantSetResponse, status_code=status.HTTP_201_CREATED)
+async def create_cylinder_variant_set(
+    request: CreateCylinderVariantsRequest,
+    variant_service: VariantService = Depends(get_variant_service)
+):
+    """
+    Create a complete set of atomic variants for a cylinder size.
+    This creates both EMPTY and FULL variants for inventory tracking.
+    """
+    try:
+        empty_variant, full_variant = await variant_service.create_atomic_cylinder_variants(
+            tenant_id=request.tenant_id,
+            product_id=request.product_id,
+            size=request.size,
+            tare_weight_kg=float(request.tare_weight_kg),
+            capacity_kg=float(request.capacity_kg),
+            gross_weight_kg=float(request.gross_weight_kg),
+            inspection_date=request.inspection_date,
+            created_by=request.created_by
+        )
+        
+        return AtomicVariantSetResponse(
+            cylinder_empty=VariantResponse(**empty_variant.to_dict()),
+            cylinder_full=VariantResponse(**full_variant.to_dict())
+        )
+    except VariantAlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.post("/atomic/gas-service", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
+async def create_gas_service_variant(
+    request: CreateGasServiceRequest,
+    variant_service: VariantService = Depends(get_variant_service)
+):
+    """
+    Create a gas service variant (consumable, no inventory).
+    This represents the gas refill service.
+    """
+    try:
+        variant = await variant_service.create_gas_service_variant(
+            tenant_id=request.tenant_id,
+            product_id=request.product_id,
+            size=request.size,
+            requires_exchange=request.requires_exchange,
+            default_price=float(request.default_price) if request.default_price else None,
+            created_by=request.created_by
+        )
+        return VariantResponse(**variant.to_dict())
+    except VariantAlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.post("/atomic/deposit", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
+async def create_deposit_variant(
+    request: CreateDepositRequest,
+    variant_service: VariantService = Depends(get_variant_service)
+):
+    """
+    Create a deposit variant (liability, no inventory).
+    This represents the refundable deposit charge.
+    """
+    try:
+        variant = await variant_service.create_deposit_variant(
+            tenant_id=request.tenant_id,
+            product_id=request.product_id,
+            size=request.size,
+            deposit_amount=float(request.deposit_amount),
+            created_by=request.created_by
+        )
+        return VariantResponse(**variant.to_dict())
+    except VariantAlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.post("/atomic/bundle", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
+async def create_bundle_variant(
+    request: CreateBundleRequest,
+    variant_service: VariantService = Depends(get_variant_service)
+):
+    """
+    Create a bundle variant (e.g., KIT13-OUTRIGHT).
+    This will automatically explode into components during order processing.
+    """
+    try:
+        variant = await variant_service.create_bundle_variant(
+            tenant_id=request.tenant_id,
+            product_id=request.product_id,
+            size=request.size,
+            bundle_type=request.bundle_type,
+            default_price=float(request.default_price) if request.default_price else None,
+            created_by=request.created_by
+        )
+        return VariantResponse(**variant.to_dict())
+    except VariantAlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.post("/atomic/complete-set", response_model=AtomicVariantSetResponse, status_code=status.HTTP_201_CREATED)
+async def create_complete_variant_set(
+    tenant_id: str,
+    product_id: str,
+    size: str,
+    tare_weight_kg: float,
+    capacity_kg: float,
+    gross_weight_kg: float,
+    deposit_amount: float,
+    gas_price: Optional[float] = None,
+    bundle_price: Optional[float] = None,
+    inspection_date: Optional[str] = None,
+    created_by: Optional[str] = None,
+    variant_service: VariantService = Depends(get_variant_service)
+):
+    """
+    Create a complete set of atomic variants for a cylinder size.
+    This includes: EMPTY, FULL, GAS service, DEPOSIT, and BUNDLE variants.
+    """
+    from datetime import datetime
+    
+    try:
+        # Parse inspection date if provided
+        inspection_date_obj = None
+        if inspection_date:
+            inspection_date_obj = datetime.fromisoformat(inspection_date).date()
+        
+        # Create cylinder variants (EMPTY and FULL)
+        empty_variant, full_variant = await variant_service.create_atomic_cylinder_variants(
+            tenant_id=tenant_id,
+            product_id=product_id,
+            size=size,
+            tare_weight_kg=tare_weight_kg,
+            capacity_kg=capacity_kg,
+            gross_weight_kg=gross_weight_kg,
+            inspection_date=inspection_date_obj,
+            created_by=created_by
+        )
+        
+        # Create gas service variant
+        gas_variant = await variant_service.create_gas_service_variant(
+            tenant_id=tenant_id,
+            product_id=product_id,
+            size=size,
+            requires_exchange=True,
+            default_price=gas_price,
+            created_by=created_by
+        )
+        
+        # Create deposit variant
+        deposit_variant = await variant_service.create_deposit_variant(
+            tenant_id=tenant_id,
+            product_id=product_id,
+            size=size,
+            deposit_amount=deposit_amount,
+            created_by=created_by
+        )
+        
+        # Create bundle variant
+        bundle_variant = await variant_service.create_bundle_variant(
+            tenant_id=tenant_id,
+            product_id=product_id,
+            size=size,
+            bundle_type="OUTRIGHT",
+            default_price=bundle_price,
+            created_by=created_by
+        )
+        
+        return AtomicVariantSetResponse(
+            cylinder_empty=VariantResponse(**empty_variant.to_dict()),
+            cylinder_full=VariantResponse(**full_variant.to_dict()),
+            gas_service=VariantResponse(**gas_variant.to_dict()),
+            deposit=VariantResponse(**deposit_variant.to_dict()),
+            bundle=VariantResponse(**bundle_variant.to_dict())
+        )
+    except VariantAlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

@@ -37,7 +37,7 @@ class WarehouseRepositoryImpl(WarehouseRepository):
         # Update model fields from entity
         model.code = warehouse.code
         model.name = warehouse.name
-        model.type = warehouse.type.value if warehouse.type else None
+        model.type = warehouse.type if warehouse.type else None
         model.location = warehouse.location
         model.unlimited_stock = warehouse.unlimited_stock
         model.updated_at = warehouse.updated_at
@@ -81,7 +81,7 @@ class WarehouseRepositoryImpl(WarehouseRepository):
             tenant_id=entity.tenant_id,
             code=entity.code,
             name=entity.name,
-            type=entity.type.value if entity.type else None,
+            type=entity.type if entity.type else None,
             location=entity.location,
             unlimited_stock=entity.unlimited_stock,
             created_at=entity.created_at,

@@ -1,21 +1,37 @@
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
-from app.domain.entities.variants import ProductStatus, ProductScenario
+from app.domain.entities.variants import (
+    ProductStatus, ProductScenario,
+    SKUType, StateAttribute, RevenueCategory
+)
 
 class VariantResponse(BaseModel):
     id: str
     tenant_id: str
     product_id: str
     sku: str
-    status: ProductStatus
-    scenario: ProductScenario
+    # New atomic model fields
+    sku_type: Optional[str]
+    state_attr: Optional[str]
+    requires_exchange: bool
+    is_stock_item: bool
+    bundle_components: Optional[List[Dict[str, Any]]]
+    revenue_category: Optional[str]
+    affects_inventory: bool
+    is_serialized: bool
+    default_price: Optional[Decimal]
+    # Legacy fields
+    status: Optional[str]
+    scenario: Optional[str]
+    # Physical attributes
     tare_weight_kg: Optional[Decimal]
     capacity_kg: Optional[Decimal]
     gross_weight_kg: Optional[Decimal]
     deposit: Optional[Decimal]
     inspection_date: Optional[str]
     active: bool
+    # Audit fields
     created_at: str
     created_by: Optional[str]
     updated_at: str
@@ -28,6 +44,14 @@ class VariantListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+class AtomicVariantSetResponse(BaseModel):
+    """Response for creating a complete set of atomic variants"""
+    cylinder_empty: VariantResponse
+    cylinder_full: VariantResponse
+    gas_service: Optional[VariantResponse] = None
+    deposit: Optional[VariantResponse] = None
+    bundle: Optional[VariantResponse] = None
 
 class OrderProcessingResponse(BaseModel):
     """Response schema for LPG order line processing"""

@@ -10,7 +10,7 @@ from app.domain.exceptions.warehouses.warehouse_exceptions import (
 from app.presentation.schemas.warehouses.input_schemas import CreateWarehouseRequest, UpdateWarehouseRequest
 from app.presentation.schemas.warehouses.output_schemas import WarehouseResponse, WarehouseListResponse
 from app.services.dependencies.warehouses import get_warehouse_service
-from app.core.user_context import UserContext, user_context
+from app.core.user_context import UserContext, user_context, get_optional_user_context
 
 router = APIRouter(prefix="/warehouses", tags=["Warehouses"])
 

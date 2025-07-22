@@ -1,7 +1,8 @@
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Enum
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.sql import func
 from app.infrastucture.database.models.base import Base
+from app.domain.entities.warehouses import WarehouseType
 
 class WarehouseModel(Base):
     __tablename__ = "warehouses"
@@ -9,8 +10,8 @@ class WarehouseModel(Base):
     tenant_id = Column(PostgresUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     code = Column(String(50), nullable=False)
     name = Column(String(255), nullable=False)
-    type = Column(String(50), nullable=True)
-    location = Column(Text, nullable=True)
+    type = Column(Enum(WarehouseType, name='warehouse_type', native_enum=True), nullable=True)
+    location = Column(Text, nullable=True)  # Use Text instead of geography
     unlimited_stock = Column(Boolean, nullable=True, default=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(PostgresUUID(as_uuid=True), nullable=True)
