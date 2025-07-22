@@ -176,7 +176,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
             .options(selectinload(OrderModel.order_lines))
             .where(
                 and_(
-                    OrderModel.order_status == status,
+                    OrderModel.order_status == (status.value if isinstance(status, OrderStatus) else status),
                     OrderModel.tenant_id == tenant_id,
                     OrderModel.deleted_at.is_(None)
                 )
