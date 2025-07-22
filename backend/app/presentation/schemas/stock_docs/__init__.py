@@ -1,0 +1,1 @@
+# Stock documents schemas module

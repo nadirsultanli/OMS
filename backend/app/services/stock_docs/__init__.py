@@ -1,0 +1,1 @@
+# Stock documents services module
