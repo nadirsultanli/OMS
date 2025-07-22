@@ -39,7 +39,11 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/users', label: 'Users', icon: UserPlus },
-    { path: '/customers', label: 'Customers', icon: Users }
+    { path: '/customers', label: 'Customers', icon: Users },
+    { path: '/products', label: 'Products', icon: Package },
+    { path: '/variants', label: 'Variants', icon: Package },
+    { path: '/price-lists', label: 'Price Lists', icon: DollarSign },
+    { path: '/warehouses', label: 'Warehouses', icon: Warehouse }
   ];
 
   // Determine if sidebar should be expanded

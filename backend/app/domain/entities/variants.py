@@ -7,15 +7,37 @@ from uuid import UUID
 
 
 class ProductStatus(str, Enum):
-    """Product status enum for variants"""
+    """Product status enum for variants - DEPRECATED, use state_attr instead"""
     FULL = "FULL"  # Full cylinder with gas
     EMPTY = "EMPTY"  # Empty cylinder shell
 
 
 class ProductScenario(str, Enum):
-    """Product scenario enum for variants"""
+    """Product scenario enum for variants - DEPRECATED, use requires_exchange instead"""
     OUT = "OUT"  # Outright sale (customer owns the cylinder)
     XCH = "XCH"  # Exchange (customer returns empty for full)
+
+
+class SKUType(str, Enum):
+    """SKU type for atomic model"""
+    ASSET = "ASSET"  # Physical inventory items (cylinders)
+    CONSUMABLE = "CONSUMABLE"  # Services like gas refill
+    DEPOSIT = "DEPOSIT"  # Customer liability
+    BUNDLE = "BUNDLE"  # Composite SKU that explodes to components
+
+
+class StateAttribute(str, Enum):
+    """State attribute for ASSET type SKUs"""
+    EMPTY = "EMPTY"  # Empty cylinder
+    FULL = "FULL"  # Full cylinder
+
+
+class RevenueCategory(str, Enum):
+    """Revenue category for financial reporting"""
+    GAS_REVENUE = "GAS_REVENUE"
+    DEPOSIT_LIABILITY = "DEPOSIT_LIABILITY"
+    ASSET_SALE = "ASSET_SALE"
+    SERVICE_FEE = "SERVICE_FEE"
 
 
 @dataclass
@@ -23,31 +45,109 @@ class Variant:
     """
     Variant domain entity representing specific SKUs in the LPG Cylinder business.
     
-    Based on the business logic:
-    - CYL13-EMPTY = Empty 13kg cylinder shell (physical, inventory tracked)
-    - CYL13-FULL = Full 13kg cylinder ready for delivery (physical, inventory tracked)
-    - GAS13 = Gas refill service (pure revenue, no physical item)
-    - DEP13 = Deposit charge (customer liability, no physical item)
-    - KIT13-OUTRIGHT = Complete package for new customers (bundle)
+    Updated for Atomic SKU Model:
+    - CYL13-EMPTY = Empty 13kg cylinder shell (ASSET, state=EMPTY, stock tracked)
+    - CYL13-FULL = Full 13kg cylinder (ASSET, state=FULL, stock tracked)
+    - GAS13 = Gas refill service (CONSUMABLE, no stock)
+    - DEP13 = Deposit charge (DEPOSIT, no stock)
+    - KIT13-OUTRIGHT = Bundle (BUNDLE, explodes to components)
     """
     id: UUID
     tenant_id: UUID
     product_id: UUID
     sku: str
-    status: ProductStatus
-    scenario: ProductScenario
+    # New atomic model fields
+    sku_type: Optional[SKUType] = None
+    state_attr: Optional[StateAttribute] = None
+    requires_exchange: bool = False
+    is_stock_item: bool = True
+    bundle_components: Optional[List[Dict]] = None
+    revenue_category: Optional[RevenueCategory] = None
+    affects_inventory: bool = False
+    is_serialized: bool = False
+    default_price: Optional[Decimal] = None
+    # Legacy fields (kept for backward compatibility)
+    status: Optional[ProductStatus] = None
+    scenario: Optional[ProductScenario] = None
+    # Physical attributes
     tare_weight_kg: Optional[Decimal] = None
     capacity_kg: Optional[Decimal] = None
     gross_weight_kg: Optional[Decimal] = None
     deposit: Optional[Decimal] = None
     inspection_date: Optional[date] = None
     active: bool = True
+    # Audit fields
     created_at: datetime = field(default_factory=datetime.utcnow)
     created_by: Optional[UUID] = None
     updated_at: datetime = field(default_factory=datetime.utcnow)
     updated_by: Optional[UUID] = None
     deleted_at: Optional[datetime] = None
     deleted_by: Optional[UUID] = None
+
+    def __post_init__(self):
+        """Initialize SKU type based on SKU pattern if not provided"""
+        if self.sku_type is None:
+            self._infer_sku_type()
+        if self.revenue_category is None:
+            self._infer_revenue_category()
+    
+    def _infer_sku_type(self):
+        """Infer SKU type from SKU pattern"""
+        if self.sku.startswith("CYL"):
+            self.sku_type = SKUType.ASSET
+            self.is_stock_item = True
+            self.affects_inventory = True
+            # Infer state from SKU or legacy status
+            if "-EMPTY" in self.sku:
+                self.state_attr = StateAttribute.EMPTY
+            elif "-FULL" in self.sku:
+                self.state_attr = StateAttribute.FULL
+            elif self.status:
+                self.state_attr = StateAttribute(self.status.value)
+        elif self.sku.startswith("GAS"):
+            self.sku_type = SKUType.CONSUMABLE
+            self.is_stock_item = False
+            self.affects_inventory = False
+            # Infer exchange requirement from legacy scenario
+            if self.scenario == ProductScenario.XCH:
+                self.requires_exchange = True
+        elif self.sku.startswith("DEP"):
+            self.sku_type = SKUType.DEPOSIT
+            self.is_stock_item = False
+            self.affects_inventory = False
+        elif self.sku.startswith("KIT"):
+            self.sku_type = SKUType.BUNDLE
+            self.is_stock_item = False
+            self.affects_inventory = False
+            if not self.bundle_components:
+                self._infer_bundle_components()
+    
+    def _infer_revenue_category(self):
+        """Infer revenue category from SKU type"""
+        if self.sku_type == SKUType.CONSUMABLE:
+            self.revenue_category = RevenueCategory.GAS_REVENUE
+        elif self.sku_type == SKUType.DEPOSIT:
+            self.revenue_category = RevenueCategory.DEPOSIT_LIABILITY
+        elif self.sku_type == SKUType.ASSET:
+            self.revenue_category = RevenueCategory.ASSET_SALE
+    
+    def _infer_bundle_components(self):
+        """Infer bundle components for KIT SKUs"""
+        if self.sku_type == SKUType.BUNDLE and self.sku.endswith("-OUTRIGHT"):
+            # Extract size from bundle SKU (e.g., KIT13-OUTRIGHT → 13)
+            size = self.sku.replace("KIT", "").replace("-OUTRIGHT", "")
+            self.bundle_components = [
+                {
+                    "sku": f"CYL{size}-FULL",
+                    "quantity": 1,
+                    "component_type": "PHYSICAL"
+                },
+                {
+                    "sku": f"DEP{size}",
+                    "quantity": 1,
+                    "component_type": "DEPOSIT"
+                }
+            ]
     
     @classmethod
     def create(
@@ -55,8 +155,18 @@ class Variant:
         tenant_id: UUID,
         product_id: UUID,
         sku: str,
-        status: ProductStatus,
-        scenario: ProductScenario,
+        sku_type: Optional[SKUType] = None,
+        state_attr: Optional[StateAttribute] = None,
+        requires_exchange: bool = False,
+        is_stock_item: Optional[bool] = None,
+        bundle_components: Optional[List[Dict]] = None,
+        revenue_category: Optional[RevenueCategory] = None,
+        affects_inventory: Optional[bool] = None,
+        default_price: Optional[Decimal] = None,
+        # Legacy parameters
+        status: Optional[ProductStatus] = None,
+        scenario: Optional[ProductScenario] = None,
+        # Physical attributes
         tare_weight_kg: Optional[Decimal] = None,
         capacity_kg: Optional[Decimal] = None,
         gross_weight_kg: Optional[Decimal] = None,
@@ -65,14 +175,30 @@ class Variant:
         active: bool = True,
         created_by: Optional[UUID] = None,
     ) -> "Variant":
-        """Create a new Variant instance"""
+        """Create a new Variant instance with atomic SKU model support"""
         from uuid import uuid4
+        
+        # Auto-determine stock and inventory flags based on SKU type
+        if sku_type == SKUType.ASSET:
+            is_stock_item = True
+            affects_inventory = True
+        elif sku_type in [SKUType.CONSUMABLE, SKUType.DEPOSIT, SKUType.BUNDLE]:
+            is_stock_item = False
+            affects_inventory = False
         
         return cls(
             id=uuid4(),
             tenant_id=tenant_id,
             product_id=product_id,
             sku=sku,
+            sku_type=sku_type,
+            state_attr=state_attr,
+            requires_exchange=requires_exchange,
+            is_stock_item=is_stock_item if is_stock_item is not None else True,
+            bundle_components=bundle_components,
+            revenue_category=revenue_category,
+            affects_inventory=affects_inventory if affects_inventory is not None else False,
+            default_price=default_price,
             status=status,
             scenario=scenario,
             tare_weight_kg=tare_weight_kg,
@@ -85,33 +211,31 @@ class Variant:
         )
     
     def is_physical_item(self) -> bool:
-        """
-        Check if this variant is a physical item that affects inventory.
-        
-        Physical items: CYL13-EMPTY, CYL13-FULL
-        Non-physical items: GAS13, DEP13, KIT13-OUTRIGHT
-        """
-        return self.sku.startswith("CYL")
+        """Check if this variant is a physical item that affects inventory"""
+        return self.sku_type == SKUType.ASSET or (self.sku_type is None and self.sku.startswith("CYL"))
     
     def is_gas_service(self) -> bool:
         """Check if this variant represents a gas refill service"""
-        return self.sku.startswith("GAS")
+        return self.sku_type == SKUType.CONSUMABLE or (self.sku_type is None and self.sku.startswith("GAS"))
     
     def is_deposit(self) -> bool:
         """Check if this variant represents a deposit charge"""
-        return self.sku.startswith("DEP")
+        return self.sku_type == SKUType.DEPOSIT or (self.sku_type is None and self.sku.startswith("DEP"))
     
     def is_bundle(self) -> bool:
-        """Check if this variant is a bundle (like KIT13-OUTRIGHT)"""
-        return self.sku.startswith("KIT")
+        """Check if this variant is a bundle"""
+        return self.sku_type == SKUType.BUNDLE or (self.sku_type is None and self.sku.startswith("KIT"))
     
-    def requires_exchange(self) -> bool:
+    def needs_exchange(self) -> bool:
         """
         Check if this variant requires cylinder exchange.
         
         Gas services with XCH scenario require exchange.
         Gas services with OUT scenario don't require exchange (deposit will be added).
         """
+        # Check the field value directly, or infer from legacy scenario
+        if self.requires_exchange:
+            return True
         return self.is_gas_service() and self.scenario == ProductScenario.XCH
     
     def get_weight_for_inventory(self) -> Optional[Decimal]:
@@ -124,9 +248,9 @@ class Variant:
         if not self.is_physical_item():
             return None
         
-        if self.status == ProductStatus.FULL:
+        if self.state_attr == StateAttribute.FULL:
             return self.gross_weight_kg
-        elif self.status == ProductStatus.EMPTY:
+        elif self.state_attr == StateAttribute.EMPTY:
             return self.tare_weight_kg
         
         return None
@@ -261,11 +385,11 @@ class Variant:
             # Extract size from cylinder SKU
             size = self.sku.replace("CYL", "").replace("-FULL", "").replace("-EMPTY", "")
             
-            if self.status == ProductStatus.FULL:
+            if self.state_attr == StateAttribute.FULL:
                 relationships["empty_version"] = f"CYL{size}-EMPTY"
                 relationships["gas_service"] = f"GAS{size}"
                 relationships["deposit"] = f"DEP{size}"
-            elif self.status == ProductStatus.EMPTY:
+            elif self.state_attr == StateAttribute.EMPTY:
                 relationships["full_version"] = f"CYL{size}-FULL"
                 relationships["gas_service"] = f"GAS{size}"
                 relationships["deposit"] = f"DEP{size}"
@@ -304,7 +428,7 @@ class Variant:
         if self.is_physical_item():
             if not self.tare_weight_kg:
                 errors.append("Physical items must have tare_weight_kg")
-            if self.status == ProductStatus.FULL and not self.gross_weight_kg:
+            if self.state_attr == StateAttribute.FULL and not self.gross_weight_kg:
                 errors.append("Full cylinders must have gross_weight_kg")
         
         # Rule 2: Non-physical items should not have weights
@@ -337,8 +461,17 @@ class Variant:
             "tenant_id": str(self.tenant_id),
             "product_id": str(self.product_id),
             "sku": self.sku,
-            "status": self.status.value,
-            "scenario": self.scenario.value,
+            "sku_type": self.sku_type.value if self.sku_type else None,
+            "state_attr": self.state_attr.value if self.state_attr else None,
+            "requires_exchange": self.requires_exchange,
+            "is_stock_item": self.is_stock_item,
+            "bundle_components": self.bundle_components,
+            "revenue_category": self.revenue_category.value if self.revenue_category else None,
+            "affects_inventory": self.affects_inventory,
+            "is_serialized": self.is_serialized,
+            "default_price": float(self.default_price) if self.default_price else None,
+            "status": self.status.value if self.status else None,
+            "scenario": self.scenario.value if self.scenario else None,
             "tare_weight_kg": float(self.tare_weight_kg) if self.tare_weight_kg else None,
             "capacity_kg": float(self.capacity_kg) if self.capacity_kg else None,
             "gross_weight_kg": float(self.gross_weight_kg) if self.gross_weight_kg else None,

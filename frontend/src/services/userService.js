@@ -45,7 +45,7 @@ class UserService {
       if (params.role) queryParams.append('role', params.role);
       if (params.active_only !== undefined) queryParams.append('active_only', params.active_only);
       
-      const response = await api.get(`/api/v1/users/?${queryParams.toString()}`);
+      const response = await api.get(`/users/?${queryParams.toString()}`);
       
       return {
         success: true,
@@ -63,7 +63,7 @@ class UserService {
   // Create a new user (admin creates user, then user receives email to set password)
   async createUser(userData) {
     try {
-      const response = await api.post('/api/v1/users/', userData);
+      const response = await api.post('/users/', userData);
       
       return {
         success: true,
@@ -81,7 +81,7 @@ class UserService {
   // Get user by ID
   async getUserById(userId) {
     try {
-      const response = await api.get(`/api/v1/users/${userId}`);
+      const response = await api.get(`/users/${userId}`);
       
       return {
         success: true,
@@ -99,7 +99,7 @@ class UserService {
   // Update user
   async updateUser(userId, userData) {
     try {
-      const response = await api.put(`/api/v1/users/${userId}`, userData);
+      const response = await api.put(`/users/${userId}`, userData);
       
       return {
         success: true,
@@ -117,7 +117,7 @@ class UserService {
   // Delete user
   async deleteUser(userId) {
     try {
-      await api.delete(`/api/v1/users/${userId}`);
+      await api.delete(`/users/${userId}`);
       
       return {
         success: true
@@ -134,7 +134,7 @@ class UserService {
   // Activate user
   async activateUser(userId) {
     try {
-      const response = await api.post(`/api/v1/users/${userId}/activate`);
+      const response = await api.post(`/users/${userId}/activate`);
       
       return {
         success: true,
@@ -152,7 +152,7 @@ class UserService {
   // Deactivate user
   async deactivateUser(userId) {
     try {
-      const response = await api.post(`/api/v1/users/${userId}/deactivate`);
+      const response = await api.post(`/users/${userId}/deactivate`);
       
       return {
         success: true,
@@ -170,7 +170,7 @@ class UserService {
   // Send verification email after user creation
   async sendVerificationEmail(email) {
     try {
-      const response = await api.post('/api/v1/verification/verify-email', {
+      const response = await api.post('/verification/verify-email', {
         email
       });
       
