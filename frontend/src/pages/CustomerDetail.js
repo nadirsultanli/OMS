@@ -160,7 +160,14 @@ const CustomerDetail = () => {
       // Refresh addresses
       await fetchCustomerAddresses();
     } catch (error) {
-      setErrors({ general: error.response?.data?.detail || 'Failed to create address.' });
+      console.error('Address creation error:', error);
+      const errorDetail = error.response?.data?.detail;
+      const errorMessage = typeof errorDetail === 'string' 
+        ? errorDetail 
+        : (errorDetail && typeof errorDetail === 'object')
+          ? JSON.stringify(errorDetail)
+          : 'Failed to create address.';
+      setErrors({ general: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -267,7 +274,7 @@ const CustomerDetail = () => {
 
       {errors.general && (
         <div className="message error-message">
-          {errors.general}
+          {typeof errors.general === 'string' ? errors.general : JSON.stringify(errors.general)}
         </div>
       )}
 
@@ -469,7 +476,7 @@ const CustomerDetail = () => {
                     <option value="delivery">Delivery</option>
                     <option value="billing">Billing</option>
                   </select>
-                  {errors.address_type && <span className="error-text">{errors.address_type}</span>}
+                  {errors.address_type && <span className="error-text">{typeof errors.address_type === 'string' ? errors.address_type : JSON.stringify(errors.address_type)}</span>}
                 </div>
 
                 <div className="form-group full-width">
@@ -479,7 +486,7 @@ const CustomerDetail = () => {
                     onCoordinatesChange={handleMapboxCoordinatesChange}
                     placeholder="Search for an address..."
                   />
-                  {errors.street && <span className="error-text">{errors.street}</span>}
+                  {errors.street && <span className="error-text">{typeof errors.street === 'string' ? errors.street : JSON.stringify(errors.street)}</span>}
                 </div>
 
                 <div className="form-group">
@@ -493,7 +500,7 @@ const CustomerDetail = () => {
                     placeholder="Enter street address"
                     className={errors.street ? 'error' : ''}
                   />
-                  {errors.street && <span className="error-text">{errors.street}</span>}
+                  {errors.street && <span className="error-text">{typeof errors.street === 'string' ? errors.street : JSON.stringify(errors.street)}</span>}
                 </div>
 
                 <div className="form-group">
@@ -507,7 +514,7 @@ const CustomerDetail = () => {
                     placeholder="Enter city"
                     className={errors.city ? 'error' : ''}
                   />
-                  {errors.city && <span className="error-text">{errors.city}</span>}
+                  {errors.city && <span className="error-text">{typeof errors.city === 'string' ? errors.city : JSON.stringify(errors.city)}</span>}
                 </div>
 
                 <div className="form-group">
@@ -545,7 +552,7 @@ const CustomerDetail = () => {
                     placeholder="Enter country"
                     className={errors.country ? 'error' : ''}
                   />
-                  {errors.country && <span className="error-text">{errors.country}</span>}
+                  {errors.country && <span className="error-text">{typeof errors.country === 'string' ? errors.country : JSON.stringify(errors.country)}</span>}
                 </div>
 
                 <div className="form-group">
