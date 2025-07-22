@@ -13,8 +13,10 @@ EXCLUDED_PATHS = {
     "/openapi.json",
     "/health",
     "/debug/env",
-    "/debug/supabase",
+    "/debug/supabase", 
+    "/debug/database",
     "/api/v1/auth/login",
+    "/api/v1/auth-fallback/login",  # Fallback login for Railway
     "/api/v1/auth/signup", 
     "/api/v1/auth/refresh",
     "/api/v1/auth/forgot-password",
