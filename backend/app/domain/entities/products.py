@@ -18,14 +18,14 @@ class Product:
     id: UUID
     tenant_id: UUID
     name: str
+    created_at: datetime
+    updated_at: datetime
     category: Optional[str] = None
     unit_of_measure: str = "PCS"
     min_price: Decimal = Decimal("0")
     taxable: bool = True
     density_kg_per_l: Optional[Decimal] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
     created_by: Optional[UUID] = None
-    updated_at: datetime = field(default_factory=datetime.utcnow)
     updated_by: Optional[UUID] = None
     deleted_at: Optional[datetime] = None
     deleted_by: Optional[UUID] = None
@@ -47,6 +47,9 @@ class Product:
     ) -> "Product":
         """Create a new Product instance"""
         from uuid import uuid4
+        from datetime import datetime
+        
+        now = datetime.utcnow()
         
         return cls(
             id=uuid4(),
@@ -57,7 +60,9 @@ class Product:
             min_price=min_price,
             taxable=taxable,
             density_kg_per_l=density_kg_per_l,
+            created_at=now,
             created_by=created_by,
+            updated_at=now,
         )
     
     def add_variant(self, variant: Variant) -> None:

@@ -1,7 +1,9 @@
 from typing import List, Optional
 from uuid import UUID
+import time
 from app.domain.entities.products import Product
 from app.domain.repositories.product_repository import ProductRepository
+from app.infrastucture.logs.logger import default_logger
 
 
 class ProductNotFoundError(Exception):
@@ -56,7 +58,13 @@ class ProductService:
     
     async def get_product_by_id(self, product_id: str) -> Product:
         """Get product by ID"""
+        start_time = time.time()
         product = await self.product_repository.get_product_by_id(UUID(product_id))
+        duration = time.time() - start_time
+        
+        if duration > 0.1:
+            default_logger.info(f"Get product by ID took {duration:.3f}s")
+            
         if not product:
             raise ProductNotFoundError(f"Product with ID {product_id} not found")
         return product
@@ -72,7 +80,14 @@ class ProductService:
         offset: int = 0
     ) -> List[Product]:
         """Get all products for a tenant"""
-        return await self.product_repository.get_all_products(tenant_id, limit, offset)
+        start_time = time.time()
+        result = await self.product_repository.get_all_products(tenant_id, limit, offset)
+        duration = time.time() - start_time
+        
+        if duration > 0.1:
+            default_logger.info(f"Get all products took {duration:.3f}s for tenant {tenant_id}")
+            
+        return result
     
     async def get_products_by_category(
         self, 
@@ -94,25 +109,48 @@ class ProductService:
         updated_by: Optional[UUID] = None
     ) -> Product:
         """Update an existing product"""
-        product = await self.get_product_by_id(product_id)
+        from datetime import datetime
         
-        # Update fields if provided
-        if name is not None:
-            product.name = name
-        if category is not None:
-            product.category = category
-        if unit_of_measure is not None:
-            product.unit_of_measure = unit_of_measure
-        if min_price is not None:
-            product.min_price = min_price
-        if taxable is not None:
-            product.taxable = taxable
-        if density_kg_per_l is not None:
-            product.density_kg_per_l = density_kg_per_l
-        if updated_by is not None:
-            product.updated_by = updated_by
+        start_time = time.time()
         
-        return await self.product_repository.update_product(product)
+        # Get current product
+        get_start = time.time()
+        current_product = await self.get_product_by_id(product_id)
+        get_time = time.time()
+        default_logger.info(f"Get product by ID completed in {get_time - get_start:.3f}s")
+        
+        # Create updated product
+        create_start = time.time()
+        updated_product = Product(
+            id=current_product.id,
+            tenant_id=current_product.tenant_id,
+            name=name if name is not None else current_product.name,
+            created_at=current_product.created_at,
+            updated_at=datetime.utcnow(),
+            category=category if category is not None else current_product.category,
+            unit_of_measure=unit_of_measure if unit_of_measure is not None else current_product.unit_of_measure,
+            min_price=min_price if min_price is not None else current_product.min_price,
+            taxable=taxable if taxable is not None else current_product.taxable,
+            density_kg_per_l=density_kg_per_l if density_kg_per_l is not None else current_product.density_kg_per_l,
+            created_by=current_product.created_by,
+            updated_by=updated_by if updated_by is not None else current_product.updated_by,
+            deleted_at=current_product.deleted_at,
+            deleted_by=current_product.deleted_by,
+            variants=current_product.variants
+        )
+        create_time = time.time()
+        default_logger.info(f"Product entity creation completed in {create_time - create_start:.3f}s")
+        
+        # Update in repository
+        repo_start = time.time()
+        result = await self.product_repository.update_product(updated_product)
+        repo_time = time.time()
+        default_logger.info(f"Repository update completed in {repo_time - repo_start:.3f}s")
+        
+        total_time = time.time() - start_time
+        default_logger.info(f"Product service update total: {total_time:.3f}s (get: {get_time - get_start:.3f}s, create: {create_time - create_start:.3f}s, repo: {repo_time - repo_start:.3f}s)")
+        
+        return result
     
     async def delete_product(
         self, 

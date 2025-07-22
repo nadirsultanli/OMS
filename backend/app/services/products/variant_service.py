@@ -143,36 +143,38 @@ class VariantService:
         updated_by: Optional[UUID] = None
     ) -> Variant:
         """Update an existing variant"""
-        variant = await self.get_variant_by_id(variant_id)
+        from datetime import datetime
         
-        # Update fields if provided
-        if sku is not None:
-            variant.sku = sku
-        if status is not None:
-            variant.status = status
-        if scenario is not None:
-            variant.scenario = scenario
-        if tare_weight_kg is not None:
-            variant.tare_weight_kg = tare_weight_kg
-        if capacity_kg is not None:
-            variant.capacity_kg = capacity_kg
-        if gross_weight_kg is not None:
-            variant.gross_weight_kg = gross_weight_kg
-        if deposit is not None:
-            variant.deposit = deposit
-        if inspection_date is not None:
-            variant.inspection_date = inspection_date
-        if active is not None:
-            variant.active = active
-        if updated_by is not None:
-            variant.updated_by = updated_by
+        current_variant = await self.get_variant_by_id(variant_id)
+        
+        # Create a new variant with updated fields
+        updated_variant = Variant(
+            id=current_variant.id,
+            tenant_id=current_variant.tenant_id,
+            product_id=current_variant.product_id,
+            sku=sku if sku is not None else current_variant.sku,
+            status=status if status is not None else current_variant.status,
+            scenario=scenario if scenario is not None else current_variant.scenario,
+            tare_weight_kg=tare_weight_kg if tare_weight_kg is not None else current_variant.tare_weight_kg,
+            capacity_kg=capacity_kg if capacity_kg is not None else current_variant.capacity_kg,
+            gross_weight_kg=gross_weight_kg if gross_weight_kg is not None else current_variant.gross_weight_kg,
+            deposit=deposit if deposit is not None else current_variant.deposit,
+            inspection_date=inspection_date if inspection_date is not None else current_variant.inspection_date,
+            active=active if active is not None else current_variant.active,
+            created_at=current_variant.created_at,
+            created_by=current_variant.created_by,
+            updated_at=datetime.utcnow(),
+            updated_by=updated_by if updated_by is not None else current_variant.updated_by,
+            deleted_at=current_variant.deleted_at,
+            deleted_by=current_variant.deleted_by,
+        )
         
         # Validate business rules after update
-        validation_errors = variant.validate_business_rules()
+        validation_errors = updated_variant.validate_business_rules()
         if validation_errors:
             raise ValueError(f"Business rule validation failed: {', '.join(validation_errors)}")
         
-        return await self.variant_repository.update_variant(variant)
+        return await self.variant_repository.update_variant(updated_variant)
     
     async def delete_variant(
         self, 

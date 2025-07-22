@@ -18,10 +18,16 @@ class VariantRepositoryImpl(VariantRepository):
     
     def _to_entity(self, model: VariantModel) -> VariantEntity:
         """Convert SQLAlchemy model to domain entity"""
+        # Convert asyncpg UUID objects to Python UUID objects
+        def convert_uuid(uuid_obj):
+            if uuid_obj is None:
+                return None
+            return UUID(str(uuid_obj)) if hasattr(uuid_obj, '__str__') else uuid_obj
+        
         return VariantEntity(
-            id=model.id,
-            tenant_id=model.tenant_id,
-            product_id=model.product_id,
+            id=convert_uuid(model.id),
+            tenant_id=convert_uuid(model.tenant_id),
+            product_id=convert_uuid(model.product_id),
             sku=model.sku,
             status=ProductStatus(model.status),
             scenario=ProductScenario(model.scenario),
@@ -32,11 +38,11 @@ class VariantRepositoryImpl(VariantRepository):
             inspection_date=model.inspection_date,
             active=model.active,
             created_at=model.created_at,
-            created_by=model.created_by,
+            created_by=convert_uuid(model.created_by),
             updated_at=model.updated_at,
-            updated_by=model.updated_by,
+            updated_by=convert_uuid(model.updated_by),
             deleted_at=model.deleted_at,
-            deleted_by=model.deleted_by,
+            deleted_by=convert_uuid(model.deleted_by),
         )
     
     def _to_model(self, entity: VariantEntity) -> VariantModel:

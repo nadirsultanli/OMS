@@ -21,7 +21,8 @@ from app.presentation.schemas.variants.output_schemas import (
     VariantRelationshipsResponse
 )
 from app.services.dependencies.products import get_variant_service, get_lpg_business_service
-from app.services.dependencies.common import get_current_user
+from app.core.auth_utils import current_user
+from app.domain.entities.users import User
 from app.domain.entities.variants import ProductStatus, ProductScenario
 
 router = APIRouter(prefix="/variants", tags=["Variants"])
@@ -91,14 +92,16 @@ async def update_variant(
     variant_id: str, 
     request: UpdateVariantRequest, 
     variant_service: VariantService = Depends(get_variant_service),
-    current_user=Depends(get_current_user)
+    user: User = current_user
 ):
     """Update a variant"""
     try:
-        updated_by = UUID(current_user.id) if current_user else None
+        updated_by = UUID(str(user.id)) if user else None
+        # Exclude updated_by from request body since it comes from authenticated user
+        request_data = request.dict(exclude_unset=True, exclude={'updated_by'})
         variant = await variant_service.update_variant(
             variant_id, 
-            **request.dict(exclude_unset=True), 
+            **request_data, 
             updated_by=updated_by
         )
         return VariantResponse(**variant.to_dict())
@@ -111,11 +114,11 @@ async def update_variant(
 async def delete_variant(
     variant_id: str, 
     variant_service: VariantService = Depends(get_variant_service),
-    current_user=Depends(get_current_user)
+    user: User = current_user
 ):
     """Delete a variant"""
     try:
-        deleted_by = UUID(current_user.id) if current_user else None
+        deleted_by = UUID(str(user.id)) if user else None
         success = await variant_service.delete_variant(variant_id, deleted_by=deleted_by)
         if not success:
             raise HTTPException(

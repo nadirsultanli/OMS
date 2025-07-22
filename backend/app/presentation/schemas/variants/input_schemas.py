@@ -28,7 +28,6 @@ class UpdateVariantRequest(BaseModel):
     deposit: Optional[Decimal] = None
     inspection_date: Optional[date] = None
     active: Optional[bool] = None
-    updated_by: Optional[str] = None
 
 class ProcessOrderLineRequest(BaseModel):
     """Request schema for processing LPG order lines"""
