@@ -31,57 +31,57 @@ from app.core.user_context import UserContext, user_context
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@auth_router.post("/signup", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
-async def signup(
-    request: SignupRequest,
-    user_service: UserService = Depends(get_user_service)
-):
-    """User signup endpoint using Supabase Auth"""
-    try:
-        # Get Supabase client
-        supabase = get_supabase_client_sync()
+# @auth_router.post("/signup", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
+# async def signup(
+#     request: SignupRequest,
+#     user_service: UserService = Depends(get_user_service)
+# ):
+#     """User signup endpoint using Supabase Auth"""
+#     try:
+#         # Get Supabase client
+#         supabase = get_supabase_client_sync()
         
-        # Create user in Supabase Auth
-        auth_response = supabase.auth.sign_up({
-            "email": request.email,
-            "password": request.password
-        })
+#         # Create user in Supabase Auth
+#         auth_response = supabase.auth.sign_up({
+#             "email": request.email,
+#             "password": request.password
+#         })
         
-        if auth_response.user is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to create user account"
-            )
+#         if auth_response.user is None:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Failed to create user account"
+#             )
         
-        # Create user in our database with the auth_user_id
-        user = await user_service.create_user(
-            email=request.email,
-            role=request.role,
-            name=request.full_name,
-            password=request.password
-        )
+#         # Create user in our database with the auth_user_id
+#         user = await user_service.create_user(
+#             email=request.email,
+#             role=request.role,
+#             name=request.full_name,
+#             password=request.password
+#         )
         
-        default_logger.info(f"User signed up successfully", user_id=str(user.id), email=request.email)
+#         default_logger.info(f"User signed up successfully", user_id=str(user.id), email=request.email)
         
-        return LoginResponse(
-            access_token=auth_response.session.access_token,
-            refresh_token=auth_response.session.refresh_token,
-            user_id=str(user.id),
-            tenant_id=str(user.tenant_id),
-            email=user.email,
-            role=user.role.value,
-            full_name=user.full_name
-        )
+#         return LoginResponse(
+#             access_token=auth_response.session.access_token,
+#             refresh_token=auth_response.session.refresh_token,
+#             user_id=str(user.id),
+#             tenant_id=str(user.tenant_id),
+#             email=user.email,
+#             role=user.role.value,
+#             full_name=user.full_name
+#         )
         
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except Exception as e:
-        default_logger.error(f"Signup failed: {str(e)}", email=request.email)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Signup failed"
-        )
+#     except HTTPException:
+#         # Re-raise HTTP exceptions
+#         raise
+#     except Exception as e:
+#         default_logger.error(f"Signup failed: {str(e)}", email=request.email)
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Signup failed"
+#         )
 
 
 @auth_router.post("/login", response_model=LoginResponse)
