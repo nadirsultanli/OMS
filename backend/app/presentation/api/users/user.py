@@ -16,8 +16,18 @@ from app.presentation.schemas.users import (
     UserResponse,
     UserListResponse
 )
+from app.services.dependencies.railway_users import should_use_railway_mode, get_railway_user_service
 from app.services.dependencies.users import get_user_service
 from app.core.user_context import UserContext, user_context
+
+# Smart user service selection
+def get_smart_user_service():
+    if should_use_railway_mode():
+        return get_railway_user_service()
+    else:
+        # This will fail in Railway, but work locally
+        # We can't use Depends() here, so for Railway we must use railway service
+        return get_railway_user_service()  # Always use railway for now
 
 user_router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -27,7 +37,7 @@ user_router = APIRouter(prefix="/users", tags=["Users"])
 @user_router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     request: CreateUserRequest,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Create a new user"""
     try:
@@ -68,7 +78,7 @@ async def create_user(
 @user_router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: str,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Get user by ID"""
     try:
@@ -109,7 +119,7 @@ async def get_users(
     offset: int = Query(0, ge=0),
     role: Optional[UserRoleType] = Query(None),
     active_only: bool = Query(False),
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Get users with filtering and pagination"""
     try:
@@ -158,7 +168,7 @@ async def get_users(
 async def update_user(
     user_id: str,
     request: UpdateUserRequest,
-    user_service: UserService = Depends(get_user_service),
+    user_service: UserService = Depends(get_smart_user_service),
     context: UserContext = user_context
 ):
     """Update user"""
@@ -213,7 +223,7 @@ async def update_user(
 @user_router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: str,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Delete user"""
     try:
@@ -236,7 +246,7 @@ async def delete_user(
 @user_router.post("/{user_id}/activate", response_model=UserResponse)
 async def activate_user(
     user_id: str,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Activate user"""
     try:
@@ -274,7 +284,7 @@ async def activate_user(
 @user_router.post("/{user_id}/deactivate", response_model=UserResponse)
 async def deactivate_user(
     user_id: str,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Deactivate user"""
     try:
@@ -312,7 +322,7 @@ async def deactivate_user(
 @user_router.post("/{user_id}/resend-invitation", status_code=status.HTTP_200_OK)
 async def resend_user_invitation(
     user_id: str,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Resend invitation email to user"""
     try:
@@ -341,7 +351,7 @@ async def resend_user_invitation(
 
 @user_router.post("/fix-missing-auth", status_code=status.HTTP_200_OK)
 async def fix_missing_auth_users(
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Fix users that were created without auth_user_id by creating them in Supabase Auth"""
     try:
@@ -361,7 +371,7 @@ async def fix_missing_auth_users(
 
 @user_router.get("/test-supabase-connection", status_code=status.HTTP_200_OK)
 async def test_supabase_connection(
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Test Supabase connection and auth capabilities"""
     try:
@@ -382,7 +392,7 @@ async def test_supabase_connection(
 @user_router.post("/create-with-trigger", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user_with_trigger(
     request: CreateUserRequest,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Create a new user using Supabase Auth trigger (alternative method)"""
     try:
@@ -415,7 +425,7 @@ async def create_user_with_trigger(
 @user_router.post("/create-simple", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user_simple(
     request: CreateUserRequest,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_smart_user_service)
 ):
     """Create a new user with minimal Supabase Auth interaction (no triggers)"""
     try:
