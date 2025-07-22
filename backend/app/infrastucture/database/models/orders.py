@@ -7,7 +7,6 @@ from sqlalchemy import (
     Column, String, DateTime, Boolean, Numeric, Date, Text, 
     ForeignKey, CheckConstraint, UniqueConstraint, TIMESTAMP, Enum as SQLAlchemyEnum
 )
-from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.declarative import declared_attr
@@ -29,7 +28,7 @@ class OrderModel(Base):
     
     # Order details
     order_no: Mapped[str] = mapped_column(Text, nullable=False)
-    order_status: Mapped[str] = mapped_column(String, nullable=False, default=OrderStatus.DRAFT.value)
+    order_status: Mapped[str] = mapped_column(String, nullable=False, default="draft")
     requested_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     delivery_instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     payment_terms: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -97,4 +96,4 @@ class OrderLineModel(Base):
         CheckConstraint("qty_delivered >= 0", name="order_lines_qty_delivered_non_negative"),
         CheckConstraint("list_price >= 0", name="order_lines_list_price_positive"),
         CheckConstraint("final_price >= 0", name="order_lines_final_price_positive"),
-    )
+    )   

@@ -138,11 +138,11 @@ const Users = () => {
   const handleResendInvitation = async (userId, email) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/v1/users/${userId}/resend-invitation`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1'}/users/${userId}/resend-invitation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
 

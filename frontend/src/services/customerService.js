@@ -45,7 +45,7 @@ class CustomerService {
       if (params.status) queryParams.append('status', params.status);
       if (params.customer_type) queryParams.append('customer_type', params.customer_type);
       
-      const response = await api.get(`/api/v1/customers/?${queryParams.toString()}`);
+      const response = await api.get(`/customers/?${queryParams.toString()}`);
       
       return {
         success: true,
@@ -62,7 +62,7 @@ class CustomerService {
 
   async getCustomerById(customerId) {
     try {
-      const response = await api.get(`/api/v1/customers/${customerId}`);
+      const response = await api.get(`/customers/${customerId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching customer:', error);
@@ -80,7 +80,7 @@ class CustomerService {
         throw new Error('tenant_id is required');
       }
       
-      const response = await api.post('/api/v1/customers/', customerData);
+      const response = await api.post('/customers/', customerData);
       
       console.log('customerService - API response:', response.data);
       
@@ -100,7 +100,7 @@ class CustomerService {
 
   async updateCustomer(customerId, customerData) {
     try {
-      const response = await api.put(`/api/v1/customers/${customerId}`, customerData);
+      const response = await api.put(`/customers/${customerId}`, customerData);
       return response.data;
     } catch (error) {
       console.error('Error updating customer:', error);
@@ -110,7 +110,7 @@ class CustomerService {
 
   async deleteCustomer(customerId) {
     try {
-      await api.delete(`/api/v1/customers/${customerId}`);
+      await api.delete(`/customers/${customerId}`);
       return true;
     } catch (error) {
       console.error('Error deleting customer:', error);
@@ -120,7 +120,7 @@ class CustomerService {
 
   async approveCustomer(customerId) {
     try {
-      const response = await api.post(`/api/v1/customers/${customerId}/approve`);
+      const response = await api.post(`/customers/${customerId}/approve`);
       return response.data;
     } catch (error) {
       console.error('Error approving customer:', error);
@@ -130,7 +130,7 @@ class CustomerService {
 
   async rejectCustomer(customerId) {
     try {
-      const response = await api.post(`/api/v1/customers/${customerId}/reject`);
+      const response = await api.post(`/customers/${customerId}/reject`);
       return response.data;
     } catch (error) {
       console.error('Error rejecting customer:', error);
@@ -140,7 +140,7 @@ class CustomerService {
 
   async inactivateCustomer(customerId) {
     try {
-      const response = await api.post(`/api/v1/customers/${customerId}/inactivate`);
+      const response = await api.post(`/customers/${customerId}/inactivate`);
       return response.data;
     } catch (error) {
       console.error('Error inactivating customer:', error);
@@ -150,7 +150,7 @@ class CustomerService {
 
   async activateCustomer(customerId) {
     try {
-      const response = await api.post(`/api/v1/customers/${customerId}/activate`);
+      const response = await api.post(`/customers/${customerId}/activate`);
       return response.data;
     } catch (error) {
       console.error('Error activating customer:', error);
@@ -160,7 +160,7 @@ class CustomerService {
 
   async reassignOwner(customerId, newOwnerSalesRepId) {
     try {
-      const response = await api.post(`/api/v1/customers/${customerId}/reassign_owner`, {
+      const response = await api.post(`/customers/${customerId}/reassign_owner`, {
         new_owner_sales_rep_id: newOwnerSalesRepId
       });
       return response.data;
@@ -173,7 +173,7 @@ class CustomerService {
   // Address-related methods
   async getCustomerAddresses(customerId) {
     try {
-      const response = await api.get(`/api/v1/addresses?customer_id=${customerId}`);
+      const response = await api.get(`/addresses?customer_id=${customerId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching customer addresses:', error);
@@ -183,7 +183,7 @@ class CustomerService {
 
   async createAddress(addressData) {
     try {
-      const response = await api.post('/api/v1/addresses', addressData);
+      const response = await api.post('/addresses', addressData);
       return response.data;
     } catch (error) {
       console.error('Error creating address:', error);
@@ -193,7 +193,7 @@ class CustomerService {
 
   async updateAddress(addressId, addressData) {
     try {
-      const response = await api.put(`/api/v1/addresses/${addressId}`, addressData);
+      const response = await api.put(`/addresses/${addressId}`, addressData);
       return response.data;
     } catch (error) {
       console.error('Error updating address:', error);
@@ -203,7 +203,7 @@ class CustomerService {
 
   async deleteAddress(addressId) {
     try {
-      await api.delete(`/api/v1/addresses/${addressId}`);
+      await api.delete(`/addresses/${addressId}`);
       return true;
     } catch (error) {
       console.error('Error deleting address:', error);
@@ -213,7 +213,7 @@ class CustomerService {
 
   async setDefaultAddress(addressId) {
     try {
-      const response = await api.post(`/api/v1/addresses/${addressId}/set_default`);
+      const response = await api.post(`/addresses/${addressId}/set_default`);
       return response.data;
     } catch (error) {
       console.error('Error setting default address:', error);

@@ -8,6 +8,12 @@ import AcceptInvitation from './pages/AcceptInvitation';
 import Users from './pages/Users';
 import Customers from './pages/Customers';
 import CustomerDetail from './pages/CustomerDetail';
+import Warehouses from './pages/Warehouses';
+import WarehouseDetail from './pages/WarehouseDetail';
+import Products from './pages/Products';
+import PriceLists from './pages/PriceLists';
+import PriceListDetail from './pages/PriceListDetail';
+import Variants from './pages/Variants';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import authService from './services/authService';
@@ -91,6 +97,66 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <CustomerDetail />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/warehouses" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Warehouses />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/warehouses/:warehouseId" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <WarehouseDetail />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+                      <Route
+              path="/products"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Products />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/variants"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Variants />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+          <Route 
+            path="/price-lists" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PriceLists />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/price-lists/:priceListId" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PriceListDetail />
                 </Layout>
               </ProtectedRoute>
             } 

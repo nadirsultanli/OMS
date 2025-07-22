@@ -2,7 +2,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy import select, update, delete, and_, or_, func
+from sqlalchemy import select, update, delete, and_, or_, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -32,16 +32,16 @@ class SQLAlchemyOrderRepository(OrderRepository):
             tenant_id=model.tenant_id,
             order_no=model.order_no,
             customer_id=model.customer_id,
-            order_status=OrderStatus(model.order_status),  # Convert string to OrderStatus enum
+            order_status=OrderStatus(model.order_status),  # Convert string to enum
             requested_date=model.requested_date,
             delivery_instructions=model.delivery_instructions,
             payment_terms=model.payment_terms,
             total_amount=model.total_amount,
             total_weight_kg=model.total_weight_kg,
             created_by=model.created_by,
-            created_at=model.created_at,
+            created_at=getattr(model, 'created_at', datetime.utcnow()),  # Use default if missing
             updated_by=model.updated_by,
-            updated_at=model.updated_at,
+            updated_at=getattr(model, 'updated_at', datetime.utcnow()),  # Use default if missing
             deleted_at=model.deleted_at,
             deleted_by=model.deleted_by,
             order_lines=order_lines
@@ -73,7 +73,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
             tenant_id=entity.tenant_id,
             order_no=entity.order_no,
             customer_id=entity.customer_id,
-            order_status=entity.order_status.value,  # Convert OrderStatus enum to string
+            order_status=entity.order_status.value,  # Convert enum to string
             requested_date=entity.requested_date,
             delivery_instructions=entity.delivery_instructions,
             payment_terms=entity.payment_terms,
@@ -98,7 +98,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
             list_price=entity.list_price,
             manual_unit_price=entity.manual_unit_price,
             final_price=entity.final_price,
+            created_at=entity.created_at,
             created_by=entity.created_by,
+            updated_at=entity.updated_at,
             updated_by=entity.updated_by
         )
 
@@ -436,21 +438,16 @@ class SQLAlchemyOrderRepository(OrderRepository):
         if not await self.validate_order_number_unique(order.order_no, order.tenant_id):
             raise OrderAlreadyExistsError(order.order_no)
         
-        # Create order
-        order_model = self._to_order_model(order)
-        self.session.add(order_model)
-        await self.session.flush()  # Get the order ID
+        # Create order using the same raw SQL approach
+        created_order = await self.create_order(order)
         
         # Create order lines
         for line in order.order_lines:
-            line.order_id = order_model.id
-            line_model = self._to_order_line_model(line)
-            self.session.add(line_model)
+            line.order_id = created_order.id
+            await self.create_order_line(line)
         
-        await self.session.commit()
-        await self.session.refresh(order_model)
-        
-        return self._to_order_entity(order_model)
+        # Return the order with all lines
+        return await self.get_order_with_lines(str(created_order.id))
 
     async def update_order_with_lines(self, order: Order) -> Optional[Order]:
         """Update an order with all its order lines in a transaction"""

@@ -28,6 +28,7 @@ class LoginResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user_id: str
+    tenant_id: str
     email: str
     role: str
     full_name: Optional[str]
