@@ -2,12 +2,11 @@ from typing import List, Optional, Any, Dict
 from supabase import Client
 from pydantic import BaseModel
 
-from app.domain.repositories.base import BaseRepository
 from app.infrastucture.database.connection import get_database
 from app.infrastucture.logs.logger import default_logger
 
 
-class SupabaseRepository(BaseRepository):
+class SupabaseRepository():
     """Supabase implementation of base repository"""
     
     def __init__(self, table_name: str, model_class: type[BaseModel]):
