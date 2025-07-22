@@ -1,0 +1,1 @@
+# Stock documents exceptions module

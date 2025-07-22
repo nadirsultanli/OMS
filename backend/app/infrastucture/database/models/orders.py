@@ -5,7 +5,7 @@ from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import (
     Column, String, DateTime, Boolean, Numeric, Date, Text, 
-    ForeignKey, CheckConstraint, UniqueConstraint, TIMESTAMP, Enum as SQLAlchemyEnum
+    ForeignKey, CheckConstraint, UniqueConstraint, TIMESTAMP, Enum as SQLAlchemyEnum, text
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -29,7 +29,7 @@ class OrderModel(Base):
     
     # Order details
     order_no: Mapped[str] = mapped_column(Text, nullable=False)
-    order_status: Mapped[str] = mapped_column(String, nullable=False, default="draft")
+    order_status: Mapped[str] = mapped_column(SQLAlchemyEnum(OrderStatus, name="order_status", create_constraint=True, native_enum=True, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=OrderStatus.DRAFT)
     requested_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     delivery_instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     payment_terms: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -39,10 +39,10 @@ class OrderModel(Base):
     total_weight_kg: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True, default=0)
     
     # Audit fields
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
     updated_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
     deleted_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     deleted_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
@@ -86,10 +86,10 @@ class OrderLineModel(Base):
     final_price: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     
     # Audit fields
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
     updated_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
     
     # Relationships
     order: Mapped["OrderModel"] = relationship("OrderModel", back_populates="order_lines")
