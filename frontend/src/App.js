@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Verification from './pages/Verification';
 import PasswordReset from './pages/PasswordReset';
 import AcceptInvitation from './pages/AcceptInvitation';
+import AuthCallback from './pages/AuthCallback';
 import Users from './pages/Users';
 import Customers from './pages/Customers';
 import CustomerDetail from './pages/CustomerDetail';
@@ -216,12 +217,16 @@ function App() {
             } 
           />
           
+          {/* Auth callback route - handles Supabase redirects */}
+          <Route 
+            path="/auth/callback" 
+            element={<AuthCallback />} 
+          />
+          
           {/* Default redirect */}
           <Route 
             path="/" 
-            element={
-              <Navigate to={authService.isAuthenticated() ? "/dashboard" : "/login"} replace />
-            } 
+            element={<AuthCallback />}
           />
           
           {/* Catch all route */}

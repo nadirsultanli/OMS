@@ -21,48 +21,65 @@ const AcceptInvitation = () => {
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     
-    // Extract token from URL parameters
-    // Supabase sends invite links with 'access_token' and 'type=invite'
-    const urlParams = new URLSearchParams(location.search);
-    const accessToken = urlParams.get('access_token');
-    const type = urlParams.get('type');
+    console.log('AcceptInvitation - Processing URL:', window.location.href);
     
-    // Also check for hash parameters (common in OAuth flows)
+    // Extract token from URL parameters and hash fragments
+    const urlParams = new URLSearchParams(location.search);
     const hashParams = new URLSearchParams(location.hash.substring(1));
+    
+    // Check all possible token parameter names
+    const searchAccessToken = urlParams.get('access_token');
+    const searchToken = urlParams.get('token');
+    const searchType = urlParams.get('type');
+    
     const hashAccessToken = hashParams.get('access_token');
+    const hashToken = hashParams.get('token');  
     const hashType = hashParams.get('type');
     
-    console.log('Invitation URL search params:', location.search);
-    console.log('Invitation URL hash params:', location.hash);
-    console.log('Access token from search:', accessToken);
-    console.log('Access token from hash:', hashAccessToken);
-    console.log('Type from search:', type);
-    console.log('Type from hash:', hashType);
+    console.log('AcceptInvitation - URL parsing:', {
+      search: location.search,
+      hash: location.hash,
+      searchAccessToken: searchAccessToken ? 'present' : 'missing',
+      searchToken: searchToken ? 'present' : 'missing',
+      searchType,
+      hashAccessToken: hashAccessToken ? 'present' : 'missing',
+      hashToken: hashToken ? 'present' : 'missing',
+      hashType
+    });
     
-    // Use the token from either search params or hash params
-    const finalToken = accessToken || hashAccessToken;
-    const finalType = type || hashType;
+    // Determine the final token and type
+    const finalToken = searchAccessToken || hashAccessToken || searchToken || hashToken;
+    const finalType = searchType || hashType;
     
-    // Set the token if it exists and type is invite
-    if (finalToken && finalType === 'invite') {
+    console.log('AcceptInvitation - Final values:', {
+      token: finalToken ? 'present' : 'missing',
+      type: finalType
+    });
+    
+    // Set the token if it exists and type is invite (or no type but token exists)
+    if (finalToken && (finalType === 'invite' || !finalType)) {
       setToken(finalToken);
-      console.log('Invitation token set successfully:', finalToken);
+      console.log('AcceptInvitation - Token set successfully');
       
       // Try to decode the token to get user email (optional, for display)
       try {
         const tokenParts = finalToken.split('.');
         if (tokenParts.length === 3) {
           const payload = JSON.parse(atob(tokenParts[1]));
+          console.log('AcceptInvitation - Token payload:', { email: payload.email, sub: payload.sub });
           if (payload.email) {
             setUserEmail(payload.email);
           }
         }
       } catch (e) {
-        console.log('Could not decode token for email extraction:', e);
+        console.log('AcceptInvitation - Could not decode token for email extraction:', e);
       }
     } else {
-      console.warn('No valid invitation token found. Expected type=invite with access_token.');
-      setErrors({ general: 'Invalid invitation link. Please check your email for the correct invitation link.' });
+      console.warn('AcceptInvitation - No valid invitation token found');
+      console.warn('AcceptInvitation - Expected: token with type=invite or just token parameter');
+      setErrors({ 
+        general: 'Invalid invitation link. Please check your email for the correct invitation link or try accessing the link again.' 
+      });
     }
   }, [location]);
 

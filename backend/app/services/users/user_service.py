@@ -81,9 +81,9 @@ class UserService:
             frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
             if role.value.lower() == "driver":
                 driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
-                redirect_url = f"{driver_frontend_url}/accept-invitation"
+                redirect_url = driver_frontend_url
             else:
-                redirect_url = f"{frontend_url}/accept-invitation"
+                redirect_url = frontend_url
             
             # Step 1: Create Supabase Auth user first (MANDATORY)
             auth_user_id = None
@@ -366,9 +366,9 @@ class UserService:
             frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
             if user.role.value.lower() == "driver":
                 driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
-                redirect_url = f"{driver_frontend_url}/accept-invitation"
+                redirect_url = driver_frontend_url
             else:
-                redirect_url = f"{frontend_url}/accept-invitation"
+                redirect_url = frontend_url
             
             supabase = get_supabase_admin_client_sync()
             
@@ -473,9 +473,9 @@ class UserService:
                                 frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
                                 if user.role.value.lower() == "driver":
                                     driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
-                                    redirect_url = f"{driver_frontend_url}/accept-invitation"
+                                    redirect_url = driver_frontend_url
                                 else:
-                                    redirect_url = f"{frontend_url}/accept-invitation"
+                                    redirect_url = frontend_url
                                 
                                 supabase.auth.admin.invite_user_by_email(
                                     user.email,
@@ -601,9 +601,9 @@ class UserService:
             frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
             if role.value.lower() == "driver":
                 driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
-                redirect_url = f"{driver_frontend_url}/accept-invitation"
+                redirect_url = driver_frontend_url
             else:
-                redirect_url = f"{frontend_url}/accept-invitation"
+                redirect_url = frontend_url
             
             # Create Supabase Auth user - trigger handles app DB creation automatically
             default_logger.info(f"Creating Auth user via trigger method", email=email, role=role.value)
@@ -717,12 +717,14 @@ class UserService:
                 default_logger.warning(f"Could not check existing auth users: {str(e)}")
             
             # Configure redirect URL based on role
+            # Note: Supabase will redirect to the root URL with auth parameters
+            # Our AuthCallback component will then route to the appropriate page
             frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
             if role.value.lower() == "driver":
                 driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
-                redirect_url = f"{driver_frontend_url}/accept-invitation"
+                redirect_url = driver_frontend_url
             else:
-                redirect_url = f"{frontend_url}/accept-invitation"
+                redirect_url = frontend_url
             
             # Step 1: Create user in Supabase Auth FIRST (mandatory)
             auth_user_id = None
