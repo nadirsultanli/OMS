@@ -146,23 +146,45 @@ async def login(
         
         default_logger.info(f"User logged in successfully", user_id=str(user.id), email=request.email)
         
-        return LoginResponse(
-            access_token=auth_response.session.access_token,
-            refresh_token=auth_response.session.refresh_token,
-            user_id=str(user.id),
-            email=user.email,
-            role=user.role.value,
-            full_name=user.full_name
-        )
+        try:
+            response = LoginResponse(
+                access_token=auth_response.session.access_token,
+                refresh_token=auth_response.session.refresh_token,
+                user_id=str(user.id),
+                email=user.email,
+                role=user.role.value,
+                full_name=user.full_name
+            )
+            default_logger.info("Login response created successfully")
+            return response
+        except Exception as e:
+            default_logger.error(f"Failed to create login response: {str(e)}", user_id=str(user.id))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create login response"
+            )
         
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except HTTPException as he:
+        # Re-raise HTTP exceptions with better logging
+        default_logger.warning(f"Login HTTP exception: {he.status_code} - {he.detail}", email=request.email)
         raise
+    except UserNotFoundError as e:
+        default_logger.warning(f"User not found during login: {str(e)}", email=request.email)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+    except UserInactiveError as e:
+        default_logger.warning(f"Inactive user login attempt: {str(e)}", email=request.email)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account is inactive, please activate your account or contact your administrator"
+        )
     except Exception as e:
-        default_logger.error(f"Login failed: {str(e)}", email=request.email)
+        default_logger.error(f"Unexpected login error: {str(e)} | Type: {type(e).__name__}", email=request.email, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed"
+            detail=f"Login failed: {str(e)}"
         )
 
 

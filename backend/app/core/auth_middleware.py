@@ -13,6 +13,7 @@ EXCLUDED_PATHS = {
     "/openapi.json",
     "/health",
     "/debug/env",
+    "/debug/supabase",
     "/api/v1/auth/login",
     "/api/v1/auth/signup", 
     "/api/v1/auth/refresh",
