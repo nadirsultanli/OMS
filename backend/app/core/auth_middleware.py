@@ -4,6 +4,7 @@ from app.domain.entities.users import User
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.services.users.user_service import UserService
 from app.services.dependencies.users import get_user_service
+from app.services.dependencies.railway_users import get_railway_user_service, should_use_railway_mode
 
 
 # Routes that don't require authentication
@@ -13,7 +14,9 @@ EXCLUDED_PATHS = {
     "/openapi.json",
     "/health",
     "/debug/env",
-    "/debug/supabase",
+    "/debug/supabase", 
+    "/debug/database",
+    "/debug/railway",
     "/api/v1/auth/login",
     "/api/v1/auth/signup", 
     "/api/v1/auth/refresh",
@@ -26,8 +29,7 @@ EXCLUDED_PATHS = {
 
 async def conditional_auth(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
-    user_service: UserService = Depends(get_user_service)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))
 ) -> Optional[User]:
     """
     Conditional authentication:
@@ -46,6 +48,10 @@ async def conditional_auth(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Get user service
+    from app.infrastucture.logs.logger import default_logger
+    user_service = get_railway_user_service()
+    
     try:
         from app.infrastucture.database.connection import get_supabase_client_sync
         
@@ -60,16 +66,32 @@ async def conditional_auth(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Get user from our database using the auth_user_id
+        # Try to get user by auth_user_id first, fallback to email
         auth_user_id = auth_response.user.id
+        user_email = auth_response.user.email
+        default_logger.info(f"Auth middleware looking up user by auth_id: {auth_user_id}, email: {user_email}")
+        
         user = await user_service.get_user_by_auth_id(auth_user_id)
         
         if not user:
+            default_logger.info(f"User not found by auth_id, trying email: {user_email}")
+            # Fallback to email lookup
+            user = await user_service.get_user_by_email(user_email)
+            
+            if user:
+                # Update the auth_user_id for future lookups
+                default_logger.info(f"Updating auth_user_id for user: {user.email}")
+                user = await user_service.update_user_auth_id(str(user.id), auth_user_id)
+        
+        if not user:
+            default_logger.warning(f"User not found in database for auth_id: {auth_user_id}, email: {user_email}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found in database",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        
+        default_logger.info(f"Auth middleware found user: {user.email}")
         
         from app.domain.entities.users import UserStatus
         if user.status != UserStatus.ACTIVE:
@@ -85,9 +107,10 @@ async def conditional_auth(
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        default_logger.error(f"Authentication failed: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentication failed: {str(e)}",
+            detail="Authentication failed",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

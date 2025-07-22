@@ -22,6 +22,7 @@ from app.presentation.schemas.users.password_reset_schemas import (
     ResetPasswordResponse
 )
 from app.services.dependencies.users import get_user_service
+from app.services.dependencies.railway_users import get_railway_user_service, should_use_railway_mode
 from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
 from decouple import config
 from app.domain.entities.users import UserStatus
@@ -83,11 +84,13 @@ async def signup(
 
 
 @auth_router.post("/login", response_model=LoginResponse)
-async def login(
-    request: LoginRequest,
-    user_service: UserService = Depends(get_user_service)
-):
+async def login(request: LoginRequest):
     """User login endpoint using Supabase Auth"""
+    
+    # Use Railway mode (Supabase SDK) for authentication
+    user_service = get_railway_user_service()
+    default_logger.info("Login attempt started", email=request.email)
+    
     try:
         default_logger.info(f"Login attempt started for email: {request.email}")
         
@@ -124,7 +127,14 @@ async def login(
         
         # Get user from our database to get additional info
         try:
+            # Try to find user by email first
             user = await user_service.get_user_by_email(request.email)
+            
+            # Update auth_user_id if not set or different
+            if user.auth_user_id is None or str(user.auth_user_id) != auth_response.user.id:
+                user = await user_service.update_user_auth_id(str(user.id), auth_response.user.id)
+                default_logger.info(f"Updated auth_user_id for user: {user.email}")
+            
             await user_service.validate_user_active(str(user.id))
             
             # Update last login time
@@ -132,7 +142,6 @@ async def login(
             
         except UserNotFoundError:
             # User exists in Supabase Auth but not in our database
-            # This shouldn't happen in normal flow, but handle gracefully
             default_logger.warning(f"User exists in Supabase Auth but not in database", email=request.email)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

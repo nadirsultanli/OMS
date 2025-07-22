@@ -9,6 +9,7 @@ echo "🚀 Starting OMS Backend for Railway deployment..."
 export PORT=${PORT:-8000}
 export ENVIRONMENT=${ENVIRONMENT:-production}
 export LOG_LEVEL=${LOG_LEVEL:-INFO}
+export USE_RAILWAY_MODE=true
 
 # Create logs directory if it doesn't exist
 mkdir -p /app/logs

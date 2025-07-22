@@ -6,7 +6,7 @@ from app.presentation.schemas.users.verification_schemas import (
     SetPasswordResponse
 )
 from app.services.users.user_service import UserService
-from app.services.dependencies.users import get_user_service
+from app.services.dependencies.railway_users import get_railway_user_service
 from app.infrastucture.database.connection import get_supabase_admin_client_sync
 from app.infrastucture.logs.logger import default_logger
 import secrets
@@ -20,7 +20,7 @@ logger = default_logger
 @verification_router.post("/verify-email", response_model=VerifyEmailResponse)
 async def verify_email(
     request: VerifyEmailRequest,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_railway_user_service)
 ):
     """Receive email, validate if user exists. Supabase will send verification email automatically on signup."""
     try:
@@ -52,7 +52,7 @@ async def verify_email(
 @verification_router.post("/set-password", response_model=SetPasswordResponse)
 async def set_password(
     request: SetPasswordRequest,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_railway_user_service)
 ):
     """Receive token and passwords, validate, and update user password"""
     try:
