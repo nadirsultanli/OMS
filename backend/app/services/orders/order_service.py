@@ -143,7 +143,7 @@ class OrderService:
         
         # Check if order can be deleted
         if not self.business_service.can_cancel_order(user, order):
-            raise OrderCancellationError(order_id, order.order_status.value)
+            raise OrderCancellationError(order.order_no, order.order_status.value)
         
         return await self.order_repository.delete_order(order_id, user.id)
 

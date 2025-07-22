@@ -110,12 +110,16 @@ class OrderBusinessService:
         if not order.can_be_cancelled():
             return False
         
-        # Sales reps can cancel their own orders in early stages
+        # Sales reps can cancel orders in early stages (including APPROVED)
         if user.role == UserRoleType.SALES_REP:
-            return order.order_status in [OrderStatus.DRAFT, OrderStatus.SUBMITTED, OrderStatus.REJECTED]
+            return order.order_status in [OrderStatus.DRAFT, OrderStatus.SUBMITTED, OrderStatus.APPROVED]
         
         # Accounts can cancel orders in any cancellable status
         if user.role == UserRoleType.ACCOUNTS:
+            return True
+        
+        # Tenant admins can cancel orders in any cancellable status
+        if user.role == UserRoleType.TENANT_ADMIN:
             return True
         
         return False
