@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import List
 from uuid import UUID
-from sqlalchemy import Column, String, Date, Boolean, Numeric, ForeignKey, Text
+from sqlalchemy import Column, String, Date, Boolean, Numeric, ForeignKey, Text, DateTime
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -21,6 +21,7 @@ class PriceListModel(Base):
     effective_to = Column(Date, nullable=True)
     active = Column(Boolean, nullable=False, default=True)
     currency = Column(String(3), nullable=False, default="KES")
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     lines = relationship("PriceListLineModel", back_populates="price_list", cascade="all, delete-orphan")
