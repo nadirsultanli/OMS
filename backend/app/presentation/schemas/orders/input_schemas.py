@@ -4,6 +4,8 @@ from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, model_validator, field_validator
 
+from app.domain.entities.orders import OrderStatus
+
 
 class OrderLineCreateRequest(BaseModel):
     """Schema for creating an order line"""
@@ -63,14 +65,14 @@ class UpdateOrderRequest(BaseModel):
 
 class UpdateOrderStatusRequest(BaseModel):
     """Schema for updating order status"""
-    status: str = Field(..., description="New order status")
+    status: OrderStatus = Field(..., description="New order status")
 
 
 class OrderSearchRequest(BaseModel):
     """Schema for order search parameters"""
     search_term: Optional[str] = Field(None, description="Search term for order number or delivery instructions")
     customer_id: Optional[str] = Field(None, description="Filter by customer ID")
-    status: Optional[str] = Field(None, description="Filter by order status")
+    status: Optional[OrderStatus] = Field(None, description="Filter by order status")
     start_date: Optional[date] = Field(None, description="Start date for date range filter")
     end_date: Optional[date] = Field(None, description="End date for date range filter")
     limit: int = Field(100, ge=1, le=1000, description="Number of results to return")

@@ -50,6 +50,7 @@ class OrderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        use_enum_values = True
 
 
 class OrderListResponse(BaseModel):
@@ -79,6 +80,7 @@ class OrderSummaryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        use_enum_values = True
 
 
 class OrderSummaryListResponse(BaseModel):
@@ -95,6 +97,9 @@ class OrderStatusResponse(BaseModel):
     order_id: str = Field(..., description="Order ID")
     new_status: OrderStatus = Field(..., description="New order status")
     message: Optional[str] = Field(None, description="Additional message")
+
+    class Config:
+        use_enum_values = True
 
 
 class OrderLineQuantityUpdateResponse(BaseModel):
