@@ -17,7 +17,7 @@ from app.presentation.schemas.users import (
     UserListResponse
 )
 from app.services.dependencies.users import get_user_service
-from app.services.dependencies.auth import get_current_user
+from app.core.user_context import UserContext, user_context
 
 user_router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -159,7 +159,7 @@ async def update_user(
     user_id: str,
     request: UpdateUserRequest,
     user_service: UserService = Depends(get_user_service),
-    current_user: User = Depends(get_current_user)
+    context: UserContext = user_context
 ):
     """Update user"""
     try:

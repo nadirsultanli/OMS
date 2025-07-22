@@ -41,7 +41,7 @@ class PriceListLineModel(Base):
     
     # Relationships
     price_list = relationship("PriceListModel", back_populates="lines")
-    variant = relationship("VariantModel", backref="price_list_lines")
+    variant = relationship("Variant", backref="price_list_lines")
     
     def __repr__(self):
         return f"<PriceListLineModel(id={self.id}, price_list_id={self.price_list_id}, variant_id={self.variant_id})>" 

@@ -12,7 +12,8 @@ from app.presentation.schemas.users import (
     RefreshTokenRequest,
     RefreshTokenResponse,
     LogoutRequest,
-    SignupRequest
+    SignupRequest,
+    UserResponse
 )
 from app.presentation.schemas.users.password_reset_schemas import (
     ForgotPasswordRequest,
@@ -24,6 +25,7 @@ from app.services.dependencies.users import get_user_service
 from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
 from decouple import config
 from app.domain.entities.users import UserStatus
+from app.core.user_context import UserContext, user_context
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -455,4 +457,36 @@ async def handle_magic_link(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process magic link"
+        )
+
+
+@auth_router.get("/me", response_model=UserResponse)
+async def get_current_user_info(
+    context: UserContext = user_context
+):
+    """Get current authenticated user information from token"""
+    try:
+        # The user is already authenticated by our global auth middleware
+        # and the UserContext contains all user information
+        return UserResponse(
+            id=str(context.user_id),
+            tenant_id=str(context.tenant_id) if context.tenant_id else "",
+            email=context.email,
+            full_name=context.full_name,
+            role=context.role,
+            status=context.user.status,
+            last_login=str(context.user.last_login) if context.user.last_login else None,
+            created_at=str(context.user.created_at),
+            created_by=str(context.user.created_by) if context.user.created_by else None,
+            updated_at=str(context.user.updated_at),
+            updated_by=str(context.user.updated_by) if context.user.updated_by else None,
+            deleted_at=str(context.user.deleted_at) if context.user.deleted_at else None,
+            deleted_by=str(context.user.deleted_by) if context.user.deleted_by else None
+        )
+        
+    except Exception as e:
+        default_logger.error(f"Failed to get current user info: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user information"
         ) 
