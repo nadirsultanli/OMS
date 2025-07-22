@@ -1,6 +1,6 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from decouple import config
@@ -15,6 +15,7 @@ from app.presentation.api.products.product import router as product_router
 from app.presentation.api.products.variant import router as variant_router
 from app.presentation.api.price_lists.price_list import router as price_list_router
 import sqlalchemy
+from app.core.auth_middleware import conditional_auth
 
 # Get configuration from environment
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")
@@ -56,6 +57,7 @@ app = FastAPI(
     description="Order Management System Backend API",
     version="1.0.0",
     lifespan=lifespan,
+    dependencies=[Depends(conditional_auth)],
     openapi_tags=[
         {
             "name": "Authentication",
@@ -111,28 +113,22 @@ app.include_router(price_list_router, prefix="/api/v1")
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
-    
     openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
+        title="OMS Backend",
+        version="1.0.0",
+        description="Order Management System Backend API",
         routes=app.routes,
     )
-    
-    # Remove any security schemes and requirements since we handle auth globally
-    if "components" in openapi_schema and "securitySchemes" in openapi_schema["components"]:
-        del openapi_schema["components"]["securitySchemes"]
-    
-    # Remove security requirements from all endpoints
-    for path in openapi_schema["paths"]:
-        for method in openapi_schema["paths"][path]:
-            if method in ["get", "put", "delete", "post"]:
-                if "security" in openapi_schema["paths"][path][method]:
-                    del openapi_schema["paths"][path][method]["security"]
-    
+    openapi_schema["components"]["securitySchemes"] = {
+        "HTTPBearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    }
+    openapi_schema["security"] = [{"HTTPBearer": []}]
     app.openapi_schema = openapi_schema
     return app.openapi_schema
-
 
 app.openapi = custom_openapi
 
