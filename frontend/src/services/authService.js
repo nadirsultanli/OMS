@@ -38,30 +38,32 @@ class AuthService {
   // Login function
   async login(email, password) {
     try {
-      const response = await api.post('/api/v1/auth/login', {
+      const response = await api.post('/auth/login', {
         email,
         password
       });
       
-      const { access_token, refresh_token, user_id, email: userEmail, role, name } = response.data;
+      const { access_token, refresh_token, user_id, tenant_id, email: userEmail, role, full_name } = response.data;
       
       // Store tokens and user info
       localStorage.setItem('accessToken', access_token);
       localStorage.setItem('refreshToken', refresh_token);
       localStorage.setItem('user', JSON.stringify({
         id: user_id,
+        tenant_id: tenant_id,
         email: userEmail,
         role,
-        name
+        name: full_name
       }));
       
       return {
         success: true,
         user: {
           id: user_id,
+          tenant_id: tenant_id,
           email: userEmail,
           role,
-          name
+          name: full_name
         }
       };
     } catch (error) {
@@ -78,7 +80,7 @@ class AuthService {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
-        await api.post('/api/v1/auth/logout', {
+        await api.post('/auth/logout', {
           refresh_token: refreshToken
         });
       }
@@ -105,10 +107,16 @@ class AuthService {
     return userStr ? JSON.parse(userStr) : null;
   }
 
+  // Get current user's tenant ID
+  getCurrentTenantId() {
+    const user = this.getCurrentUser();
+    return user ? user.tenant_id : null;
+  }
+
   // Send forgot password email
   async forgotPassword(email) {
     try {
-      const response = await api.post('/api/v1/auth/forgot-password', {
+      const response = await api.post('/auth/forgot-password', {
         email
       });
       
@@ -128,7 +136,7 @@ class AuthService {
   // Reset password with token
   async resetPassword(token, password, confirmPassword) {
     try {
-      const response = await api.post('/api/v1/auth/reset-password', {
+      const response = await api.post('/auth/reset-password', {
         token,
         password,
         confirm_password: confirmPassword
@@ -150,7 +158,7 @@ class AuthService {
   // Accept invitation with token and set password
   async acceptInvitation(token, password, confirmPassword) {
     try {
-      const response = await api.post('/api/v1/auth/accept-invitation', {
+      const response = await api.post('/auth/accept-invitation', {
         token,
         password,
         confirm_password: confirmPassword

@@ -5,8 +5,6 @@ import MapboxAddressInput from '../components/MapboxAddressInput';
 import { 
   ArrowLeft, 
   MapPin, 
-  Mail, 
-  Phone, 
   Building2, 
   CreditCard, 
   Calendar,
@@ -41,8 +39,6 @@ const CustomerDetail = () => {
     country: 'Kenya',
     access_instructions: '',
     is_default: false,
-    email: '',
-    phone: '',
     coordinates: null
   });
 
@@ -127,16 +123,40 @@ const CustomerDetail = () => {
     try {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       
+      // Debug: Log the current user to see what data we have
+      console.log('Current user data for address:', currentUser);
+      
+      // Ensure tenant_id is present - add fallback if needed
+      let tenantId = currentUser.tenant_id || 
+                     currentUser.tenant?.id || 
+                     "332072c1-5405-4f09-a56f-a631defa911b"; // Default tenant ID as fallback
+      
+      // Validate that tenantId is not null, undefined, or empty string
+      if (!tenantId || tenantId === 'null' || tenantId === 'undefined') {
+        tenantId = "332072c1-5405-4f09-a56f-a631defa911b"; // Fallback tenant ID
+        console.warn('Using fallback tenant_id for address:', tenantId);
+      }
+      
       const addressData = {
         ...addressForm,
         customer_id: customerId,
-        tenant_id: currentUser.tenant_id,
+        tenant_id: tenantId,
         created_by: currentUser.id,
         // Format coordinates as PostgreSQL POINT if they exist
         coordinates: addressForm.coordinates ? 
           `POINT(${addressForm.coordinates[0]} ${addressForm.coordinates[1]})` : 
           null
       };
+      
+      // Final validation - ensure no required fields are missing
+      if (!addressData.tenant_id) {
+        setErrors({ general: 'Unable to determine tenant. Please refresh and try again.' });
+        setLoading(false);
+        return;
+      }
+      
+      // Debug: Log the address data being sent
+      console.log('Address data being sent:', addressData);
 
       await customerService.createAddress(addressData);
       setMessage('Address created successfully!');
@@ -151,8 +171,6 @@ const CustomerDetail = () => {
         country: 'Kenya',
         access_instructions: '',
         is_default: false,
-        email: '',
-        phone: '',
         coordinates: null
       });
       setShowAddressForm(false);
@@ -417,22 +435,6 @@ const CustomerDetail = () => {
                         {address.country && `, ${address.country}`}
                       </div>
                       
-                      {(address.email || address.phone) && (
-                        <div className="contact-info">
-                          {address.email && (
-                            <div className="contact-item">
-                              <Mail size={14} />
-                              {address.email}
-                            </div>
-                          )}
-                          {address.phone && (
-                            <div className="contact-item">
-                              <Phone size={14} />
-                              {address.phone}
-                            </div>
-                          )}
-                        </div>
-                      )}
                       
                       {address.access_instructions && (
                         <div className="access-instructions">
@@ -555,29 +557,6 @@ const CustomerDetail = () => {
                   {errors.country && <span className="error-text">{typeof errors.country === 'string' ? errors.country : JSON.stringify(errors.country)}</span>}
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="email">Email</label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={addressForm.email}
-                    onChange={handleAddressInputChange}
-                    placeholder="Enter email address"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="phone">Phone</label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={addressForm.phone}
-                    onChange={handleAddressInputChange}
-                    placeholder="Enter phone number"
-                  />
-                </div>
 
                 <div className="form-group full-width">
                   <label htmlFor="access_instructions">Access Instructions</label>

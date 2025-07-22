@@ -45,7 +45,7 @@ const Login = () => {
       setIsLoading(true);
       
       // Process the magic link token through your backend
-      const response = await fetch('/api/v1/auth/magic-link', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1'}/auth/magic-link`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

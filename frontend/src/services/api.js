@@ -3,9 +3,25 @@ import axios from 'axios';
 // Get API URL based on environment
 const getApiUrl = () => {
   const environment = process.env.REACT_APP_ENVIRONMENT || 'development';
-  return environment === 'production' 
+  // Prefer explicit env variables if set
+  let url = environment === 'production'
     ? process.env.REACT_APP_API_URL_PROD 
-    : process.env.REACT_APP_API_URL_DEV;
+    : process.env.REACT_APP_API_URL_DEV || 'http://localhost:8000';
+
+  // Fallback for empty string
+  if (!url) {
+    url = 'http://localhost:8000';
+  }
+
+  // Ensure the URL ends with /api/v1
+  if (!url.endsWith('/api/v1')) {
+    // Remove trailing slash if present
+    if (url.endsWith('/')) {
+      url = url.slice(0, -1);
+    }
+    url = `${url}/api/v1`;
+  }
+  return url;
 };
 
 // Create axios instance
@@ -42,7 +58,7 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
         try {
-          const response = await axios.post(`${getApiUrl()}/api/v1/auth/refresh`, {
+          const response = await axios.post(`${getApiUrl()}/auth/refresh`, {
             refresh_token: refreshToken
           });
           

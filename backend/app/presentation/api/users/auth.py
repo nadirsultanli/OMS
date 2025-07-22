@@ -67,6 +67,7 @@ async def signup(
             access_token=auth_response.session.access_token,
             refresh_token=auth_response.session.refresh_token,
             user_id=str(user.id),
+            tenant_id=str(user.tenant_id),
             email=user.email,
             role=user.role.value,
             full_name=user.full_name
@@ -160,6 +161,7 @@ async def login(request: LoginRequest):
                 access_token=auth_response.session.access_token,
                 refresh_token=auth_response.session.refresh_token,
                 user_id=str(user.id),
+                tenant_id=str(user.tenant_id),
                 email=user.email,
                 role=user.role.value,
                 full_name=user.full_name
