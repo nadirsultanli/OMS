@@ -134,14 +134,14 @@ const orderService = {
     }
   },
 
-  // Delete order
+  // Cancel order (delete)
   deleteOrder: async (orderId) => {
     try {
       await api.delete(`/orders/${orderId}/`);
       return { success: true };
     } catch (error) {
-      console.error('Error deleting order:', error);
-      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to delete order' };
+      console.error('Error cancelling order:', error);
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to cancel order' };
     }
   },
 

@@ -267,7 +267,7 @@ const Orders = () => {
   };
 
   const handleDeleteOrder = async (orderId) => {
-    if (!window.confirm('Are you sure you want to delete this order?')) {
+    if (!window.confirm('Are you sure you want to cancel this order?')) {
       return;
     }
 
@@ -276,14 +276,14 @@ const Orders = () => {
       const result = await orderService.deleteOrder(orderId);
       
       if (result.success) {
-        setMessage('Order deleted successfully!');
+        setMessage('Order cancelled successfully!');
         fetchOrders();
       } else {
         const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
-        setErrors({ general: errorMessage || 'Failed to delete order' });
+        setErrors({ general: errorMessage || 'Failed to cancel order' });
       }
     } catch (error) {
-      const errorMessage = extractErrorMessage(error.response?.data) || 'Failed to delete order.';
+      const errorMessage = extractErrorMessage(error.response?.data) || 'Failed to cancel order.';
       setErrors({ general: errorMessage });
     } finally {
       setLoading(false);
@@ -552,9 +552,9 @@ const Orders = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => handleDeleteOrder(order.id)}
-                      className="action-icon-btn delete"
-                      title="Delete order"
+                                        onClick={() => handleDeleteOrder(order.id)}
+                  className="action-icon-btn delete"
+                  title="Cancel order"
                       disabled={loading}
                     >
                       <Trash2 size={16} />
