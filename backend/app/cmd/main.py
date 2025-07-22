@@ -252,6 +252,23 @@ async def debug_database():
             "error_type": type(e).__name__
         }
 
+
+@app.get("/debug/railway")
+async def debug_railway_mode():
+    """Debug endpoint to check Railway mode detection"""
+    from app.services.dependencies.railway_users import should_use_railway_mode
+    from decouple import config
+    
+    return {
+        "railway_mode": should_use_railway_mode(),
+        "environment": config("ENVIRONMENT", default="development"),
+        "use_railway_mode_var": config("USE_RAILWAY_MODE", default="false"),
+        "railway_environment": config("RAILWAY_ENVIRONMENT", default=None),
+        "railway_project_id": config("RAILWAY_PROJECT_ID", default=None),
+        "railway_service_id": config("RAILWAY_SERVICE_ID", default=None),
+        "timestamp": str(datetime.now())
+    }
+
 @app.get("/logs/test")
 async def test_logging(request: Request):
     """Test endpoint to demonstrate logging"""

@@ -15,6 +15,7 @@ EXCLUDED_PATHS = {
     "/debug/env",
     "/debug/supabase", 
     "/debug/database",
+    "/debug/railway",
     "/api/v1/auth/login",
     "/api/v1/auth-fallback/login",  # Fallback login for Railway
     "/api/v1/auth/signup", 

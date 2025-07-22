@@ -22,6 +22,7 @@ from app.presentation.schemas.users.password_reset_schemas import (
     ResetPasswordResponse
 )
 from app.services.dependencies.users import get_user_service
+from app.services.dependencies.railway_users import get_railway_user_service, should_use_railway_mode
 from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
 from decouple import config
 from app.domain.entities.users import UserStatus
@@ -83,11 +84,31 @@ async def signup(
 
 
 @auth_router.post("/login", response_model=LoginResponse)
-async def login(
-    request: LoginRequest,
-    user_service: UserService = Depends(get_user_service)
-):
-    """User login endpoint using Supabase Auth"""
+async def login(request: LoginRequest):
+    """User login endpoint using Supabase Auth with automatic Railway compatibility"""
+    
+    # Get appropriate user service based on environment
+    if should_use_railway_mode():
+        default_logger.info("Using Railway mode (Supabase SDK) for authentication")
+        user_service = get_railway_user_service()
+    else:
+        default_logger.info("Using standard mode (direct database) for authentication - this will fail in Railway")
+        # This will fail in Railway because direct database connection doesn't work
+        # But we keep it for local development
+        try:
+            from app.services.dependencies.common import get_db_session
+            from app.infrastucture.database.repositories.user_repository import UserRepository
+            
+            # This is a workaround - in Railway this should not be reached due to USE_RAILWAY_MODE=true
+            session_gen = get_db_session()
+            session = await session_gen.__anext__()
+            user_repo = UserRepository(session=session)
+            user_service = UserService(user_repo)
+        except Exception as e:
+            default_logger.error(f"Failed to create standard user service: {str(e)}")
+            default_logger.info("Falling back to Railway mode")
+            user_service = get_railway_user_service()
+    
     try:
         default_logger.info(f"Login attempt started for email: {request.email}")
         
