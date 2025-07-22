@@ -174,3 +174,35 @@ class SupabaseUserRepository(UserRepositoryInterface):
         except Exception as e:
             default_logger.error(f"Supabase delete_user failed: {str(e)}")
             return False
+
+    async def activate_user(self, user_id: str) -> Optional[User]:
+        """Activate user by setting status to active"""
+        try:
+            client = self._get_client()
+            result = client.table(self.table_name).update({
+                "status": "active",
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", user_id).execute()
+            
+            if result.data and len(result.data) > 0:
+                return self._to_entity(result.data[0])
+            return None
+        except Exception as e:
+            default_logger.error(f"Supabase activate_user failed: {str(e)}")
+            return None
+
+    async def deactivate_user(self, user_id: str) -> Optional[User]:
+        """Deactivate user by setting status to inactive"""
+        try:
+            client = self._get_client()
+            result = client.table(self.table_name).update({
+                "status": "inactive",
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", user_id).execute()
+            
+            if result.data and len(result.data) > 0:
+                return self._to_entity(result.data[0])
+            return None
+        except Exception as e:
+            default_logger.error(f"Supabase deactivate_user failed: {str(e)}")
+            return None
