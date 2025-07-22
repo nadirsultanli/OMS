@@ -29,8 +29,8 @@ class StockDocModel(Base):
     
     # Document details
     doc_no: Mapped[str] = mapped_column(Text, nullable=False)
-    doc_type: Mapped[StockDocType] = mapped_column(SQLAlchemyEnum(StockDocType, name="stock_doc_type", create_constraint=True, native_enum=False), nullable=False)
-    doc_status: Mapped[StockDocStatus] = mapped_column(SQLAlchemyEnum(StockDocStatus, name="stock_doc_status", create_constraint=True, native_enum=False), nullable=False, default=StockDocStatus.OPEN)
+    doc_type: Mapped[StockDocType] = mapped_column(SQLAlchemyEnum(StockDocType, name="stock_doc_type", create_constraint=True, native_enum=False, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
+    doc_status: Mapped[StockDocStatus] = mapped_column(SQLAlchemyEnum(StockDocStatus, name="stock_doc_status", create_constraint=True, native_enum=False, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=StockDocStatus.OPEN)
     
     # Reference fields
     ref_doc_id: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), nullable=True)

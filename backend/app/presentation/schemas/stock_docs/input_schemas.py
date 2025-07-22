@@ -11,7 +11,7 @@ class StockDocLineCreateRequest(BaseModel):
     """Schema for creating a stock document line"""
     variant_id: Optional[UUID] = Field(None, description="Variant ID for specific product variant")
     gas_type: Optional[str] = Field(None, description="Gas type for bulk stock movements")
-    quantity: Decimal = Field(..., gt=0, description="Quantity")
+    quantity: Decimal = Field(..., description="Quantity (can be negative for conversions)")
     unit_cost: Decimal = Field(0, ge=0, description="Unit cost")
 
     @model_validator(mode='after')
@@ -22,13 +22,20 @@ class StockDocLineCreateRequest(BaseModel):
         if self.variant_id is not None and self.gas_type is not None:
             raise ValueError("Cannot specify both variant_id and gas_type")
         return self
+    
+    @model_validator(mode='after')
+    def validate_quantity(self):
+        """Validate quantity (allow negative for conversions)"""
+        if self.quantity == 0:
+            raise ValueError("Quantity cannot be zero")
+        return self
 
 
 class StockDocLineUpdateRequest(BaseModel):
     """Schema for updating a stock document line"""
     variant_id: Optional[UUID] = Field(None, description="Variant ID for specific product variant")
     gas_type: Optional[str] = Field(None, description="Gas type for bulk stock movements")
-    quantity: Optional[Decimal] = Field(None, gt=0, description="Quantity")
+    quantity: Optional[Decimal] = Field(None, description="Quantity (can be negative for conversions)")
     unit_cost: Optional[Decimal] = Field(None, ge=0, description="Unit cost")
 
     @model_validator(mode='after')
@@ -55,24 +62,28 @@ class CreateStockDocRequest(BaseModel):
     @model_validator(mode='after')
     def validate_warehouse_requirements(self):
         """Validate warehouse requirements based on document type"""
-        if self.doc_type in [StockDocType.REC_FIL, StockDocType.ISS_FIL, StockDocType.CONV_FIL]:
-            # External receipts/issues and conversions require destination warehouse only
+        if self.doc_type in [StockDocType.REC_FILL, StockDocType.REC_SUPP, StockDocType.REC_RET]:
+            # External receipts require destination warehouse only
             if not self.dest_wh_id:
                 raise ValueError(f"{self.doc_type.value} requires destination warehouse")
-        elif self.doc_type == StockDocType.XFER:
+        elif self.doc_type in [StockDocType.ISS_LOAD, StockDocType.ISS_SALE]:
+            # External issues require source warehouse only
+            if not self.source_wh_id:
+                raise ValueError(f"{self.doc_type.value} requires source warehouse")
+        elif self.doc_type == StockDocType.TRF_WH:
             # Transfers require both source and destination
             if not self.source_wh_id or not self.dest_wh_id:
                 raise ValueError("Transfers require both source and destination warehouses")
             if self.source_wh_id == self.dest_wh_id:
                 raise ValueError("Source and destination warehouses must be different")
-        elif self.doc_type == StockDocType.LOAD_MOB:
-            # Load operations require source warehouse
-            if not self.source_wh_id:
-                raise ValueError("Load operations require source warehouse")
-        elif self.doc_type == StockDocType.UNLD_MOB:
-            # Unload operations require destination warehouse
+        elif self.doc_type == StockDocType.TRF_TRUCK:
+            # Truck transfers require either source or destination warehouse
+            if not self.source_wh_id and not self.dest_wh_id:
+                raise ValueError("Truck transfers require either source or destination warehouse")
+        elif self.doc_type in [StockDocType.ADJ_SCRAP, StockDocType.ADJ_VARIANCE]:
+            # Adjustments require destination warehouse
             if not self.dest_wh_id:
-                raise ValueError("Unload operations require destination warehouse")
+                raise ValueError(f"{self.doc_type.value} requires destination warehouse")
         
         return self
 
@@ -127,7 +138,7 @@ class ConversionCreateRequest(BaseModel):
     def to_stock_doc_request(self) -> CreateStockDocRequest:
         """Convert to standard stock document request"""
         return CreateStockDocRequest(
-            doc_type=StockDocType.CONV_FIL,
+            doc_type=StockDocType.ADJ_VARIANCE,  # Using adjustment for conversion
             dest_wh_id=self.dest_wh_id,
             notes=self.notes,
             stock_doc_lines=[
@@ -166,7 +177,7 @@ class TransferCreateRequest(BaseModel):
     def to_stock_doc_request(self) -> CreateStockDocRequest:
         """Convert to standard stock document request"""
         return CreateStockDocRequest(
-            doc_type=StockDocType.XFER,
+            doc_type=StockDocType.TRF_WH,
             source_wh_id=self.source_wh_id,
             dest_wh_id=self.dest_wh_id,
             notes=self.notes,
@@ -200,7 +211,7 @@ class TruckLoadCreateRequest(BaseModel):
             notes = f"Truck: {self.truck_id}\n{notes}".strip()
         
         return CreateStockDocRequest(
-            doc_type=StockDocType.LOAD_MOB,
+            doc_type=StockDocType.TRF_TRUCK,
             source_wh_id=self.source_wh_id,
             ref_doc_id=ref_doc_id,
             ref_doc_type=ref_doc_type,
@@ -235,7 +246,7 @@ class TruckUnloadCreateRequest(BaseModel):
             notes = f"Truck: {self.truck_id}\n{notes}".strip()
         
         return CreateStockDocRequest(
-            doc_type=StockDocType.UNLD_MOB,
+            doc_type=StockDocType.TRF_TRUCK,
             dest_wh_id=self.dest_wh_id,
             ref_doc_id=ref_doc_id,
             ref_doc_type=ref_doc_type,

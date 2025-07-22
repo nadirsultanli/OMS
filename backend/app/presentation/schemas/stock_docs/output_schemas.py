@@ -242,19 +242,14 @@ class StockDocBusinessRulesResponse(BaseModel):
         # Determine available status transitions
         transitions = []
         if stock_doc.doc_status == StockDocStatus.OPEN:
-            if stock_doc.is_transfer():
-                transitions.extend([StockDocStatus.SHIPPED, StockDocStatus.CANCELLED])
-            else:
-                transitions.extend([StockDocStatus.POSTED, StockDocStatus.CANCELLED])
-        elif stock_doc.doc_status == StockDocStatus.SHIPPED:
-            transitions.append(StockDocStatus.POSTED)
+            transitions.extend([StockDocStatus.POSTED, StockDocStatus.CANCELLED])
         
         return cls(
             can_modify=stock_doc.can_be_modified(),
             can_post=stock_doc.can_be_posted(),
             can_cancel=stock_doc.can_be_cancelled(),
             can_ship=stock_doc.is_transfer() and stock_doc.doc_status == StockDocStatus.OPEN,
-            can_receive=stock_doc.is_transfer() and stock_doc.doc_status == StockDocStatus.SHIPPED,
+            can_receive=stock_doc.is_transfer() and stock_doc.doc_status == StockDocStatus.OPEN,
             status_transitions=transitions
         )
 

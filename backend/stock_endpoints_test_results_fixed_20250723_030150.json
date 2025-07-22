@@ -1,0 +1,554 @@
+{
+  "test_timestamp": "2025-07-23T03:01:50.439038",
+  "base_url": "http://localhost:8000",
+  "results": [
+    {
+      "endpoint": "/stock-docs/",
+      "method": "POST",
+      "status_code": 201,
+      "success": true,
+      "response_data": {
+        "id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "doc_no": "TRF_WH-000001",
+        "doc_type": "TRF_WH",
+        "doc_status": "open",
+        "source_wh_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+        "dest_wh_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+        "ref_doc_id": null,
+        "ref_doc_type": null,
+        "posted_date": null,
+        "total_qty": 10.0,
+        "notes": "Test transfer document",
+        "created_at": "2025-07-22T23:01:29.938969Z",
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+        "updated_at": "2025-07-22T23:01:29.938969Z",
+        "updated_by": null,
+        "deleted_at": null,
+        "deleted_by": null,
+        "stock_doc_lines": [
+          {
+            "id": "eccee5dd-298e-4756-8c90-38dfceafda8d",
+            "stock_doc_id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+            "variant_id": "78755b8d-c581-4c9f-9465-a57b288b14ca",
+            "gas_type": null,
+            "quantity": 10.0,
+            "unit_cost": 5.5,
+            "line_value": 55.0,
+            "created_at": "2025-07-22T23:01:29.938969Z",
+            "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+            "updated_at": "2025-07-22T23:01:29.938969Z",
+            "updated_by": null
+          }
+        ]
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/374c84bd-db8c-457c-ac23-bd3b33d4a008",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "doc_no": "TRF_WH-000001",
+        "doc_type": "TRF_WH",
+        "doc_status": "open",
+        "source_wh_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+        "dest_wh_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+        "ref_doc_id": null,
+        "ref_doc_type": null,
+        "posted_date": null,
+        "total_qty": 10.0,
+        "notes": "Test transfer document",
+        "created_at": "2025-07-22T23:01:29.938969Z",
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+        "updated_at": "2025-07-22T23:01:29.938969Z",
+        "updated_by": null,
+        "deleted_at": null,
+        "deleted_by": null,
+        "stock_doc_lines": [
+          {
+            "id": "eccee5dd-298e-4756-8c90-38dfceafda8d",
+            "stock_doc_id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+            "variant_id": "78755b8d-c581-4c9f-9465-a57b288b14ca",
+            "gas_type": null,
+            "quantity": 10.0,
+            "unit_cost": 5.5,
+            "line_value": 55.0,
+            "created_at": "2025-07-22T23:01:29.938969Z",
+            "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+            "updated_at": "2025-07-22T23:01:29.938969Z",
+            "updated_by": null
+          }
+        ]
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/by-number/TRF_WH-000001",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+        "doc_no": "TRF_WH-000001",
+        "doc_type": "TRF_WH",
+        "doc_status": "open",
+        "source_wh_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+        "dest_wh_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+        "ref_doc_id": null,
+        "ref_doc_type": null,
+        "posted_date": null,
+        "total_qty": 10.0,
+        "notes": "Test transfer document",
+        "created_at": "2025-07-22T23:01:29.938969Z",
+        "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+        "updated_at": "2025-07-22T23:01:29.938969Z",
+        "updated_by": null,
+        "deleted_at": null,
+        "deleted_by": null,
+        "stock_doc_lines": [
+          {
+            "id": "eccee5dd-298e-4756-8c90-38dfceafda8d",
+            "stock_doc_id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+            "variant_id": "78755b8d-c581-4c9f-9465-a57b288b14ca",
+            "gas_type": null,
+            "quantity": 10.0,
+            "unit_cost": 5.5,
+            "line_value": 55.0,
+            "created_at": "2025-07-22T23:01:29.938969Z",
+            "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+            "updated_at": "2025-07-22T23:01:29.938969Z",
+            "updated_by": null
+          }
+        ]
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "stock_docs": [
+          {
+            "id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+            "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+            "doc_no": "TRF_WH-000001",
+            "doc_type": "TRF_WH",
+            "doc_status": "open",
+            "source_wh_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+            "dest_wh_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+            "ref_doc_id": null,
+            "ref_doc_type": null,
+            "posted_date": null,
+            "total_qty": 10.0,
+            "notes": "Test transfer document",
+            "created_at": "2025-07-22T23:01:29.938969Z",
+            "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+            "updated_at": "2025-07-22T23:01:29.938969Z",
+            "updated_by": null,
+            "line_count": 1
+          }
+        ],
+        "total": 1,
+        "limit": 10,
+        "offset": 0
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/type/TRF_WH",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": [
+        {
+          "id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+          "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+          "doc_no": "TRF_WH-000001",
+          "doc_type": "TRF_WH",
+          "doc_status": "open",
+          "source_wh_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+          "dest_wh_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+          "ref_doc_id": null,
+          "ref_doc_type": null,
+          "posted_date": null,
+          "total_qty": 10.0,
+          "notes": "Test transfer document",
+          "created_at": "2025-07-22T23:01:29.938969Z",
+          "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+          "updated_at": "2025-07-22T23:01:29.938969Z",
+          "updated_by": null,
+          "line_count": 1
+        }
+      ],
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/status/open",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": [
+        {
+          "id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+          "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+          "doc_no": "TRF_WH-000001",
+          "doc_type": "TRF_WH",
+          "doc_status": "open",
+          "source_wh_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+          "dest_wh_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+          "ref_doc_id": null,
+          "ref_doc_type": null,
+          "posted_date": null,
+          "total_qty": 10.0,
+          "notes": "Test transfer document",
+          "created_at": "2025-07-22T23:01:29.938969Z",
+          "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+          "updated_at": "2025-07-22T23:01:29.938969Z",
+          "updated_by": null,
+          "line_count": 1
+        }
+      ],
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/warehouse/5bde8036-01d3-46dd-a150-ccb2951463ce",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": [
+        {
+          "id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+          "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+          "doc_no": "TRF_WH-000001",
+          "doc_type": "TRF_WH",
+          "doc_status": "open",
+          "source_wh_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+          "dest_wh_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+          "ref_doc_id": null,
+          "ref_doc_type": null,
+          "posted_date": null,
+          "total_qty": 10.0,
+          "notes": "Test transfer document",
+          "created_at": "2025-07-22T23:01:29.938969Z",
+          "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+          "updated_at": "2025-07-22T23:01:29.938969Z",
+          "updated_by": null,
+          "line_count": 1
+        }
+      ],
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/warehouse/5bde8036-01d3-46dd-a150-ccb2951463ce/pending-transfers",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "pending_transfers": [],
+        "total_pending": 0,
+        "warehouse_id": "5bde8036-01d3-46dd-a150-ccb2951463ce"
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/374c84bd-db8c-457c-ac23-bd3b33d4a008/post",
+      "method": "POST",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+        "doc_no": "TRF_WH-000001",
+        "doc_status": "posted",
+        "updated_at": "2025-07-22T23:01:39.260703Z",
+        "updated_by": "572c619c-32e4-45dc-9027-8c594a9d0612"
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/374c84bd-db8c-457c-ac23-bd3b33d4a008/cancel",
+      "method": "POST",
+      "status_code": 409,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"Stock document 374c84bd-db8c-457c-ac23-bd3b33d4a008 cannot be cancelled in status posted\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/374c84bd-db8c-457c-ac23-bd3b33d4a008/ship",
+      "method": "POST",
+      "status_code": 409,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"Invalid status transition from posted to posted for document 374c84bd-db8c-457c-ac23-bd3b33d4a008\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/374c84bd-db8c-457c-ac23-bd3b33d4a008/receive",
+      "method": "POST",
+      "status_code": 409,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"Invalid status transition from posted to posted for document 374c84bd-db8c-457c-ac23-bd3b33d4a008\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/conversions",
+      "method": "POST",
+      "status_code": 500,
+      "success": false,
+      "response_data": null,
+      "error_message": "Internal Server Error",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/transfers",
+      "method": "POST",
+      "status_code": 201,
+      "success": true,
+      "response_data": {
+        "stock_doc": {
+          "id": "dd8288c0-1573-495b-a6d4-e2fd2a3e1b23",
+          "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+          "doc_no": "TRF_WH-000002",
+          "doc_type": "TRF_WH",
+          "doc_status": "open",
+          "source_wh_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+          "dest_wh_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+          "ref_doc_id": null,
+          "ref_doc_type": null,
+          "posted_date": null,
+          "total_qty": 3.0,
+          "notes": "Test transfer",
+          "created_at": "2025-07-22T23:01:42.584353Z",
+          "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+          "updated_at": "2025-07-22T23:01:42.584353Z",
+          "updated_by": null,
+          "deleted_at": null,
+          "deleted_by": null,
+          "stock_doc_lines": [
+            {
+              "id": "2107934e-d5d1-4ecb-ab0e-ac90485c5ca3",
+              "stock_doc_id": "dd8288c0-1573-495b-a6d4-e2fd2a3e1b23",
+              "variant_id": "78755b8d-c581-4c9f-9465-a57b288b14ca",
+              "gas_type": null,
+              "quantity": 3.0,
+              "unit_cost": 4.0,
+              "line_value": 12.0,
+              "created_at": "2025-07-22T23:01:42.584353Z",
+              "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+              "updated_at": "2025-07-22T23:01:42.584353Z",
+              "updated_by": null
+            }
+          ]
+        },
+        "source_warehouse": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+        "dest_warehouse": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+        "total_items": 1
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/truck-loads",
+      "method": "POST",
+      "status_code": 201,
+      "success": true,
+      "response_data": {
+        "stock_doc": {
+          "id": "e1d631b9-547d-42be-bbb7-360cb8f859c4",
+          "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+          "doc_no": "TRF_TRUCK-000001",
+          "doc_type": "TRF_TRUCK",
+          "doc_status": "open",
+          "source_wh_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+          "dest_wh_id": null,
+          "ref_doc_id": null,
+          "ref_doc_type": null,
+          "posted_date": null,
+          "total_qty": 2.0,
+          "notes": "Truck: TRUCK-001\nTest truck load",
+          "created_at": "2025-07-22T23:01:43.768597Z",
+          "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+          "updated_at": "2025-07-22T23:01:43.768597Z",
+          "updated_by": null,
+          "deleted_at": null,
+          "deleted_by": null,
+          "stock_doc_lines": [
+            {
+              "id": "a1ad9cb5-0bf2-4634-a96f-f28658354c98",
+              "stock_doc_id": "e1d631b9-547d-42be-bbb7-360cb8f859c4",
+              "variant_id": "78755b8d-c581-4c9f-9465-a57b288b14ca",
+              "gas_type": null,
+              "quantity": 2.0,
+              "unit_cost": 3.5,
+              "line_value": 7.0,
+              "created_at": "2025-07-22T23:01:43.768597Z",
+              "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+              "updated_at": "2025-07-22T23:01:43.768597Z",
+              "updated_by": null
+            }
+          ]
+        },
+        "operation_type": "load",
+        "warehouse_id": "5bde8036-01d3-46dd-a150-ccb2951463ce",
+        "trip_id": null,
+        "truck_id": "TRUCK-001",
+        "total_items": 1
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/truck-unloads",
+      "method": "POST",
+      "status_code": 201,
+      "success": true,
+      "response_data": {
+        "stock_doc": {
+          "id": "8fd5beaa-3910-4dc9-8c0b-ae7942cdab32",
+          "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b",
+          "doc_no": "TRF_TRUCK-000002",
+          "doc_type": "TRF_TRUCK",
+          "doc_status": "open",
+          "source_wh_id": null,
+          "dest_wh_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+          "ref_doc_id": null,
+          "ref_doc_type": null,
+          "posted_date": null,
+          "total_qty": 2.0,
+          "notes": "Truck: TRUCK-001\nTest truck unload",
+          "created_at": "2025-07-22T23:01:44.941553Z",
+          "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+          "updated_at": "2025-07-22T23:01:44.941553Z",
+          "updated_by": null,
+          "deleted_at": null,
+          "deleted_by": null,
+          "stock_doc_lines": [
+            {
+              "id": "f083fbb5-fcdb-493d-acdf-5e00855ae957",
+              "stock_doc_id": "8fd5beaa-3910-4dc9-8c0b-ae7942cdab32",
+              "variant_id": "78755b8d-c581-4c9f-9465-a57b288b14ca",
+              "gas_type": null,
+              "quantity": 2.0,
+              "unit_cost": 3.5,
+              "line_value": 7.0,
+              "created_at": "2025-07-22T23:01:44.941553Z",
+              "created_by": "572c619c-32e4-45dc-9027-8c594a9d0612",
+              "updated_at": "2025-07-22T23:01:44.941553Z",
+              "updated_by": null
+            }
+          ]
+        },
+        "operation_type": "unload",
+        "warehouse_id": "c1ea1cf5-45b1-4c71-b113-86445467b592",
+        "trip_id": null,
+        "truck_id": "TRUCK-001",
+        "total_items": 1
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/count",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "total": 4,
+        "doc_type": null,
+        "status": null,
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b"
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/generate-number/TRF_WH",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "doc_no": "TRF_WH-000003",
+        "doc_type": "TRF_WH",
+        "tenant_id": "332072c1-5405-4f09-a56f-a631defa911b"
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/movements/summary",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "period_start": null,
+        "period_end": null,
+        "warehouse_id": null,
+        "variant_id": null,
+        "gas_type": null,
+        "movements_by_type": {
+          "TRF_WH": {
+            "document_count": 1.0,
+            "total_quantity": 10.0
+          }
+        },
+        "total_documents": 1,
+        "total_quantity": 10.0
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/374c84bd-db8c-457c-ac23-bd3b33d4a008/business-rules",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "response_data": {
+        "can_modify": false,
+        "can_post": false,
+        "can_cancel": false,
+        "can_ship": false,
+        "can_receive": false,
+        "status_transitions": []
+      },
+      "error_message": null,
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/374c84bd-db8c-457c-ac23-bd3b33d4a008",
+      "method": "PUT",
+      "status_code": 409,
+      "success": false,
+      "response_data": null,
+      "error_message": "{\"detail\":\"Stock document 374c84bd-db8c-457c-ac23-bd3b33d4a008 cannot be modified in status posted\"}",
+      "expected_failure": false
+    },
+    {
+      "endpoint": "/stock-docs/374c84bd-db8c-457c-ac23-bd3b33d4a008",
+      "method": "DELETE",
+      "status_code": 409,
+      "success": false,
+      "response_data": "{\"detail\":\"Stock document 374c84bd-db8c-457c-ac23-bd3b33d4a008 cannot be modified in status posted\"}",
+      "error_message": "{\"detail\":\"Stock document 374c84bd-db8c-457c-ac23-bd3b33d4a008 cannot be modified in status posted\"}",
+      "expected_failure": false
+    }
+  ],
+  "created_doc_id": "374c84bd-db8c-457c-ac23-bd3b33d4a008",
+  "created_doc_no": "TRF_WH-000001"
+}
