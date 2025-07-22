@@ -37,4 +37,4 @@ USER appuser
 EXPOSE 8000
 
 # Use the entrypoint script
-CMD ["./entrypoint.sh"]
+CMD ["./start.sh"]
