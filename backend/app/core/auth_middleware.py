@@ -18,7 +18,6 @@ EXCLUDED_PATHS = {
     "/debug/database",
     "/debug/railway",
     "/api/v1/auth/login",
-    "/api/v1/auth-fallback/login",  # Fallback login for Railway
     "/api/v1/auth/signup", 
     "/api/v1/auth/refresh",
     "/api/v1/auth/forgot-password",
@@ -49,25 +48,9 @@ async def conditional_auth(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Get appropriate user service based on environment  
+    # Get user service
     from app.infrastucture.logs.logger import default_logger
-    
-    if should_use_railway_mode():
-        default_logger.info("Auth middleware using Railway mode (Supabase SDK)")
-        user_service = get_railway_user_service()
-    else:
-        # Create standard user service for local development
-        try:
-            from app.services.dependencies.common import get_db_session
-            from app.infrastucture.database.repositories.user_repository import UserRepository
-            
-            session_gen = get_db_session()
-            session = await session_gen.__anext__()
-            user_repo = UserRepository(session=session)
-            user_service = UserService(user_repo)
-        except Exception as e:
-            # Fallback to Railway mode if standard mode fails
-            user_service = get_railway_user_service()
+    user_service = get_railway_user_service()
     
     try:
         from app.infrastucture.database.connection import get_supabase_client_sync
@@ -83,14 +66,25 @@ async def conditional_auth(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Get user from our database using the auth_user_id
+        # Try to get user by auth_user_id first, fallback to email
         auth_user_id = auth_response.user.id
-        default_logger.info(f"Auth middleware looking up user by auth_id: {auth_user_id}")
+        user_email = auth_response.user.email
+        default_logger.info(f"Auth middleware looking up user by auth_id: {auth_user_id}, email: {user_email}")
         
         user = await user_service.get_user_by_auth_id(auth_user_id)
         
         if not user:
-            default_logger.warning(f"User not found in database for auth_id: {auth_user_id}")
+            default_logger.info(f"User not found by auth_id, trying email: {user_email}")
+            # Fallback to email lookup
+            user = await user_service.get_user_by_email(user_email)
+            
+            if user:
+                # Update the auth_user_id for future lookups
+                default_logger.info(f"Updating auth_user_id for user: {user.email}")
+                user = await user_service.update_user_auth_id(str(user.id), auth_user_id)
+        
+        if not user:
+            default_logger.warning(f"User not found in database for auth_id: {auth_user_id}, email: {user_email}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found in database",
@@ -113,9 +107,10 @@ async def conditional_auth(
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        default_logger.error(f"Authentication failed: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentication failed: {str(e)}",
+            detail="Authentication failed",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

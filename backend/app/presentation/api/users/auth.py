@@ -85,29 +85,11 @@ async def signup(
 
 @auth_router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
-    """User login endpoint using Supabase Auth with automatic Railway compatibility"""
+    """User login endpoint using Supabase Auth"""
     
-    # Get appropriate user service based on environment
-    if should_use_railway_mode():
-        default_logger.info("Using Railway mode (Supabase SDK) for authentication")
-        user_service = get_railway_user_service()
-    else:
-        default_logger.info("Using standard mode (direct database) for authentication - this will fail in Railway")
-        # This will fail in Railway because direct database connection doesn't work
-        # But we keep it for local development
-        try:
-            from app.services.dependencies.common import get_db_session
-            from app.infrastucture.database.repositories.user_repository import UserRepository
-            
-            # This is a workaround - in Railway this should not be reached due to USE_RAILWAY_MODE=true
-            session_gen = get_db_session()
-            session = await session_gen.__anext__()
-            user_repo = UserRepository(session=session)
-            user_service = UserService(user_repo)
-        except Exception as e:
-            default_logger.error(f"Failed to create standard user service: {str(e)}")
-            default_logger.info("Falling back to Railway mode")
-            user_service = get_railway_user_service()
+    # Use Railway mode (Supabase SDK) for authentication
+    user_service = get_railway_user_service()
+    default_logger.info("Login attempt started", email=request.email)
     
     try:
         default_logger.info(f"Login attempt started for email: {request.email}")
@@ -145,7 +127,14 @@ async def login(request: LoginRequest):
         
         # Get user from our database to get additional info
         try:
+            # Try to find user by email first
             user = await user_service.get_user_by_email(request.email)
+            
+            # Update auth_user_id if not set or different
+            if user.auth_user_id is None or str(user.auth_user_id) != auth_response.user.id:
+                user = await user_service.update_user_auth_id(str(user.id), auth_response.user.id)
+                default_logger.info(f"Updated auth_user_id for user: {user.email}")
+            
             await user_service.validate_user_active(str(user.id))
             
             # Update last login time
@@ -153,7 +142,6 @@ async def login(request: LoginRequest):
             
         except UserNotFoundError:
             # User exists in Supabase Auth but not in our database
-            # This shouldn't happen in normal flow, but handle gracefully
             default_logger.warning(f"User exists in Supabase Auth but not in database", email=request.email)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
