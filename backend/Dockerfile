@@ -14,5 +14,5 @@ COPY . .
 # Expose port
 EXPOSE $PORT
 
-# Run FastAPI with uvicorn
-CMD ["uvicorn", "app.cmd.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+# Run FastAPI with uvicorn (using shell form to expand $PORT)
+CMD uvicorn app.cmd.main:app --host 0.0.0.0 --port $PORT
