@@ -89,14 +89,32 @@ async def login(
 ):
     """User login endpoint using Supabase Auth"""
     try:
+        default_logger.info(f"Login attempt started for email: {request.email}")
+        
         # Get Supabase client
-        supabase = get_supabase_client_sync()
+        try:
+            supabase = get_supabase_client_sync()
+            default_logger.info("Supabase client obtained successfully")
+        except Exception as e:
+            default_logger.error(f"Failed to get Supabase client: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Service unavailable"
+            )
         
         # Authenticate with Supabase Auth
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": request.email,
-            "password": request.password
-        })
+        try:
+            auth_response = supabase.auth.sign_in_with_password({
+                "email": request.email,
+                "password": request.password
+            })
+            default_logger.info(f"Supabase auth response received for: {request.email}")
+        except Exception as e:
+            default_logger.error(f"Supabase authentication failed: {str(e)}", email=request.email)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
         
         if auth_response.user is None:
             raise HTTPException(

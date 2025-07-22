@@ -146,6 +146,24 @@ async def health_check():
         "status": "healthy"
     }
 
+
+@app.get("/debug/env")
+async def debug_environment():
+    """Debug endpoint to check environment configuration (exclude sensitive values)"""
+    from decouple import config
+    
+    return {
+        "environment": ENVIRONMENT,
+        "log_level": LOG_LEVEL,
+        "supabase_url_configured": bool(config("SUPABASE_URL", default=None)),
+        "supabase_key_configured": bool(config("SUPABASE_KEY", default=None)),
+        "supabase_anon_key_configured": bool(config("SUPABASE_ANON_KEY", default=None)),
+        "database_url_configured": bool(config("DATABASE_URL", default=None)),
+        "port": config("PORT", default="not_set"),
+        "python_version": os.sys.version,
+        "available_env_keys": [key for key in os.environ.keys() if "SUPABASE" in key or "DATABASE" in key or "PORT" in key]
+    }
+
 @app.get("/logs/test")
 async def test_logging(request: Request):
     """Test endpoint to demonstrate logging"""
