@@ -36,16 +36,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         default_logger.error(f"Failed to initialize database: {str(e)}")
     
-    # Initialize direct SQLAlchemy connection (one-time)
-    try:
-        await init_direct_database()
-        # Test a one-time connection using async context manager
-        if direct_db_connection._engine:
-            async with direct_db_connection._engine.connect() as conn:
-                await conn.execute(sqlalchemy.text("SELECT 1"))
-            default_logger.info("Direct SQLAlchemy one-time connection successful")
-    except Exception as e:
-        default_logger.error(f"Failed to initialize direct SQLAlchemy connection: {str(e)}")
+    # Initialize direct SQLAlchemy connection (only for local development)
+    from app.services.dependencies.railway_users import should_use_railway_mode
+    if not should_use_railway_mode():
+        try:
+            await init_direct_database()
+            # Test a one-time connection using async context manager
+            if direct_db_connection._engine:
+                async with direct_db_connection._engine.connect() as conn:
+                    await conn.execute(sqlalchemy.text("SELECT 1"))
+                default_logger.info("Direct SQLAlchemy connection successful (local development)")
+        except Exception as e:
+            default_logger.error(f"Failed to initialize direct SQLAlchemy connection: {str(e)}")
+    else:
+        default_logger.info("Skipping direct SQLAlchemy connection (Railway mode enabled)")
     
     yield
     
