@@ -93,9 +93,8 @@ class OrderSummaryListResponse(BaseModel):
 
 class OrderStatusResponse(BaseModel):
     """Schema for order status update response"""
-    success: bool = Field(..., description="Whether the status update was successful")
     order_id: str = Field(..., description="Order ID")
-    new_status: OrderStatus = Field(..., description="New order status")
+    status: OrderStatus = Field(..., description="New order status")
     message: Optional[str] = Field(None, description="Additional message")
 
     class Config:
@@ -133,7 +132,5 @@ class OrderCountResponse(BaseModel):
 
 class OrderLineAddResponse(BaseModel):
     """Schema for order line addition response"""
-    success: bool = Field(..., description="Whether the line addition was successful")
-    order_line: OrderLineResponse = Field(..., description="Added order line")
-    order_total: float = Field(..., description="Updated order total amount")
+    order_line_id: str = Field(..., description="Added order line ID")
     message: Optional[str] = Field(None, description="Additional message") 
