@@ -8,7 +8,10 @@ const PasswordSetupForm = ({
   title = "Set Your Password",
   description = "Create a secure password for your account",
   buttonText = "Set Password",
-  loadingText = "Setting Password..."
+  loadingText = "Setting Password...",
+  showEmail = false,
+  email = '',
+  onEmailChange = null
 }) => {
   const [formData, setFormData] = useState({
     password: '',
@@ -99,6 +102,23 @@ const PasswordSetupForm = ({
       </div>
 
       <form onSubmit={handleSubmit} className="verification-form">
+        {showEmail && (
+          <div className="form-group">
+            <label htmlFor="email" className="form-label">Email Address</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={email}
+              onChange={(e) => onEmailChange && onEmailChange(e.target.value)}
+              className={`form-input ${errors.email ? 'error' : ''}`}
+              placeholder="Enter your email address"
+              disabled={isLoading}
+            />
+            {errors.email && <span className="error-text">{errors.email}</span>}
+          </div>
+        )}
+        
         <div className="form-group">
           <label htmlFor="password" className="form-label">Password</label>
           <input

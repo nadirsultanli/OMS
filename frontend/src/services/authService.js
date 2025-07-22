@@ -133,21 +133,49 @@ class AuthService {
     }
   }
 
-  // Reset password with token
+  // Reset password with token (legacy method)
   async resetPassword(token, password, confirmPassword) {
     try {
+      console.log('Sending reset password request with token:', token ? 'present' : 'missing');
       const response = await api.post('/auth/reset-password', {
         token,
         password,
         confirm_password: confirmPassword
       });
       
+      console.log('Reset password response:', response.data);
       return {
         success: true,
         data: response.data
       };
     } catch (error) {
       console.error('Reset password error:', error);
+      console.error('Error response:', error.response?.data);
+      return {
+        success: false,
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to reset password. Please try again.'
+      };
+    }
+  }
+
+  // Simple password reset without token
+  async resetPasswordSimple(email, password, confirmPassword) {
+    try {
+      console.log('Sending simple reset password request for email:', email);
+      const response = await api.post('/auth/reset-password-simple', {
+        email,
+        password,
+        confirm_password: confirmPassword
+      });
+      
+      console.log('Simple reset password response:', response.data);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Simple reset password error:', error);
+      console.error('Error response:', error.response?.data);
       return {
         success: false,
         error: this.extractErrorMessage(error.response?.data) || 'Failed to reset password. Please try again.'
