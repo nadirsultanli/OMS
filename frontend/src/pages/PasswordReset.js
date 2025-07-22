@@ -10,6 +10,8 @@ const PasswordReset = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [token, setToken] = useState('');
+  const [email, setEmail] = useState('');
+  const [useSimpleMethod, setUseSimpleMethod] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,9 +42,11 @@ const PasswordReset = () => {
     // Set the token if it exists and type is recovery
     if (finalToken && finalType === 'recovery') {
       setToken(finalToken);
+      setUseSimpleMethod(false);
       console.log('Password reset token set successfully:', finalToken);
     } else {
-      console.warn('No valid password reset token found. Expected type=recovery with access_token.');
+      console.warn('No valid password reset token found. Using simple method.');
+      setUseSimpleMethod(true);
     }
   }, [location]);
 
@@ -50,17 +54,35 @@ const PasswordReset = () => {
     setMessage('');
     setErrors({});
     
-    // Check if token exists
-    if (!token) {
+    // Check if we need email for simple method
+    if (useSimpleMethod && !email) {
+      setErrors({ general: 'Please enter your email address to reset your password.' });
+      return;
+    }
+    
+    // Check if token exists for token method
+    if (!useSimpleMethod && !token) {
       setErrors({ general: 'No reset token found. Please use the link from your email or request a new password reset.' });
       return;
     }
     
     setIsLoading(true);
-    console.log('Submitting password reset with token:', token);
+    console.log('Submitting password reset:', {
+      method: useSimpleMethod ? 'simple' : 'token',
+      email: useSimpleMethod ? email : 'not needed',
+      token: useSimpleMethod ? 'not needed' : (token ? 'present' : 'missing'),
+      passwordLength: password.length,
+      confirmPasswordLength: confirmPassword.length
+    });
     
     try {
-      const result = await authService.resetPassword(token, password, confirmPassword);
+      let result;
+      if (useSimpleMethod) {
+        result = await authService.resetPasswordSimple(email, password, confirmPassword);
+      } else {
+        result = await authService.resetPassword(token, password, confirmPassword);
+      }
+      
       console.log('Reset password result:', result);
       
       if (result.success) {
@@ -75,6 +97,7 @@ const PasswordReset = () => {
           });
         }, 2000);
       } else {
+        console.error('Reset password failed:', result.error);
         setErrors({ general: result.error });
       }
     } catch (error) {
@@ -114,9 +137,12 @@ const PasswordReset = () => {
           isLoading={isLoading}
           errors={errors}
           title="Reset Your Password"
-          description="Create a new secure password for your account"
+          description={useSimpleMethod ? "Enter your email and create a new secure password" : "Create a new secure password for your account"}
           buttonText="Reset Password"
           loadingText="Resetting Password..."
+          showEmail={useSimpleMethod}
+          email={email}
+          onEmailChange={setEmail}
         />
 
         <div className="back-to-login">
