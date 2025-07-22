@@ -133,19 +133,28 @@ class OrderService:
         
         return updated_order
 
-    async def delete_order(
+    async def cancel_order(
         self,
         user: User,
         order_id: str,
-    ) -> bool:
-        """Delete an order with business logic validation"""
+    ) -> Order:
+        """Cancel an order by setting status to CANCELLED"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
         
-        # Check if order can be deleted
+        # Check if order can be cancelled
         if not self.business_service.can_cancel_order(user, order):
             raise OrderCancellationError(order.order_no, order.order_status.value)
         
-        return await self.order_repository.delete_order(order_id, user.id)
+        # Update status to CANCELLED instead of deleting
+        order.update_status(OrderStatus.CANCELLED, user.id)
+        
+        # Save the updated order
+        updated_order = await self.order_repository.update_order(order_id, {
+            "order_status": OrderStatus.CANCELLED.value,
+            "updated_by": user.id
+        })
+        
+        return updated_order
 
     # ============================================================================
     # STATUS MANAGEMENT WITH BUSINESS LOGIC

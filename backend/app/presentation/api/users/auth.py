@@ -372,41 +372,94 @@ async def accept_invitation(
 ):
     """Accept invitation and set password using Supabase token"""
     try:
-        # Use Supabase's built-in functionality to accept the invitation
-        # The token comes from the invitation email sent by Supabase
+        default_logger.info(f"Starting invitation acceptance process")
+        
+        # Get Supabase client
         supabase = get_supabase_client_sync()
         
-        # Update the user's password using Supabase Auth
-        # For invitations, we need to set the session first, then update password
-        # Set the session using the invite token
-        session_response = supabase.auth.set_session(request.token, request.token)
+        # For invitation tokens, we need to verify the token and set up the session
+        # The token from invitation email is an access token that allows password updates
+        auth_response = None
         
-        if not session_response.user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired invitation token"
-            )
-        
-        # Now update the password
-        auth_response = supabase.auth.update_user({
-            "password": request.password
-        })
-        
-        if not auth_response.user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired invitation token"
-            )
+        try:
+            # Method 1: Try to verify the token by setting session with it
+            # For invitation tokens, we set session first to authenticate, then update password
+            default_logger.info("Attempting to set session with invitation token")
+            session_response = supabase.auth.set_session(request.token, request.token)
+            
+            if not session_response.user:
+                raise Exception("Session creation failed - no user returned")
+                
+            default_logger.info(f"Session created successfully for user: {session_response.user.email}")
+            
+            # Now that we have an authenticated session, update the password
+            auth_response = supabase.auth.update_user({
+                "password": request.password
+            })
+            
+            if not auth_response.user:
+                raise Exception("Password update failed - no user returned")
+                
+            default_logger.info(f"Password updated successfully for user: {auth_response.user.email}")
+            
+        except Exception as session_error:
+            default_logger.error(f"Session-based invitation acceptance failed: {str(session_error)}")
+            
+            # Method 2: Try direct password update with token as access_token
+            try:
+                default_logger.info("Attempting direct password update with token")
+                auth_response = supabase.auth.update_user({
+                    "password": request.password
+                }, access_token=request.token)
+                
+                if not auth_response.user:
+                    raise Exception("Direct password update failed - no user returned")
+                    
+                default_logger.info(f"Direct password update successful for user: {auth_response.user.email}")
+                
+            except Exception as direct_error:
+                default_logger.error(f"Direct password update also failed: {str(direct_error)}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or expired invitation token. Please request a new invitation."
+                )
         
         # Get user from our database using the email from auth response
-        user = await user_service.get_user_by_email(auth_response.user.email)
+        try:
+            user = await user_service.get_user_by_email(auth_response.user.email)
+            default_logger.info(f"Found user in database - ID: {user.id}, Status: {user.status.value}, Auth ID: {user.auth_user_id}")
+        except Exception as db_error:
+            default_logger.error(f"Failed to find user in database: {str(db_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User account not found in system"
+            )
         
-        # Activate the user if they're not already active
+        # Update auth_user_id if not set or different
+        if not user.auth_user_id or str(user.auth_user_id) != auth_response.user.id:
+            try:
+                user = await user_service.update_user_auth_id(str(user.id), auth_response.user.id)
+                default_logger.info(f"Updated auth_user_id for user: {user.email}")
+            except Exception as auth_id_error:
+                default_logger.error(f"Failed to update auth_user_id: {str(auth_id_error)}")
+                # Continue anyway, this might not be critical
+        
+        # Activate the user if they're not already active (THIS IS THE KEY STEP)
         if user.status != UserStatus.ACTIVE:
-            await user_service.activate_user(str(user.id))
+            try:
+                user = await user_service.activate_user(str(user.id))
+                default_logger.info(f"User activated successfully - New status: {user.status.value}")
+            except Exception as activation_error:
+                default_logger.error(f"Failed to activate user: {str(activation_error)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to activate user account"
+                )
+        else:
+            default_logger.info(f"User already active - Status: {user.status.value}")
         
         # IMPORTANT: Sign out the user so they have to login manually
-        # This prevents automatic login after password setup
+        # This prevents automatic login after password setup and ensures clean state
         try:
             supabase.auth.sign_out()
             default_logger.info(f"User signed out after invitation acceptance to force manual login")
@@ -414,7 +467,7 @@ async def accept_invitation(
             default_logger.warning(f"Failed to sign out user after invitation: {str(signout_error)}")
             # Continue anyway, this is not critical
         
-        default_logger.info(f"Invitation accepted successfully for user: {user.id}")
+        default_logger.info(f"Invitation acceptance completed successfully - User: {user.email}, Status: {user.status.value}, Auth ID: {user.auth_user_id}")
         
         return ResetPasswordResponse(
             message="Account setup completed successfully. Please login with your new credentials.",
@@ -425,10 +478,10 @@ async def accept_invitation(
     except HTTPException:
         raise
     except Exception as e:
-        default_logger.error(f"Accept invitation failed: {str(e)}")
+        default_logger.error(f"Accept invitation failed with unexpected error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to accept invitation"
+            detail="Failed to accept invitation. Please try again or contact support."
         )
 
 

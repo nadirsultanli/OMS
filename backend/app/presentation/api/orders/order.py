@@ -386,23 +386,20 @@ async def approve_order(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_order(
+@router.delete("/{order_id}", response_model=OrderResponse)
+async def cancel_order(
     order_id: str,
     order_service: OrderService = Depends(get_order_service),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete an order with business logic validation"""
+    """Cancel an order by setting status to CANCELLED"""
     try:
-        success = await order_service.delete_order(
+        cancelled_order = await order_service.cancel_order(
             user=current_user,
             order_id=order_id
         )
         
-        if not success:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-        
-        return None
+        return OrderResponse(**cancelled_order.to_dict())
     
     except OrderPermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))

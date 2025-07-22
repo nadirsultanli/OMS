@@ -3,7 +3,7 @@ import orderService from '../services/orderService';
 import customerService from '../services/customerService';
 import variantService from '../services/variantService';
 import { extractErrorMessage } from '../utils/errorUtils';
-import { Search, Plus, Edit2, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Truck } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Truck, X } from 'lucide-react';
 import './Orders.css';
 
 const Orders = () => {
@@ -266,7 +266,7 @@ const Orders = () => {
     }
   };
 
-  const handleDeleteOrder = async (orderId) => {
+  const handleCancelOrder = async (orderId) => {
     if (!window.confirm('Are you sure you want to cancel this order?')) {
       return;
     }
@@ -277,7 +277,22 @@ const Orders = () => {
       
       if (result.success) {
         setMessage('Order cancelled successfully!');
-        fetchOrders();
+        // Update the order in the local state instead of refetching
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === orderId 
+              ? { ...order, order_status: 'cancelled' }
+              : order
+          )
+        );
+        // Also update filtered orders
+        setFilteredOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === orderId 
+              ? { ...order, order_status: 'cancelled' }
+              : order
+          )
+        );
       } else {
         const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
         setErrors({ general: errorMessage || 'Failed to cancel order' });
@@ -551,14 +566,17 @@ const Orders = () => {
                         <Edit2 size={16} />
                       </button>
                     )}
+                                      {/* Only show cancel button for cancellable orders */}
+                  {['draft', 'submitted', 'approved'].includes(order.order_status) && (
                     <button
-                                        onClick={() => handleDeleteOrder(order.id)}
-                  className="action-icon-btn delete"
-                  title="Cancel order"
+                      onClick={() => handleCancelOrder(order.id)}
+                      className="action-icon-btn cancel"
+                      title="Cancel order"
                       disabled={loading}
                     >
-                      <Trash2 size={16} />
+                      <X size={16} />
                     </button>
+                  )}
                   </td>
                 </tr>
               ))}

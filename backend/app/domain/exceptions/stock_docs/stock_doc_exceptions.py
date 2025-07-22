@@ -179,3 +179,25 @@ class StockDocIntegrityError(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(f"Stock document integrity error: {message}")
+
+
+# Additional exceptions for stock level management
+class StockDocValidationError(Exception):
+    """Raised when general stock document validation fails"""
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
+
+
+class InsufficientStockError(Exception):
+    """Raised when there's insufficient stock for an operation"""
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
+
+
+class InvalidStockOperationError(Exception):
+    """Raised when an invalid stock operation is attempted"""
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
