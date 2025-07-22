@@ -24,8 +24,8 @@ if [ -z "$SUPABASE_URL" ]; then
     exit 1
 fi
 
-if [ -z "$SUPABASE_ANON_KEY" ]; then
-    echo "❌ Error: SUPABASE_ANON_KEY environment variable is required"
+if [ -z "$SUPABASE_KEY" ] && [ -z "$SUPABASE_ANON_KEY" ]; then
+    echo "❌ Error: SUPABASE_KEY or SUPABASE_ANON_KEY environment variable is required"
     exit 1
 fi
 
