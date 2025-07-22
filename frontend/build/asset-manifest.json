@@ -8,6 +8,7 @@
     "main.6deb4123.js.map": "/static/js/main.6deb4123.js.map"
   },
   "entrypoints": [
+    "static/css/main.37246d70.css",
     "static/js/main.6deb4123.js"
   ]
 }
