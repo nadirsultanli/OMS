@@ -149,7 +149,10 @@ const StockLevels = () => {
         <div className="page-header">
           <h1>Stock Levels</h1>
         </div>
-        <div className="loading-spinner">Loading...</div>
+        <div className="loading-container">
+          <div className="spinner"></div>
+          <p>Loading...</p>
+        </div>
       </div>
     );
   }
