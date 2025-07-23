@@ -8,8 +8,9 @@ from app.presentation.schemas.products.output_schemas import ProductResponse, Pr
 from app.services.dependencies.products import get_product_service
 from app.domain.entities.users import User
 from app.core.auth_utils import current_user
-from app.infrastucture.logs.logger import default_logger
+from app.infrastucture.logs.logger import get_logger
 
+logger = get_logger("products_api")
 router = APIRouter(prefix="/products", tags=["Products"])
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
@@ -19,9 +20,27 @@ async def create_product(
     user: User = current_user
 ):
     """Create a new product"""
+    logger.info(
+        "Creating new product",
+        user_id=str(user.id) if user else None,
+        tenant_id=str(user.tenant_id) if user else None,
+        user_role=user.role.value if user else None,
+        product_name=request.name,
+        category=request.category,
+        sku=request.sku
+    )
+    
     try:
         # Only Sales Rep and Tenant Admin can create products
         if user and user.role.value not in ["sales_rep", "tenant_admin"]:
+            logger.error(
+                "Failed to create product - insufficient permissions",
+                user_id=str(user.id),
+                tenant_id=str(user.tenant_id),
+                user_role=user.role.value,
+                product_name=request.name,
+                required_roles=["sales_rep", "tenant_admin"]
+            )
             raise HTTPException(status_code=403, detail="Only Sales Rep and Tenant Admin can create products.")
         
         # Add created_by to the request data
@@ -29,11 +48,40 @@ async def create_product(
         request_data["created_by"] = str(user.id) if user else None
         
         product = await product_service.create_product(**request_data)
+        
+        logger.info(
+            "Product created successfully",
+            user_id=str(user.id) if user else None,
+            tenant_id=str(user.tenant_id) if user else None,
+            product_id=str(product.id),
+            product_name=product.name,
+            category=product.category,
+            sku=product.sku,
+            created_by=str(product.created_by) if hasattr(product, 'created_by') else None
+        )
+        
         return ProductResponse(**product.to_dict())
+        
     except ProductAlreadyExistsError as e:
+        logger.error(
+            "Failed to create product - product already exists",
+            user_id=str(user.id) if user else None,
+            tenant_id=str(user.tenant_id) if user else None,
+            product_name=request.name,
+            sku=request.sku,
+            error=str(e)
+        )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        logger.error(
+            "Failed to create product - unexpected error",
+            user_id=str(user.id) if user else None,
+            tenant_id=str(user.tenant_id) if user else None,
+            product_name=request.name,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(
@@ -62,7 +110,7 @@ async def get_products(
     
     try:
         auth_time = time.time()
-        default_logger.info(f"Auth check completed in {auth_time - start_time:.3f}s")
+        logger.info(f"Auth check completed in {auth_time - start_time:.3f}s")
         
         service_start = time.time()
         if category:
@@ -71,7 +119,7 @@ async def get_products(
             products = await product_service.get_all_products(UUID(tenant_id), limit, offset)
         
         service_time = time.time()
-        default_logger.info(f"Product service get completed in {service_time - service_start:.3f}s")
+        logger.info(f"Product service get completed in {service_time - service_start:.3f}s")
         
         response_start = time.time()
         product_responses = [ProductResponse(**product.to_dict()) for product in products]
@@ -83,12 +131,12 @@ async def get_products(
         )
         
         total_time = time.time() - start_time
-        default_logger.info(f"Get products total time: {total_time:.3f}s (auth: {auth_time - start_time:.3f}s, service: {service_time - service_start:.3f}s, response: {time.time() - response_start:.3f}s)")
+        logger.info(f"Get products total time: {total_time:.3f}s (auth: {auth_time - start_time:.3f}s, service: {service_time - service_start:.3f}s, response: {time.time() - response_start:.3f}s)")
         
         return response
     except Exception as e:
         total_time = time.time() - start_time
-        default_logger.error(f"Get products failed after {total_time:.3f}s: {str(e)}")
+        logger.error(f"Get products failed after {total_time:.3f}s: {str(e)}")
         raise
 
 @router.put("/{product_id}", response_model=ProductResponse)
@@ -107,7 +155,7 @@ async def update_product(
             raise HTTPException(status_code=403, detail="Only Sales Rep and Tenant Admin can edit products.")
         
         auth_time = time.time()
-        default_logger.info(f"Auth check completed in {auth_time - start_time:.3f}s")
+        logger.info(f"Auth check completed in {auth_time - start_time:.3f}s")
         
         updated_by = user.id if user else None
         service_start = time.time()
@@ -119,20 +167,20 @@ async def update_product(
         )
         
         service_time = time.time()
-        default_logger.info(f"Product service update completed in {service_time - service_start:.3f}s")
+        logger.info(f"Product service update completed in {service_time - service_start:.3f}s")
         
         response_start = time.time()
         response = ProductResponse(**product.to_dict())
         
         total_time = time.time() - start_time
-        default_logger.info(f"Product update total time: {total_time:.3f}s (auth: {auth_time - start_time:.3f}s, service: {service_time - service_start:.3f}s, response: {time.time() - response_start:.3f}s)")
+        logger.info(f"Product update total time: {total_time:.3f}s (auth: {auth_time - start_time:.3f}s, service: {service_time - service_start:.3f}s, response: {time.time() - response_start:.3f}s)")
         
         return response
     except ProductNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         total_time = time.time() - start_time
-        default_logger.error(f"Product update failed after {total_time:.3f}s: {str(e)}")
+        logger.error(f"Product update failed after {total_time:.3f}s: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
