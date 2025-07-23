@@ -84,6 +84,26 @@ const CustomerDetail = () => {
     }
   };
 
+  const handleEditAddress = (address) => {
+    console.log('Edit button clicked!', address);
+    setEditingAddress(address);
+    setAddressForm({
+      address_type: address.address_type,
+      street: address.street,
+      city: address.city,
+      state: address.state || '',
+      zip_code: address.zip_code || '',
+      country: address.country,
+      access_instructions: address.access_instructions || '',
+      is_default: address.is_default,
+      coordinates: address.coordinates ? 
+        address.coordinates.replace('POINT(', '').replace(')', '').split(' ').map(Number) : 
+        null
+    });
+    setShowAddressForm(true);
+    console.log('Modal should be open now');
+  };
+
   const handleMapboxAddressSelect = (addressComponents) => {
     setAddressForm(prev => ({
       ...prev,
@@ -207,7 +227,7 @@ const CustomerDetail = () => {
 
   const handleSetDefaultAddress = async (addressId) => {
     try {
-      await customerService.setDefaultAddress(addressId);
+      await customerService.setDefaultAddress(addressId, customerId);
       setMessage('Default address updated successfully!');
       await fetchCustomerAddresses();
     } catch (error) {
@@ -224,6 +244,65 @@ const CustomerDetail = () => {
       await fetchCustomerAddresses();
     } catch (error) {
       setErrors({ general: 'Failed to delete address.' });
+    }
+  };
+
+  const handleUpdateAddress = async (e) => {
+    e.preventDefault();
+    console.log('Updating address:', editingAddress?.id);
+    setMessage('');
+
+    const isValid = validateAddressForm();
+    console.log('Validation result:', isValid);
+    if (!isValid) {
+      console.log('Form validation failed, not submitting');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const addressData = {
+        ...addressForm,
+        // Format coordinates as PostgreSQL POINT if they exist
+        coordinates: addressForm.coordinates ? 
+          `POINT(${addressForm.coordinates[0]} ${addressForm.coordinates[1]})` : 
+          null
+      };
+      
+      // Debug: Log the address data being sent
+      console.log('Address update data being sent:', addressData);
+
+      await customerService.updateAddress(editingAddress.id, addressData);
+      setMessage('Address updated successfully!');
+      
+      // Reset form and close modal
+      setAddressForm({
+        address_type: 'delivery',
+        street: '',
+        city: '',
+        state: '',
+        zip_code: '',
+        country: 'Kenya',
+        access_instructions: '',
+        is_default: false,
+        coordinates: null
+      });
+      setEditingAddress(null);
+      setShowAddressForm(false);
+      
+      // Refresh addresses
+      await fetchCustomerAddresses();
+    } catch (error) {
+      console.error('Address update error:', error);
+      const errorDetail = error.response?.data?.detail;
+      const errorMessage = typeof errorDetail === 'string' 
+        ? errorDetail 
+        : (errorDetail && typeof errorDetail === 'object')
+          ? JSON.stringify(errorDetail)
+          : 'Failed to update address.';
+      setErrors({ general: errorMessage });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -387,7 +466,21 @@ const CustomerDetail = () => {
               Addresses ({addresses.length})
             </h2>
             <button 
-              onClick={() => setShowAddressForm(true)}
+              onClick={() => {
+                setEditingAddress(null);
+                setAddressForm({
+                  address_type: 'delivery',
+                  street: '',
+                  city: '',
+                  state: '',
+                  zip_code: '',
+                  country: 'Kenya',
+                  access_instructions: '',
+                  is_default: false,
+                  coordinates: null
+                });
+                setShowAddressForm(true);
+              }}
               className="add-address-btn"
             >
               <Plus size={16} />
@@ -424,7 +517,7 @@ const CustomerDetail = () => {
                           </button>
                         )}
                         <button 
-                          onClick={() => setEditingAddress(address)}
+                          onClick={() => handleEditAddress(address)}
                           className="edit-btn"
                           title="Edit address"
                         >
@@ -469,16 +562,30 @@ const CustomerDetail = () => {
         <div className="modal-overlay" onClick={() => setShowAddressForm(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Add New Address</h2>
+              <h2>{editingAddress ? 'Edit Address' : 'Add New Address'}</h2>
               <button
                 className="close-btn"
-                onClick={() => setShowAddressForm(false)}
+                onClick={() => {
+                  setShowAddressForm(false);
+                  setEditingAddress(null);
+                  setAddressForm({
+                    address_type: 'delivery',
+                    street: '',
+                    city: '',
+                    state: '',
+                    zip_code: '',
+                    country: 'Kenya',
+                    access_instructions: '',
+                    is_default: false,
+                    coordinates: null
+                  });
+                }}
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleCreateAddress} className="address-form">
+            <form onSubmit={editingAddress ? handleUpdateAddress : handleCreateAddress} className="address-form">
               <div className="form-grid">
                 <div className="form-group">
                   <label htmlFor="address_type">Address Type *</label>
@@ -611,7 +718,7 @@ const CustomerDetail = () => {
                   className="submit-btn"
                   disabled={loading}
                 >
-                  {loading ? 'Creating...' : 'Create Address'}
+                  {loading ? (editingAddress ? 'Updating...' : 'Creating...') : (editingAddress ? 'Update Address' : 'Create Address')}
                 </button>
               </div>
             </form>
