@@ -1,6 +1,6 @@
 from typing import List, Optional
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, desc, asc
 from sqlalchemy.orm import selectinload
@@ -229,7 +229,7 @@ class SQLAlchemyTripRepository(TripRepository):
             if not trip_model:
                 return False
             
-            trip_model.deleted_at = trip.updated_at
+            trip_model.deleted_at = datetime.now()
             trip_model.deleted_by = deleted_by
             
             await self.session.commit()
