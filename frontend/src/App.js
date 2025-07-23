@@ -19,6 +19,8 @@ import Orders from './pages/Orders';
 import StockDashboard from './pages/StockDashboard';
 import StockLevels from './pages/StockLevels';
 import StockDocuments from './pages/StockDocuments';
+import Trips from './pages/Trips';
+import Vehicles from './pages/Vehicles';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import authService from './services/authService';
@@ -192,6 +194,26 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <StockDocuments />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/trips"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Trips />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vehicles"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Vehicles />
                   </Layout>
                 </ProtectedRoute>
               }

@@ -5,7 +5,6 @@ import {
   Users, 
   UserPlus,
   Package, 
-  ShoppingCart, 
   DollarSign, 
   Warehouse,
   Menu,
@@ -14,7 +13,6 @@ import {
   Truck,
   ArrowLeftRight,
   X,
-  BarChart3,
   Route,
   FileText,
   Archive,
@@ -43,6 +41,8 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
     { path: '/users', label: 'Users', icon: UserPlus },
     { path: '/customers', label: 'Customers', icon: Users },
     { path: '/orders', label: 'Orders', icon: FileText },
+    { path: '/trips', label: 'Trips', icon: Route },
+    { path: '/vehicles', label: 'Vehicles', icon: Truck },
     { path: '/products', label: 'Products', icon: Package },
     { path: '/variants', label: 'Variants', icon: Package },
     { path: '/price-lists', label: 'Price Lists', icon: DollarSign },
@@ -114,8 +114,22 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
   };
 
   const isActive = (path) => {
+    // Exact match for dashboard
     if (path === '/dashboard' && location.pathname === '/dashboard') return true;
-    if (path !== '/dashboard' && location.pathname.startsWith(path)) return true;
+    
+    // Exact match for all other paths to avoid conflicts
+    if (path !== '/dashboard' && location.pathname === path) return true;
+    
+    // For paths with sub-routes (like /customers/:id), check if it starts with the path
+    // but exclude conflicting stock paths
+    if (path !== '/dashboard' && path !== '/stock' && location.pathname.startsWith(path + '/')) return true;
+    
+    // Special handling for stock paths to avoid conflicts
+    if (path === '/stock' && location.pathname === '/stock') return true;
+    if (path === '/stock-levels' && location.pathname === '/stock-levels') return true;
+    if (path === '/stock-documents' && location.pathname === '/stock-documents') return true;
+    if (path === '/stock-dashboard' && location.pathname === '/stock-dashboard') return true;
+    
     return false;
   };
 
