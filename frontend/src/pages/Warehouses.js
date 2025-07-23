@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Warehouses.css';
 import { Plus, MapPin, Warehouse as WarehouseIcon, Package, Truck, Loader, Search, RefreshCw } from 'lucide-react';
 import MapboxAddressInput from '../components/MapboxAddressInput';
@@ -7,6 +8,7 @@ import { extractErrorMessage } from '../utils/errorUtils';
 import authService from '../services/authService';
 
 const Warehouses = () => {
+  const navigate = useNavigate();
   const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -230,6 +232,10 @@ const Warehouses = () => {
     return capabilities;
   };
 
+  const handleRowClick = (warehouseId) => {
+    navigate(`/warehouses/${warehouseId}`);
+  };
+
   return (
     <div className="warehouses-container">
       <div className="warehouses-header">
@@ -309,12 +315,16 @@ const Warehouses = () => {
                 <th>Location</th>
                 <th>Capabilities</th>
                 <th>Created</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {warehouses.map((warehouse) => (
-                <tr key={warehouse.id}>
+                <tr 
+                  key={warehouse.id}
+                  className="warehouse-row"
+                  onClick={() => handleRowClick(warehouse.id)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <td className="warehouse-code">{warehouse.code}</td>
                   <td className="warehouse-name">
                     <div className="warehouse-name-cell">
@@ -347,14 +357,6 @@ const Warehouses = () => {
                     </div>
                   </td>
                   <td>{new Date(warehouse.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <button 
-                      className="action-btn"
-                      onClick={() => window.location.href = `/warehouses/${warehouse.id}`}
-                    >
-                      View Details
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>
