@@ -263,6 +263,17 @@ class PriceListRepositoryImpl(PriceListRepository):
         models = result.scalars().all()
         return [self._to_line_entity(model) for model in models]
     
+    async def get_price_list_line_by_id(self, line_id: UUID) -> Optional[PriceListLineEntity]:
+        """Get a single price list line by ID"""
+        stmt = select(PriceListLineModel).where(PriceListLineModel.id == line_id)
+        result = await self.session.execute(stmt)
+        model = result.scalar_one_or_none()
+        
+        if not model:
+            return None
+        
+        return self._to_line_entity(model)
+    
     async def update_price_list_line(self, line: PriceListLineEntity) -> PriceListLineEntity:
         """Update an existing price list line"""
         stmt = select(PriceListLineModel).where(PriceListLineModel.id == line.id)

@@ -151,6 +151,10 @@ class PriceListService:
         """Get all lines for a price list"""
         return await self.price_list_repository.get_price_list_lines(UUID(price_list_id))
     
+    async def get_price_list_line_by_id(self, line_id: str) -> Optional[PriceListLineEntity]:
+        """Get a single price list line by ID"""
+        return await self.price_list_repository.get_price_list_line_by_id(UUID(line_id))
+    
     async def update_price_list_line(
         self,
         line_id: str,
@@ -163,12 +167,7 @@ class PriceListService:
         from datetime import datetime
         
         # Get current line
-        lines = await self.price_list_repository.get_price_list_lines(UUID(line_id))
-        current_line = None
-        for line in lines:
-            if str(line.id) == line_id:
-                current_line = line
-                break
+        current_line = await self.price_list_repository.get_price_list_line_by_id(UUID(line_id))
         
         if not current_line:
             raise ValueError(f"Price list line with ID {line_id} not found")

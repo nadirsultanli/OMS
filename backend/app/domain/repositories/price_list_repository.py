@@ -50,6 +50,11 @@ class PriceListRepository(ABC):
         pass
     
     @abstractmethod
+    async def get_price_list_line_by_id(self, line_id: UUID) -> Optional[PriceListLineEntity]:
+        """Get a single price list line by ID"""
+        pass
+    
+    @abstractmethod
     async def update_price_list_line(self, line: PriceListLineEntity) -> PriceListLineEntity:
         """Update an existing price list line"""
         pass
