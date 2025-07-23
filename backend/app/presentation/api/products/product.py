@@ -105,7 +105,7 @@ async def get_products(
     product_service: ProductService = Depends(get_product_service),
     user: User = current_user
 ):
-    """Get products with optional filtering"""
+    """Get products with optional filtering and proper pagination"""
     start_time = time.time()
     
     try:
@@ -114,9 +114,11 @@ async def get_products(
         
         service_start = time.time()
         if category:
-            products = await product_service.get_products_by_category(UUID(tenant_id), category)
+            products = await product_service.get_products_by_category(UUID(tenant_id), category, limit, offset)
+            total_count = await product_service.count_products(UUID(tenant_id), category)
         else:
             products = await product_service.get_all_products(UUID(tenant_id), limit, offset)
+            total_count = await product_service.count_products(UUID(tenant_id))
         
         service_time = time.time()
         logger.info(f"Product service get completed in {service_time - service_start:.3f}s")
@@ -125,7 +127,7 @@ async def get_products(
         product_responses = [ProductResponse(**product.to_dict()) for product in products]
         response = ProductListResponse(
             products=product_responses, 
-            total=len(product_responses), 
+            total=total_count,  # ✅ Use actual total count from database
             limit=limit, 
             offset=offset
         )

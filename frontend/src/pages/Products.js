@@ -34,8 +34,10 @@ const Products = () => {
   // Pagination
   const [pagination, setPagination] = useState({
     total: 0,
-    limit: 100,
-    offset: 0
+    limit: 20,
+    offset: 0,
+    currentPage: 1,
+    totalPages: 1
   });
 
   useEffect(() => {
@@ -44,7 +46,17 @@ const Products = () => {
   }, []);
 
   useEffect(() => {
-    applyFilters();
+    fetchProducts();
+  }, [pagination.offset, pagination.limit]);
+
+  useEffect(() => {
+    // When filters change, reset to first page and fetch new data
+    if (filters.search || filters.category) {
+      applyFilters();
+    } else {
+      // If no filters, show all products
+      setFilteredProducts(products);
+    }
   }, [products, filters]);
 
   const fetchProducts = async () => {
@@ -61,9 +73,14 @@ const Products = () => {
       if (result.success) {
         console.log('Products fetched successfully:', result.data);
         setProducts(result.data.products || []);
+        const total = result.data.total || 0;
+        const totalPages = Math.ceil(total / pagination.limit);
+        const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
         setPagination(prev => ({
           ...prev,
-          total: result.data.total || 0
+          total,
+          totalPages,
+          currentPage
         }));
       } else {
         console.error('Product fetch failed:', result.error);
@@ -115,6 +132,13 @@ const Products = () => {
     setFilters(prev => ({
       ...prev,
       [name]: value
+    }));
+    
+    // Reset pagination when filters change
+    setPagination(prev => ({
+      ...prev,
+      offset: 0,
+      currentPage: 1
     }));
   };
 
@@ -267,6 +291,24 @@ const Products = () => {
     }
   };
 
+  const handlePageChange = (newPage) => {
+    const newOffset = (newPage - 1) * pagination.limit;
+    setPagination(prev => ({
+      ...prev,
+      offset: newOffset,
+      currentPage: newPage
+    }));
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setPagination(prev => ({
+      ...prev,
+      limit: parseInt(newLimit),
+      offset: 0, // Reset to first page
+      currentPage: 1
+    }));
+  };
+
   const handleEditClick = (product) => {
     setSelectedProduct(product);
     setFormData({
@@ -395,55 +437,148 @@ const Products = () => {
             <p>Start by creating your first product</p>
           </div>
         ) : (
-          <table className="products-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Unit of Measure</th>
-                <th>Min. Price</th>
-                <th>Taxable</th>
-                <th>Density (kg/L)</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((product) => (
-                <tr key={product.id}>
-                  <td className="name-cell">{product.name}</td>
-                  <td>{product.category || '-'}</td>
-                  <td>{getUnitOfMeasureDisplay(product.unit_of_measure)}</td>
-                  <td className="price-cell">{formatCurrency(product.min_price)}</td>
-                  <td>
-                    <span className={`taxable-badge ${product.taxable ? 'yes' : 'no'}`}>
-                      {product.taxable ? 'Yes' : 'No'}
-                    </span>
-                  </td>
-                  <td>{product.density_kg_per_l || '-'}</td>
-                  <td className="date-cell">{formatDate(product.created_at)}</td>
-                  <td className="actions-cell">
-                    <button
-                      onClick={() => handleEditClick(product)}
-                      className="action-icon-btn"
-                      title="Edit product"
-                      disabled={loading}
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteProduct(product.id)}
-                      className="action-icon-btn delete"
-                      title="Delete product"
-                      disabled={loading}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+          <>
+            <div className="table-header">
+              <div className="table-info">
+                <span>
+                  Showing {filteredProducts.length} of {pagination.total} products
+                </span>
+              </div>
+              <div className="table-controls">
+                <label htmlFor="pageSize">Items per page:</label>
+                <select
+                  id="pageSize"
+                  value={pagination.limit}
+                  onChange={(e) => handleLimitChange(e.target.value)}
+                  className="page-size-select"
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+            </div>
+            
+            <table className="products-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Unit of Measure</th>
+                  <th>Min. Price</th>
+                  <th>Taxable</th>
+                  <th>Density (kg/L)</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredProducts.map((product) => (
+                  <tr key={product.id}>
+                    <td className="name-cell">{product.name}</td>
+                    <td>{product.category || '-'}</td>
+                    <td>{getUnitOfMeasureDisplay(product.unit_of_measure)}</td>
+                    <td className="price-cell">{formatCurrency(product.min_price)}</td>
+                    <td>
+                      <span className={`taxable-badge ${product.taxable ? 'yes' : 'no'}`}>
+                        {product.taxable ? 'Yes' : 'No'}
+                      </span>
+                    </td>
+                    <td>{product.density_kg_per_l || '-'}</td>
+                    <td className="date-cell">{formatDate(product.created_at)}</td>
+                    <td className="actions-cell">
+                      <button
+                        onClick={() => handleEditClick(product)}
+                        className="action-icon-btn"
+                        title="Edit product"
+                        disabled={loading}
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="action-icon-btn delete"
+                        title="Delete product"
+                        disabled={loading}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Pagination Controls */}
+            {pagination.totalPages > 1 && (
+              <div className="pagination-container">
+                <div className="pagination-info">
+                  <span>
+                    Page {pagination.currentPage} of {pagination.totalPages}
+                  </span>
+                </div>
+                <div className="pagination-controls">
+                  <button
+                    onClick={() => handlePageChange(1)}
+                    disabled={pagination.currentPage === 1}
+                    className="pagination-btn"
+                    title="First page"
+                  >
+                    ««
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(pagination.currentPage - 1)}
+                    disabled={pagination.currentPage === 1}
+                    className="pagination-btn"
+                    title="Previous page"
+                  >
+                    ‹
+                  </button>
+                  
+                  {/* Page numbers */}
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (pagination.totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else {
+                      const start = Math.max(1, pagination.currentPage - 2);
+                      const end = Math.min(pagination.totalPages, start + 4);
+                      pageNum = start + i;
+                      if (pageNum > end) return null;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`pagination-btn ${pagination.currentPage === pageNum ? 'active' : ''}`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  }).filter(Boolean)}
+                  
+                  <button
+                    onClick={() => handlePageChange(pagination.currentPage + 1)}
+                    disabled={pagination.currentPage === pagination.totalPages}
+                    className="pagination-btn"
+                    title="Next page"
+                  >
+                    ›
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(pagination.totalPages)}
+                    disabled={pagination.currentPage === pagination.totalPages}
+                    className="pagination-btn"
+                    title="Last page"
+                  >
+                    »»
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
