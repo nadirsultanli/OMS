@@ -114,8 +114,22 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
   };
 
   const isActive = (path) => {
+    // Exact match for dashboard
     if (path === '/dashboard' && location.pathname === '/dashboard') return true;
-    if (path !== '/dashboard' && location.pathname.startsWith(path)) return true;
+    
+    // Exact match for all other paths to avoid conflicts
+    if (path !== '/dashboard' && location.pathname === path) return true;
+    
+    // For paths with sub-routes (like /customers/:id), check if it starts with the path
+    // but exclude conflicting stock paths
+    if (path !== '/dashboard' && path !== '/stock' && location.pathname.startsWith(path + '/')) return true;
+    
+    // Special handling for stock paths to avoid conflicts
+    if (path === '/stock' && location.pathname === '/stock') return true;
+    if (path === '/stock-levels' && location.pathname === '/stock-levels') return true;
+    if (path === '/stock-documents' && location.pathname === '/stock-documents') return true;
+    if (path === '/stock-dashboard' && location.pathname === '/stock-dashboard') return true;
+    
     return false;
   };
 
