@@ -1,4 +1,5 @@
 import api from './api';
+import authService from './authService';
 
 class UserService {
   // Helper method to extract user-friendly error messages
@@ -38,7 +39,17 @@ class UserService {
   // Get all users with filtering and pagination
   async getUsers(params = {}) {
     try {
-      const queryParams = new URLSearchParams();
+      const tenantId = authService.getCurrentTenantId();
+      if (!tenantId) {
+        return {
+          success: false,
+          error: 'No tenant ID found. Please log in again.'
+        };
+      }
+
+      const queryParams = new URLSearchParams({
+        tenant_id: tenantId
+      });
       
       if (params.limit) queryParams.append('limit', params.limit);
       if (params.offset) queryParams.append('offset', params.offset);

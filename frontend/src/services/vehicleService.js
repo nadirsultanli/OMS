@@ -13,6 +13,10 @@ const vehicleService = {
   // Get all vehicles
   getVehicles: async (tenantId, params = {}) => {
     try {
+      if (!tenantId) {
+        return { success: false, error: 'No tenant ID provided. Please log in again.' };
+      }
+
       const queryParams = new URLSearchParams({
         tenant_id: tenantId,
         limit: params.limit || 100,

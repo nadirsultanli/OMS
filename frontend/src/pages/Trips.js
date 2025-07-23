@@ -18,6 +18,7 @@ import {
 import tripService from '../services/tripService';
 import vehicleService from '../services/vehicleService';
 import userService from '../services/userService';
+import authService from '../services/authService';
 import './Trips.css';
 
 const Trips = () => {
@@ -49,7 +50,7 @@ const Trips = () => {
     totalPages: 1
   });
 
-  const tenantId = localStorage.getItem('tenantId');
+  const tenantId = authService.getCurrentTenantId();
 
   const tripStatuses = [
     { value: 'DRAFT', label: 'Draft', color: '#6b7280' },
@@ -110,7 +111,7 @@ const Trips = () => {
 
   const fetchDrivers = async () => {
     try {
-      const result = await userService.getUsers(tenantId);
+      const result = await userService.getUsers();
       if (result.success) {
         const driverUsers = result.data.results?.filter(user => 
           user.role === 'driver' && user.status === 'active'
