@@ -35,14 +35,15 @@ class AddressRepository(AddressRepositoryInterface):
         coordinates = None
         if address.coordinates is not None:
             coordinates = WKTElement(address.coordinates, srid=4326)
-        # Unset other defaults if this address is default
+        
+        # ENFORCE SINGLE DEFAULT ADDRESS PER CUSTOMER
+        # If this address is being set as default, unset ALL other default addresses for this customer
         if address.is_default:
             await self._session.execute(
                 sa_update(AddressORM)
                 .where(
                     AddressORM.tenant_id == address.tenant_id,
                     AddressORM.customer_id == address.customer_id,
-                    AddressORM.address_type == address.address_type.value,
                     AddressORM.is_default == True,
                     AddressORM.deleted_at == None
                 )
@@ -78,6 +79,22 @@ class AddressRepository(AddressRepositoryInterface):
         obj = result.scalar_one_or_none()
         if not obj:
             return None
+        
+        # ENFORCE SINGLE DEFAULT ADDRESS PER CUSTOMER
+        # If this address is being set as default, unset ALL other default addresses for this customer
+        if address.is_default and not obj.is_default:
+            await self._session.execute(
+                sa_update(AddressORM)
+                .where(
+                    AddressORM.tenant_id == address.tenant_id,
+                    AddressORM.customer_id == address.customer_id,
+                    AddressORM.id != UUID(address_id),  # Don't update the current address
+                    AddressORM.is_default == True,
+                    AddressORM.deleted_at == None
+                )
+                .values(is_default=False)
+            )
+        
         for field in [
             "tenant_id", "customer_id", "address_type", "coordinates", "is_default", "street", "city", "state", "zip_code", "country", "access_instructions", "updated_at", "updated_by", "deleted_at", "deleted_by"
         ]:

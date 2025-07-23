@@ -35,4 +35,18 @@ class AddressService:
         return await self.address_repository.delete_address(address_id, deleted_by)
 
     async def set_default_address(self, customer_id: str, address_id: str, updated_by: Optional[UUID] = None) -> bool:
-        return await self.address_repository.set_default_address(customer_id, address_id, updated_by) 
+        return await self.address_repository.set_default_address(customer_id, address_id, updated_by)
+    
+    async def validate_single_default_constraint(self, customer_id: str, address_id_to_exclude: Optional[str] = None) -> bool:
+        """
+        Validate that only one address per customer can be default.
+        Returns True if constraint is satisfied, False otherwise.
+        """
+        addresses = await self.address_repository.get_by_customer(customer_id)
+        default_addresses = [addr for addr in addresses if addr.is_default]
+        
+        if address_id_to_exclude:
+            # Exclude the address being updated from the count
+            default_addresses = [addr for addr in default_addresses if str(addr.id) != address_id_to_exclude]
+        
+        return len(default_addresses) <= 1 
