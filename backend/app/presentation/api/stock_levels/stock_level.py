@@ -41,7 +41,9 @@ from app.presentation.schemas.stock_levels.output_schemas import (
 from app.services.stock_levels.stock_level_service import StockLevelService
 from app.services.dependencies.stock_levels import get_stock_level_service
 from app.services.dependencies.auth import get_current_user
+from app.infrastucture.logs.logger import get_logger
 
+logger = get_logger("stock_levels_api")
 router = APIRouter(prefix="/stock-levels", tags=["Stock Levels"])
 
 
@@ -250,6 +252,19 @@ async def adjust_stock_level(
     current_user: User = Depends(get_current_user)
 ):
     """Perform manual stock adjustment"""
+    logger.info(
+        "Performing manual stock adjustment",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        warehouse_id=str(request.warehouse_id),
+        variant_id=str(request.variant_id),
+        quantity_change=float(request.quantity_change),
+        stock_status=request.stock_status.value,
+        reason=request.reason or "Manual adjustment",
+        unit_cost=float(request.unit_cost) if request.unit_cost else None,
+        operation="stock_adjustment"
+    )
+    
     try:
         updated_level = await stock_level_service.perform_stock_adjustment(
             current_user,
@@ -261,6 +276,19 @@ async def adjust_stock_level(
             request.stock_status
         )
 
+        logger.info(
+            "Stock adjustment completed successfully",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            warehouse_id=str(request.warehouse_id),
+            variant_id=str(request.variant_id),
+            quantity_change=float(request.quantity_change),
+            new_quantity=float(updated_level.quantity),
+            new_available_qty=float(updated_level.available_qty),
+            stock_status=request.stock_status.value,
+            reason=request.reason or "Manual adjustment"
+        )
+
         return StockAdjustmentResponse(
             success=True,
             stock_level=StockLevelResponse(**updated_level.to_dict()),
@@ -270,12 +298,28 @@ async def adjust_stock_level(
         )
 
     except StockDocValidationError as e:
+        logger.error(
+            "Failed to perform stock adjustment - validation error",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            warehouse_id=str(request.warehouse_id),
+            variant_id=str(request.variant_id),
+            quantity_change=float(request.quantity_change),
+            error=str(e)
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+        logger.error(
+            "Failed to perform stock adjustment - unexpected error",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            warehouse_id=str(request.warehouse_id),
+            variant_id=str(request.variant_id),
+            quantity_change=float(request.quantity_change),
+            error=str(e),
+            error_type=type(e).__name__
         )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.post("/reserve", response_model=StockReservationResponse)
@@ -285,6 +329,17 @@ async def reserve_stock(
     current_user: User = Depends(get_current_user)
 ):
     """Reserve stock for allocation"""
+    logger.info(
+        "Reserving stock for order allocation",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        warehouse_id=str(request.warehouse_id),
+        variant_id=str(request.variant_id),
+        quantity_to_reserve=float(request.quantity),
+        stock_status=request.stock_status.value,
+        operation="stock_reservation"
+    )
+    
     try:
         success = await stock_level_service.reserve_stock_for_order(
             current_user,
@@ -301,6 +356,29 @@ async def reserve_stock(
             request.stock_status
         )
 
+        if success:
+            logger.info(
+                "Stock reserved successfully",
+                user_id=str(current_user.id),
+                tenant_id=str(current_user.tenant_id),
+                warehouse_id=str(request.warehouse_id),
+                variant_id=str(request.variant_id),
+                quantity_reserved=float(request.quantity),
+                remaining_available=float(remaining_available),
+                stock_status=request.stock_status.value
+            )
+        else:
+            logger.warning(
+                "Failed to reserve stock - insufficient quantity",
+                user_id=str(current_user.id),
+                tenant_id=str(current_user.tenant_id),
+                warehouse_id=str(request.warehouse_id),
+                variant_id=str(request.variant_id),
+                quantity_requested=float(request.quantity),
+                available_quantity=float(remaining_available),
+                stock_status=request.stock_status.value
+            )
+
         return StockReservationResponse(
             success=success,
             warehouse_id=request.warehouse_id,
@@ -311,14 +389,38 @@ async def reserve_stock(
         )
 
     except InsufficientStockError as e:
+        logger.error(
+            "Failed to reserve stock - insufficient stock",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            warehouse_id=str(request.warehouse_id),
+            variant_id=str(request.variant_id),
+            quantity_requested=float(request.quantity),
+            error=str(e)
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except StockDocValidationError as e:
+        logger.error(
+            "Failed to reserve stock - validation error",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            warehouse_id=str(request.warehouse_id),
+            variant_id=str(request.variant_id),
+            error=str(e)
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+        logger.error(
+            "Failed to reserve stock - unexpected error",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            warehouse_id=str(request.warehouse_id),
+            variant_id=str(request.variant_id),
+            quantity_requested=float(request.quantity),
+            error=str(e),
+            error_type=type(e).__name__
         )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.post("/release-reservation", response_model=StockReservationResponse)

@@ -7,7 +7,9 @@ from app.presentation.schemas.customers.output_schemas import CustomerResponse, 
 from app.services.dependencies.customers import get_customer_service
 from app.domain.entities.users import User
 from app.core.user_context import UserContext, user_context
+from app.infrastucture.logs.logger import get_logger
 
+logger = get_logger("customers_api")
 router = APIRouter(prefix="/customers", tags=["Customers"])
 
 @router.post("/", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED)
@@ -16,19 +18,107 @@ async def create_customer(
     customer_service: CustomerService = Depends(get_customer_service),
     context: UserContext = user_context
 ):
-    # Add created_by, tenant_id, and user_role from user context
-    customer_data = request.dict()
-    customer_data['created_by'] = context.get_created_by()
-    customer_data['tenant_id'] = context.get_tenant_id()
-    customer_data['user_role'] = context.role.value
+    """Create a new customer"""
+    logger.info(
+        "Creating new customer",
+        user_id=context.user_id,
+        tenant_id=context.tenant_id,
+        user_role=context.role.value,
+        customer_name=request.name,
+        customer_type=request.customer_type,
+        phone=request.phone,
+        email=request.email
+    )
     
-    customer = await customer_service.create_customer(**customer_data)
-    return CustomerResponse(**customer.to_dict())
+    try:
+        # Add created_by, tenant_id, and user_role from user context
+        customer_data = request.dict()
+        customer_data['created_by'] = context.get_created_by()
+        customer_data['tenant_id'] = context.get_tenant_id()
+        customer_data['user_role'] = context.role.value
+        
+        customer = await customer_service.create_customer(**customer_data)
+        
+        logger.info(
+            "Customer created successfully",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=str(customer.id),
+            customer_name=customer.name,
+            customer_type=customer.customer_type,
+            customer_status=customer.status.value if hasattr(customer, 'status') else None,
+            created_by=str(customer.created_by) if hasattr(customer, 'created_by') else None
+        )
+        
+        return CustomerResponse(**customer.to_dict())
+        
+    except CustomerAlreadyExistsError as e:
+        logger.error(
+            "Failed to create customer - customer already exists",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_name=request.name,
+            error=str(e)
+        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to create customer - unexpected error",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_name=request.name,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 @router.get("/{customer_id}", response_model=CustomerResponse)
-async def get_customer(customer_id: str, customer_service: CustomerService = Depends(get_customer_service)):
-    customer = await customer_service.get_customer_by_id(customer_id)
-    return CustomerResponse(**customer.to_dict())
+async def get_customer(
+    customer_id: str, 
+    customer_service: CustomerService = Depends(get_customer_service),
+    context: UserContext = user_context
+):
+    """Get customer by ID"""
+    logger.info(
+        "Retrieving customer by ID",
+        user_id=context.user_id,
+        tenant_id=context.tenant_id,
+        customer_id=customer_id
+    )
+    
+    try:
+        customer = await customer_service.get_customer_by_id(customer_id)
+        
+        logger.info(
+            "Customer retrieved successfully",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=str(customer.id),
+            customer_name=customer.name,
+            customer_type=customer.customer_type
+        )
+        
+        return CustomerResponse(**customer.to_dict())
+        
+    except CustomerNotFoundError as e:
+        logger.warning(
+            "Customer not found",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e)
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to retrieve customer - unexpected error",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 @router.get("/", response_model=CustomerListResponse)
 async def get_customers(limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0), customer_service: CustomerService = Depends(get_customer_service)):
@@ -71,16 +161,78 @@ async def delete_customer(
     return None
 
 @router.post("/{customer_id}/approve", response_model=CustomerResponse)
-async def approve_customer(customer_id: str, customer_service: CustomerService = Depends(get_customer_service), context: UserContext = user_context):
+async def approve_customer(
+    customer_id: str, 
+    customer_service: CustomerService = Depends(get_customer_service), 
+    context: UserContext = user_context
+):
+    """Approve customer (Accounts only)"""
+    logger.info(
+        "Approving customer",
+        user_id=context.user_id,
+        tenant_id=context.tenant_id,
+        user_role=context.role.value,
+        customer_id=customer_id,
+        operation="approve_customer"
+    )
+    
     # Only Accounts can approve
     if context.role.value != "accounts":
+        logger.error(
+            "Failed to approve customer - insufficient permissions",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            user_role=context.role.value,
+            customer_id=customer_id,
+            required_role="accounts"
+        )
         raise HTTPException(status_code=403, detail="Only Accounts can approve customers.")
+    
     try:
         approved_by = UUID(context.user_id)
         customer = await customer_service.approve_customer(customer_id, approved_by=approved_by)
+        
+        logger.info(
+            "Customer approved successfully",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=str(customer.id),
+            customer_name=customer.name,
+            approved_by=str(approved_by),
+            old_status="pending",
+            new_status="approved"
+        )
+        
         return CustomerResponse(**customer.to_dict())
+        
+    except CustomerNotFoundError as e:
+        logger.warning(
+            "Cannot approve customer - customer not found",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e)
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
+        logger.error(
+            "Failed to approve customer - validation error",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e)
+        )
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to approve customer - unexpected error",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 @router.post("/{customer_id}/reject", response_model=CustomerResponse)
 async def reject_customer(customer_id: str, customer_service: CustomerService = Depends(get_customer_service), context: UserContext = user_context):

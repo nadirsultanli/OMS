@@ -7,6 +7,12 @@ from .products import Product
 from .variants import Variant
 from .price_lists import PriceListModel, PriceListLineModel
 from .orders import OrderModel, OrderLineModel, OrderStatus
+from .trips import TripModel
+from .trip_stops import TripStopModel
+from .vehicles import Vehicle
+from .warehouses import WarehouseModel
+from .stock_levels import StockLevelModel
+from .stock_docs import StockDocModel, StockDocLineModel
 
 __all__ = [
     "Base",
@@ -20,5 +26,12 @@ __all__ = [
     "PriceListLineModel",
     "OrderModel",
     "OrderLineModel",
-    "OrderStatus"
+    "OrderStatus",
+    "TripModel",
+    "TripStopModel",
+    "Vehicle",
+    "WarehouseModel",
+    "StockLevelModel",
+    "StockDocModel",
+    "StockDocLineModel"
 ] 

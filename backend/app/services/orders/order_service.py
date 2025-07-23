@@ -100,7 +100,7 @@ class OrderService:
         limit: int = 100, 
         offset: int = 0
     ) -> List[Order]:
-        """Get all orders with pagination"""
+        """Get all orders for a tenant with pagination"""
         return await self.order_repository.get_all_orders(tenant_id, limit, offset)
 
     async def update_order(
@@ -111,54 +111,39 @@ class OrderService:
         **kwargs
     ) -> Order:
         """Update an order with business logic validation"""
+        # Get existing order
         order = await self.get_order_by_id(order_id, user.tenant_id)
         
         # Check if order can be modified
-        if not self.business_service.can_edit_order(user, order):
-            raise OrderModificationError(order_id, order.order_status.value)
+        if not self.can_edit_order(user, order):
+            raise OrderPermissionError("Cannot edit order in current status")
         
-        # Update fields
-        for key, value in kwargs.items():
-            if hasattr(order, key) and value is not None:
-                setattr(order, key, value)
-        
-        # Recalculate totals if order lines changed
-        if 'order_lines' in kwargs:
-            order._recalculate_totals()
-        
-        # Update in repository
-        updated_order = await self.order_repository.update_order(order_id, order)
-        if not updated_order:
-            raise OrderNotFoundError(order_id)
-        
-        return updated_order
+        # Use business service for update
+        return await self.business_service.update_order_with_business_rules(
+            user=user,
+            order=order,
+            customer=customer,
+            **kwargs
+        )
 
     async def cancel_order(
         self,
         user: User,
         order_id: str,
     ) -> Order:
-        """Cancel an order by setting status to CANCELLED"""
+        """Cancel an order with business logic validation"""
+        # Get existing order
         order = await self.get_order_by_id(order_id, user.tenant_id)
         
         # Check if order can be cancelled
-        if not self.business_service.can_cancel_order(user, order):
-            raise OrderCancellationError(order.order_no, order.order_status.value)
+        if not self.can_cancel_order(user, order):
+            raise OrderCancellationError("Cannot cancel order in current status")
         
-        # Update status to CANCELLED instead of deleting
-        order.update_status(OrderStatus.CANCELLED, user.id)
-        
-        # Save the updated order
-        updated_order = await self.order_repository.update_order(order_id, {
-            "order_status": OrderStatus.CANCELLED.value,
-            "updated_by": user.id
-        })
-        
-        return updated_order
-
-    # ============================================================================
-    # STATUS MANAGEMENT WITH BUSINESS LOGIC
-    # ============================================================================
+        # Use business service for cancellation
+        return await self.business_service.cancel_order_with_business_rules(
+            user=user,
+            order=order
+        )
 
     async def submit_order(
         self,
@@ -166,8 +151,11 @@ class OrderService:
         order_id: str,
         customer: Customer
     ) -> Order:
-        """Submit an order with business logic validation"""
+        """Submit an order for approval"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
+        
+        if not self.can_submit_order(user, order):
+            raise OrderStatusTransitionError("Cannot submit order in current status")
         
         return await self.business_service.submit_order_with_business_rules(
             user=user,
@@ -180,9 +168,16 @@ class OrderService:
         user: User,
         order_id: str
     ) -> Order:
-        """Approve an order with business logic validation"""
+        """Approve an order"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
-        return await self.business_service.approve_order_with_business_rules(user, order)
+        
+        if not self.can_approve_order(user, order):
+            raise OrderStatusTransitionError("Cannot approve order in current status")
+        
+        return await self.business_service.approve_order_with_business_rules(
+            user=user,
+            order=order
+        )
 
     async def reject_order(
         self,
@@ -190,9 +185,17 @@ class OrderService:
         order_id: str,
         rejection_reason: str
     ) -> Order:
-        """Reject an order with business logic validation"""
+        """Reject an order"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
-        return await self.business_service.reject_order_with_business_rules(user, order, rejection_reason)
+        
+        if not self.can_approve_order(user, order):  # Same permission as approve
+            raise OrderStatusTransitionError("Cannot reject order in current status")
+        
+        return await self.business_service.reject_order_with_business_rules(
+            user=user,
+            order=order,
+            rejection_reason=rejection_reason
+        )
 
     async def set_delivery_details(
         self,
@@ -205,8 +208,14 @@ class OrderService:
     ) -> Order:
         """Set delivery details for an order"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
-        return await self.business_service.set_delivery_details(
-            user, order, delivery_time_start, delivery_time_end, delivery_address, instruction_text
+        
+        return await self.business_service.set_delivery_details_with_business_rules(
+            user=user,
+            order=order,
+            delivery_time_start=delivery_time_start,
+            delivery_time_end=delivery_time_end,
+            delivery_address=delivery_address,
+            instruction_text=instruction_text
         )
 
     async def update_order_status(
@@ -218,41 +227,65 @@ class OrderService:
         """Update order status with business logic validation"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
         
-        # Validate status transition
-        if not self.business_service.validate_status_transition(order.order_status, new_status):
+        # Check if status transition is allowed
+        allowed_transitions = self.get_allowed_status_transitions(order.order_status, user.role_type)
+        if new_status not in allowed_transitions:
             raise OrderStatusTransitionError(
-                order.order_status.value, 
-                new_status.value, 
-                order_id
+                f"Cannot transition from {order.order_status} to {new_status}"
             )
         
-        # Check permissions based on status
-        if new_status == OrderStatus.APPROVED and not self.business_service.can_approve_order(user, order):
-            raise OrderPermissionError(f"User role {user.role} cannot approve orders")
-        elif new_status == OrderStatus.ALLOCATED and not self.business_service.can_dispatch_order(user, order):
-            raise OrderPermissionError(f"User role {user.role} cannot allocate orders")
-        elif new_status == OrderStatus.LOADED and not self.business_service.can_dispatch_order(user, order):
-            raise OrderPermissionError(f"User role {user.role} cannot load orders")
-        elif new_status == OrderStatus.IN_TRANSIT and not self.business_service.can_dispatch_order(user, order):
-            raise OrderPermissionError(f"User role {user.role} cannot mark orders as in transit")
-        elif new_status == OrderStatus.DELIVERED and not self.business_service.can_deliver_order(user, order):
-            raise OrderPermissionError(f"User role {user.role} cannot mark orders as delivered")
-        elif new_status == OrderStatus.CLOSED and not self.business_service.can_deliver_order(user, order):
-            raise OrderPermissionError(f"User role {user.role} cannot close orders")
-        
-        # Update status
-        success = await self.order_repository.update_order_status(
-            order_id, new_status, user.id
+        # Use business service for status update
+        return await self.business_service.update_order_status_with_business_rules(
+            user=user,
+            order=order,
+            new_status=new_status
         )
-        
-        if success:
-            order.update_status(new_status, user.id)
-        
-        return success
 
-    # ============================================================================
-    # ORDER LINE MANAGEMENT WITH BUSINESS LOGIC
-    # ============================================================================
+    async def execute_order(
+        self,
+        user: User,
+        order_id: str,
+        variants: List[dict]
+    ) -> Order:
+        """Execute an order when driver completes delivery"""
+        order = await self.get_order_by_id(order_id, user.tenant_id)
+        
+        # Check if order can be executed (should be in IN_TRANSIT status)
+        if order.order_status != OrderStatus.IN_TRANSIT:
+            raise OrderStatusTransitionError(
+                f"Cannot execute order in {order.order_status} status. Order must be in transit."
+            )
+        
+        # Update order line quantities based on executed variants
+        for variant_execution in variants:
+            variant_id = variant_execution.get('variant_id')
+            quantity = variant_execution.get('quantity', 0)
+            
+            if not variant_id or quantity <= 0:
+                continue
+                
+            # Find the corresponding order line
+            order_line = None
+            for line in order.order_lines:
+                if line.variant_id == UUID(variant_id):
+                    order_line = line
+                    break
+            
+            if order_line:
+                # Update delivered quantity
+                order_line.qty_delivered = Decimal(str(quantity))
+                order_line.updated_by = user.id
+                order_line.updated_at = datetime.utcnow()
+        
+        # Update order status to DELIVERED
+        order.order_status = OrderStatus.DELIVERED
+        order.updated_by = user.id
+        order.updated_at = datetime.utcnow()
+        
+        # Save the updated order
+        updated_order = await self.order_repository.update_order(order)
+        
+        return updated_order
 
     async def add_order_line(
         self,
@@ -265,43 +298,27 @@ class OrderService:
         list_price: Decimal = Decimal('0'),
         manual_unit_price: Optional[Decimal] = None,
     ) -> OrderLine:
-        """Add an order line to an order with business logic validation"""
+        """Add an order line to an existing order"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
         
         # Check if order can be modified
-        if not self.business_service.can_edit_order(user, order):
-            raise OrderModificationError(order_id, order.order_status.value)
+        if not self.can_edit_order(user, order):
+            raise OrderPermissionError("Cannot add order line to order in current status")
         
-        # Validate order line
-        self._validate_order_line(
-            variant_id=variant_id,
-            gas_type=gas_type,
-            qty_ordered=qty_ordered,
-            list_price=list_price
-        )
+        # Validate order line data
+        self._validate_order_line(variant_id, gas_type, qty_ordered, list_price)
         
-        # Create order line
-        order_line = OrderLine.create(
-            order_id=order.id,
+        # Use business service for adding order line
+        return await self.business_service.add_order_line_with_business_rules(
+            user=user,
+            order=order,
+            customer=customer,
             variant_id=variant_id,
             gas_type=gas_type,
             qty_ordered=qty_ordered,
             list_price=list_price,
-            manual_unit_price=manual_unit_price,
-            created_by=user.id
+            manual_unit_price=manual_unit_price
         )
-        
-        # Apply business rules
-        self.business_service.validate_order_line_for_role(user, order_line, order)
-        self.business_service.apply_pricing_rules(order_line, customer)
-        
-        # Add to order and update totals
-        order.add_order_line(order_line)
-        
-        # Save to repository
-        await self.order_repository.update_order_with_lines(order)
-        
-        return order_line
 
     async def update_order_line(
         self,
@@ -311,24 +328,19 @@ class OrderService:
         customer: Customer,
         **kwargs
     ) -> OrderLine:
-        """Update an order line with business logic validation"""
+        """Update an order line"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
         
-        # Find order line
-        order_line = None
-        for line in order.order_lines:
-            if str(line.id) == line_id:
-                order_line = line
-                break
+        # Check if order can be modified
+        if not self.can_edit_order(user, order):
+            raise OrderPermissionError("Cannot update order line in current status")
         
-        if not order_line:
-            raise OrderLineNotFoundError(line_id)
-        
+        # Use business service for updating order line
         return await self.business_service.update_order_line_with_business_rules(
             user=user,
             order=order,
-            order_line=order_line,
             customer=customer,
+            line_id=line_id,
             **kwargs
         )
 
@@ -338,20 +350,19 @@ class OrderService:
         order_id: str,
         line_id: str
     ) -> bool:
-        """Remove an order line from an order with business logic validation"""
+        """Remove an order line from an order"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
         
         # Check if order can be modified
-        if not self.business_service.can_edit_order(user, order):
-            raise OrderModificationError(order_id, order.order_status.value)
+        if not self.can_edit_order(user, order):
+            raise OrderPermissionError("Cannot remove order line in current status")
         
-        # Remove order line
-        order.remove_order_line(UUID(line_id))
-        
-        # Save to repository
-        await self.order_repository.update_order_with_lines(order)
-        
-        return True
+        # Use business service for removing order line
+        return await self.business_service.remove_order_line_with_business_rules(
+            user=user,
+            order=order,
+            line_id=line_id
+        )
 
     async def update_order_line_quantities(
         self,
@@ -361,10 +372,10 @@ class OrderService:
         qty_allocated: Optional[float] = None,
         qty_delivered: Optional[float] = None,
     ) -> bool:
-        """Update order line quantities with business logic validation"""
+        """Update order line quantities (allocated/delivered)"""
         order = await self.get_order_by_id(order_id, user.tenant_id)
         
-        # Find order line
+        # Find the order line
         order_line = None
         for line in order.order_lines:
             if str(line.id) == line_id:
@@ -374,27 +385,19 @@ class OrderService:
         if not order_line:
             raise OrderLineNotFoundError(line_id)
         
-        # Validate quantities
-        if qty_allocated is not None and qty_allocated < 0:
-            raise OrderLineQuantityError(line_id, qty_allocated, "Allocated quantity cannot be negative")
-        
-        if qty_delivered is not None and qty_delivered < 0:
-            raise OrderLineQuantityError(line_id, qty_delivered, "Delivered quantity cannot be negative")
-        
         # Update quantities
-        order_line.update_quantities(
-            allocated=Decimal(str(qty_allocated)) if qty_allocated is not None else None,
-            delivered=Decimal(str(qty_delivered)) if qty_delivered is not None else None
-        )
+        if qty_allocated is not None:
+            order_line.qty_allocated = Decimal(str(qty_allocated))
+        if qty_delivered is not None:
+            order_line.qty_delivered = Decimal(str(qty_delivered))
         
-        # Save to repository
-        return await self.order_repository.update_order_line_quantities(
-            line_id, qty_allocated, qty_delivered, user.id
-        )
-
-    # ============================================================================
-    # SEARCH AND ANALYTICS
-    # ============================================================================
+        order_line.updated_by = user.id
+        order_line.updated_at = datetime.utcnow()
+        
+        # Save the updated order
+        await self.order_repository.update_order(order)
+        
+        return True
 
     async def search_orders(
         self,
@@ -407,7 +410,7 @@ class OrderService:
         limit: int = 100,
         offset: int = 0
     ) -> List[Order]:
-        """Search orders with multiple filters"""
+        """Search orders with various filters"""
         return await self.order_repository.search_orders(
             tenant_id=tenant_id,
             search_term=search_term,
@@ -424,19 +427,19 @@ class OrderService:
         tenant_id: UUID,
         status: Optional[OrderStatus] = None
     ) -> int:
-        """Get count of orders for a tenant"""
+        """Get count of orders with optional status filter"""
         return await self.order_repository.get_orders_count(tenant_id, status)
 
     # ============================================================================
-    # BUSINESS LOGIC HELPERS
+    # PERMISSION AND VALIDATION METHODS
     # ============================================================================
 
     def get_allowed_status_transitions(self, current_status: OrderStatus, user_role: UserRoleType) -> List[OrderStatus]:
-        """Get allowed status transitions for a user role"""
+        """Get allowed status transitions based on current status and user role"""
         return self.business_service.get_allowed_status_transitions(current_status, user_role)
 
     def can_edit_pricing(self, user: User, order: Order) -> bool:
-        """Check if user can edit pricing"""
+        """Check if user can edit order pricing"""
         return self.business_service.can_edit_pricing(user, order)
 
     def can_edit_order(self, user: User, order: Order) -> bool:
@@ -448,36 +451,32 @@ class OrderService:
         return self.business_service.can_submit_order(user, order)
 
     def can_approve_order(self, user: User, order: Order) -> bool:
-        """Check if user can approve the order"""
+        """Check if user can approve order"""
         return self.business_service.can_approve_order(user, order)
 
     def can_allocate_order(self, user: User, order: Order) -> bool:
-        """Check if user can allocate the order"""
-        return self.business_service.can_dispatch_order(user, order)
+        """Check if user can allocate order"""
+        return self.business_service.can_allocate_order(user, order)
 
     def can_load_order(self, user: User, order: Order) -> bool:
-        """Check if user can load the order"""
-        return self.business_service.can_dispatch_order(user, order)
+        """Check if user can load order"""
+        return self.business_service.can_load_order(user, order)
 
     def can_mark_in_transit(self, user: User, order: Order) -> bool:
         """Check if user can mark order as in transit"""
-        return self.business_service.can_dispatch_order(user, order)
+        return self.business_service.can_mark_in_transit(user, order)
 
     def can_deliver_order(self, user: User, order: Order) -> bool:
-        """Check if user can mark order as delivered"""
+        """Check if user can deliver order"""
         return self.business_service.can_deliver_order(user, order)
 
     def can_close_order(self, user: User, order: Order) -> bool:
-        """Check if user can close the order"""
-        return self.business_service.can_deliver_order(user, order)
+        """Check if user can close order"""
+        return self.business_service.can_close_order(user, order)
 
     def can_cancel_order(self, user: User, order: Order) -> bool:
-        """Check if user can cancel the order"""
+        """Check if user can cancel order"""
         return self.business_service.can_cancel_order(user, order)
-
-    # ============================================================================
-    # VALIDATION HELPERS
-    # ============================================================================
 
     def _validate_order_line(
         self,
@@ -487,14 +486,11 @@ class OrderService:
         list_price: Decimal = Decimal('0')
     ):
         """Validate order line data"""
-        # Must have either variant_id or gas_type
-        if not variant_id and not gas_type:
+        if variant_id is None and gas_type is None:
             raise OrderLineValidationError("Either variant_id or gas_type must be specified")
         
-        # Quantity must be positive
         if qty_ordered <= 0:
-            raise OrderLineValidationError("Quantity ordered must be greater than zero")
+            raise OrderLineQuantityError("Quantity ordered must be greater than 0")
         
-        # List price must be non-negative
         if list_price < 0:
-            raise OrderLineValidationError("List price cannot be negative") 
+            raise OrderPricingError("List price cannot be negative") 

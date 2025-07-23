@@ -5,7 +5,7 @@ from app.domain.exceptions.users import (
     UserAuthenticationError,
     UserInactiveError
 )
-from app.infrastucture.logs.logger import default_logger
+from app.infrastucture.logs.logger import get_logger
 from app.presentation.schemas.users import (
     LoginRequest,
     LoginResponse,
@@ -28,6 +28,7 @@ from decouple import config
 from app.domain.entities.users import UserStatus
 from app.core.user_context import UserContext, user_context
 
+logger = get_logger("auth_api")
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
@@ -61,7 +62,7 @@ auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 #             password=request.password
 #         )
         
-#         default_logger.info(f"User signed up successfully", user_id=str(user.id), email=request.email)
+#         logger.info(f"User signed up successfully", user_id=str(user.id), email=request.email)
         
 #         return LoginResponse(
 #             access_token=auth_response.session.access_token,
@@ -77,7 +78,7 @@ auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 #         # Re-raise HTTP exceptions
 #         raise
 #     except Exception as e:
-#         default_logger.error(f"Signup failed: {str(e)}", email=request.email)
+#         logger.error(f"Signup failed: {str(e)}", email=request.email)
 #         raise HTTPException(
 #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 #             detail="Signup failed"
@@ -90,17 +91,26 @@ async def login(request: LoginRequest):
     
     # Use Railway mode (Supabase SDK) for authentication
     user_service = get_railway_user_service()
-    default_logger.info("Login attempt started", email=request.email)
+    
+    logger.info(
+        "Login attempt started",
+        email=request.email,
+        operation="user_login",
+        auth_method="supabase_email_password"
+    )
     
     try:
-        default_logger.info(f"Login attempt started for email: {request.email}")
         
         # Get Supabase client
         try:
             supabase = get_supabase_client_sync()
-            default_logger.info("Supabase client obtained successfully")
+            logger.debug("Supabase client obtained successfully")
         except Exception as e:
-            default_logger.error(f"Failed to get Supabase client: {str(e)}")
+            logger.error(
+                "Failed to get Supabase client",
+                error=str(e),
+                error_type=type(e).__name__
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Service unavailable"
@@ -112,9 +122,14 @@ async def login(request: LoginRequest):
                 "email": request.email,
                 "password": request.password
             })
-            default_logger.info(f"Supabase auth response received for: {request.email}")
+            logger.debug("Supabase auth response received", email=request.email)
         except Exception as e:
-            default_logger.error(f"Supabase authentication failed: {str(e)}", email=request.email)
+            logger.error(
+                "Supabase authentication failed",
+                email=request.email,
+                error=str(e),
+                error_type=type(e).__name__
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password"
@@ -134,7 +149,12 @@ async def login(request: LoginRequest):
             # Update auth_user_id if not set or different
             if user.auth_user_id is None or str(user.auth_user_id) != auth_response.user.id:
                 user = await user_service.update_user_auth_id(str(user.id), auth_response.user.id)
-                default_logger.info(f"Updated auth_user_id for user: {user.email}")
+                logger.debug(
+                    "Updated auth_user_id for user",
+                    user_id=str(user.id),
+                    email=user.email,
+                    auth_user_id=auth_response.user.id
+                )
             
             await user_service.validate_user_active(str(user.id))
             
@@ -143,18 +163,34 @@ async def login(request: LoginRequest):
             
         except UserNotFoundError:
             # User exists in Supabase Auth but not in our database
-            default_logger.warning(f"User exists in Supabase Auth but not in database", email=request.email)
+            logger.warning(
+                "User exists in Supabase Auth but not in database",
+                email=request.email,
+                supabase_user_id=auth_response.user.id if auth_response and auth_response.user else None
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password"
             )
         except UserInactiveError:
+            logger.warning(
+                "Login attempt by inactive user",
+                email=request.email,
+                user_id=str(user.id) if 'user' in locals() else None
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Account is inactive, please activate your account or contact your administrator"
             )
         
-        default_logger.info(f"User logged in successfully", user_id=str(user.id), email=request.email)
+        logger.info(
+            "User logged in successfully",
+            user_id=str(user.id),
+            email=user.email,
+            tenant_id=str(user.tenant_id),
+            role=user.role.value,
+            operation="login_success"
+        )
         
         try:
             response = LoginResponse(
@@ -166,10 +202,15 @@ async def login(request: LoginRequest):
                 role=user.role.value,
                 full_name=user.full_name
             )
-            default_logger.info("Login response created successfully")
+            logger.debug("Login response created successfully")
             return response
         except Exception as e:
-            default_logger.error(f"Failed to create login response: {str(e)}", user_id=str(user.id))
+            logger.error(
+                "Failed to create login response",
+                user_id=str(user.id),
+                error=str(e),
+                error_type=type(e).__name__
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to create login response"
@@ -177,22 +218,40 @@ async def login(request: LoginRequest):
         
     except HTTPException as he:
         # Re-raise HTTP exceptions with better logging
-        default_logger.warning(f"Login HTTP exception: {he.status_code} - {he.detail}", email=request.email)
+        logger.warning(
+            "Login HTTP exception",
+            email=request.email,
+            status_code=he.status_code,
+            detail=he.detail
+        )
         raise
     except UserNotFoundError as e:
-        default_logger.warning(f"User not found during login: {str(e)}", email=request.email)
+        logger.warning(
+            "User not found during login",
+            email=request.email,
+            error=str(e)
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
     except UserInactiveError as e:
-        default_logger.warning(f"Inactive user login attempt: {str(e)}", email=request.email)
+        logger.warning(
+            "Inactive user login attempt", 
+            email=request.email,
+            error=str(e)
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account is inactive, please activate your account or contact your administrator"
         )
     except Exception as e:
-        default_logger.error(f"Unexpected login error: {str(e)} | Type: {type(e).__name__}", email=request.email, exc_info=True)
+        logger.error(
+            "Unexpected login error",
+            email=request.email,
+            error=str(e),
+            error_type=type(e).__name__
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Login failed: {str(e)}"
@@ -212,12 +271,16 @@ async def logout(
         # Sign out from Supabase Auth
         supabase.auth.sign_out()
         
-        default_logger.info("User logged out successfully")
+        logger.info("User logged out successfully", operation="user_logout")
         
         return {"message": "Logged out successfully"}
         
     except Exception as e:
-        default_logger.error(f"Logout failed: {str(e)}")
+        logger.error(
+            "Logout failed",
+            error=str(e),
+            error_type=type(e).__name__
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Logout failed"
@@ -243,7 +306,7 @@ async def refresh_token(
                 detail="Invalid refresh token"
             )
         
-        default_logger.info("Token refreshed successfully")
+        logger.info("Token refreshed successfully", operation="token_refresh")
         
         return RefreshTokenResponse(access_token=auth_response.session.access_token)
         
@@ -251,7 +314,11 @@ async def refresh_token(
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        default_logger.error(f"Token refresh failed: {str(e)}")
+        logger.error(
+            "Token refresh failed",
+            error=str(e),
+            error_type=type(e).__name__
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token"
@@ -270,14 +337,14 @@ async def forgot_password(
             user = await user_service.get_user_by_email(request.email)
         except UserNotFoundError:
             # Don't reveal if user exists or not for security
-            default_logger.info(f"Password reset requested for non-existent email: {request.email}")
+            logger.info(f"Password reset requested for non-existent email: {request.email}")
             return ForgotPasswordResponse(
                 message="If an account with this email exists, a password reset link has been sent."
             )
         
         # Check if user is active
         if user.status != UserStatus.ACTIVE:
-            default_logger.info(f"Password reset requested for inactive user: {request.email}")
+            logger.info(f"Password reset requested for inactive user: {request.email}")
             return ForgotPasswordResponse(
                 message="If an account with this email exists, a password reset link has been sent."
             )
@@ -301,14 +368,14 @@ async def forgot_password(
             }
         )
         
-        default_logger.info(f"Password reset email sent via Supabase to: {request.email}")
+        logger.info(f"Password reset email sent via Supabase to: {request.email}")
         
         return ForgotPasswordResponse(
             message="If an account with this email exists, a password reset link has been sent."
         )
         
     except Exception as e:
-        default_logger.error(f"Password reset request failed: {str(e)}", email=request.email)
+        logger.error(f"Password reset request failed: {str(e)}", email=request.email)
         # Don't reveal internal errors for security
         return ForgotPasswordResponse(
             message="If an account with this email exists, a password reset link has been sent."
@@ -322,7 +389,7 @@ async def reset_password(
 ):
     """Reset password using Supabase token (legacy method)"""
     try:
-        default_logger.info(f"Starting password reset process with token: {request.token[:20]}...")
+        logger.info(f"Starting password reset process with token: {request.token[:20]}...")
         
         # Use Supabase's built-in password reset functionality
         # The token comes from the password reset email sent by Supabase
@@ -335,16 +402,16 @@ async def reset_password(
             }, access_token=request.token)
             
             if not auth_response.user:
-                default_logger.error("Password reset failed - no user returned from Supabase")
+                logger.error("Password reset failed - no user returned from Supabase")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid or expired password reset token"
                 )
             
-            default_logger.info(f"Supabase password update successful for user: {auth_response.user.email}")
+            logger.info(f"Supabase password update successful for user: {auth_response.user.email}")
             
         except Exception as auth_error:
-            default_logger.error(f"Supabase password update failed: {str(auth_error)}")
+            logger.error(f"Supabase password update failed: {str(auth_error)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to update password: {str(auth_error)}"
@@ -353,9 +420,9 @@ async def reset_password(
         # Get user from our database using the email from auth response
         try:
             user = await user_service.get_user_by_email(auth_response.user.email)
-            default_logger.info(f"Found user in database: {user.id}, status: {user.status.value}")
+            logger.info(f"Found user in database: {user.id}, status: {user.status.value}")
         except Exception as db_error:
-            default_logger.error(f"Failed to find user in database: {str(db_error)}")
+            logger.error(f"Failed to find user in database: {str(db_error)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User account not found in system"
@@ -363,13 +430,13 @@ async def reset_password(
         
         # Check if user is active
         if user.status != UserStatus.ACTIVE:
-            default_logger.warning(f"Password reset attempted for inactive user: {user.id}, status: {user.status.value}")
+            logger.warning(f"Password reset attempted for inactive user: {user.id}, status: {user.status.value}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Account is inactive. Please contact your administrator."
             )
         
-        default_logger.info(f"Password reset completed successfully for user: {user.id}")
+        logger.info(f"Password reset completed successfully for user: {user.id}")
         
         return ResetPasswordResponse(
             message="Password reset successfully.",
@@ -380,7 +447,7 @@ async def reset_password(
     except HTTPException:
         raise
     except Exception as e:
-        default_logger.error(f"Unexpected error in password reset: {str(e)}")
+        logger.error(f"Unexpected error in password reset: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to reset password. Please try again."
@@ -416,14 +483,14 @@ async def reset_password_simple(
                 detail="Password must be at least 8 characters long"
             )
         
-        default_logger.info(f"Starting simple password reset for email: {email}")
+        logger.info(f"Starting simple password reset for email: {email}")
         
         # Get user from our database
         try:
             user = await user_service.get_user_by_email(email)
-            default_logger.info(f"Found user in database: {user.id}, status: {user.status.value}")
+            logger.info(f"Found user in database: {user.id}, status: {user.status.value}")
         except Exception as db_error:
-            default_logger.error(f"Failed to find user in database: {str(db_error)}")
+            logger.error(f"Failed to find user in database: {str(db_error)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User account not found"
@@ -431,7 +498,7 @@ async def reset_password_simple(
         
         # Check if user is active
         if user.status != UserStatus.ACTIVE:
-            default_logger.warning(f"Password reset attempted for inactive user: {user.id}, status: {user.status.value}")
+            logger.warning(f"Password reset attempted for inactive user: {user.id}, status: {user.status.value}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Account is inactive. Please contact your administrator."
@@ -448,22 +515,22 @@ async def reset_password_simple(
             )
             
             if not auth_response.user:
-                default_logger.error("Password update failed - no user returned from Supabase")
+                logger.error("Password update failed - no user returned from Supabase")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Failed to update password"
                 )
             
-            default_logger.info(f"Password updated successfully for user: {user.email}")
+            logger.info(f"Password updated successfully for user: {user.email}")
             
         except Exception as auth_error:
-            default_logger.error(f"Supabase password update failed: {str(auth_error)}")
+            logger.error(f"Supabase password update failed: {str(auth_error)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to update password: {str(auth_error)}"
             )
         
-        default_logger.info(f"Simple password reset completed successfully for user: {user.id}")
+        logger.info(f"Simple password reset completed successfully for user: {user.id}")
         
         return ResetPasswordResponse(
             message="Password reset successfully.",
@@ -474,7 +541,7 @@ async def reset_password_simple(
     except HTTPException:
         raise
     except Exception as e:
-        default_logger.error(f"Unexpected error in simple password reset: {str(e)}")
+        logger.error(f"Unexpected error in simple password reset: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to reset password. Please try again."
@@ -488,8 +555,8 @@ async def accept_invitation(
 ):
     """Accept invitation and set password using Supabase JWT token"""
     try:
-        default_logger.info(f"Starting invitation acceptance process with JWT token: {request.token[:20]}...")
-        default_logger.info(f"JWT token length: {len(request.token)}")
+        logger.info(f"Starting invitation acceptance process with JWT token: {request.token[:20]}...")
+        logger.info(f"JWT token length: {len(request.token)}")
         
         # Get Supabase client
         supabase = get_supabase_client_sync()
@@ -500,7 +567,7 @@ async def accept_invitation(
         
         try:
             # Method 1: Try to decode the JWT to get user info first
-            default_logger.info("Attempting to decode JWT token to get user info")
+            logger.info("Attempting to decode JWT token to get user info")
             import jwt
             import base64
             import json
@@ -515,13 +582,13 @@ async def accept_invitation(
             user_id = payload.get('sub')
             user_email = payload.get('email')
             
-            default_logger.info(f"JWT decoded - User ID: {user_id}, Email: {user_email}")
+            logger.info(f"JWT decoded - User ID: {user_id}, Email: {user_email}")
             
             if not user_id:
                 raise Exception("No user ID found in JWT token")
             
             # Method 2: Use admin client to update password directly
-            default_logger.info("Using admin client to update password")
+            logger.info("Using admin client to update password")
             from app.infrastucture.database.connection import get_supabase_admin_client_sync
             admin_supabase = get_supabase_admin_client_sync()
             
@@ -533,20 +600,20 @@ async def accept_invitation(
             if not auth_response.user:
                 raise Exception("Admin password update failed - no user returned")
                 
-            default_logger.info(f"Admin password update successful for user: {auth_response.user.email}")
+            logger.info(f"Admin password update successful for user: {auth_response.user.email}")
             
         except Exception as admin_error:
-            default_logger.error(f"Admin password update failed: {str(admin_error)}")
+            logger.error(f"Admin password update failed: {str(admin_error)}")
             
             # Method 3: Fallback to regular client with session
             try:
-                default_logger.info("Attempting session-based password update as fallback")
+                logger.info("Attempting session-based password update as fallback")
                 session_response = supabase.auth.set_session(request.token, None)
                 
                 if not session_response.user:
                     raise Exception("Session creation failed - no user returned")
                     
-                default_logger.info(f"Session created successfully for user: {session_response.user.email}")
+                logger.info(f"Session created successfully for user: {session_response.user.email}")
                 
                 # Now update the password in the established session
                 auth_response = supabase.auth.update_user({
@@ -556,10 +623,10 @@ async def accept_invitation(
                 if not auth_response.user:
                     raise Exception("Password update failed - no user returned")
                     
-                default_logger.info(f"Session-based password update successful for user: {session_response.user.email}")
+                logger.info(f"Session-based password update successful for user: {session_response.user.email}")
                 
             except Exception as session_error:
-                default_logger.error(f"Session-based password update also failed: {str(session_error)}")
+                logger.error(f"Session-based password update also failed: {str(session_error)}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid or expired invitation token. Please request a new invitation."
@@ -568,9 +635,9 @@ async def accept_invitation(
         # Get user from our database using the email from auth response
         try:
             user = await user_service.get_user_by_email(auth_response.user.email)
-            default_logger.info(f"Found user in database - ID: {user.id}, Status: {user.status.value}, Auth ID: {user.auth_user_id}")
+            logger.info(f"Found user in database - ID: {user.id}, Status: {user.status.value}, Auth ID: {user.auth_user_id}")
         except Exception as db_error:
-            default_logger.error(f"Failed to find user in database: {str(db_error)}")
+            logger.error(f"Failed to find user in database: {str(db_error)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User account not found in system"
@@ -580,15 +647,15 @@ async def accept_invitation(
         if not user.auth_user_id or str(user.auth_user_id) != auth_response.user.id:
             try:
                 user = await user_service.update_user_auth_id(str(user.id), auth_response.user.id)
-                default_logger.info(f"Updated auth_user_id for user: {user.email}")
+                logger.info(f"Updated auth_user_id for user: {user.email}")
             except Exception as auth_id_error:
-                default_logger.error(f"Failed to update auth_user_id: {str(auth_id_error)}")
+                logger.error(f"Failed to update auth_user_id: {str(auth_id_error)}")
                 # Continue anyway, this might not be critical
         
         # Verify the password was actually set by testing sign-in
         # This ensures we only activate users who can actually log in
         try:
-            default_logger.info("Verifying password was set correctly by testing sign-in")
+            logger.info("Verifying password was set correctly by testing sign-in")
             test_auth = supabase.auth.sign_in_with_password({
                 "email": auth_response.user.email,
                 "password": request.password
@@ -597,13 +664,13 @@ async def accept_invitation(
             if not test_auth.user:
                 raise Exception("Password verification failed - sign-in unsuccessful")
                 
-            default_logger.info("Password verification successful - user can sign in")
+            logger.info("Password verification successful - user can sign in")
             
             # Sign out the test session immediately
             supabase.auth.sign_out()
             
         except Exception as verify_error:
-            default_logger.error(f"Password verification failed: {str(verify_error)}")
+            logger.error(f"Password verification failed: {str(verify_error)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password update failed. Please try again with a new invitation link."
@@ -613,26 +680,26 @@ async def accept_invitation(
         if user.status != UserStatus.ACTIVE:
             try:
                 user = await user_service.activate_user(str(user.id))
-                default_logger.info(f"User activated successfully - New status: {user.status.value}")
+                logger.info(f"User activated successfully - New status: {user.status.value}")
             except Exception as activation_error:
-                default_logger.error(f"Failed to activate user: {str(activation_error)}")
+                logger.error(f"Failed to activate user: {str(activation_error)}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to activate user account"
                 )
         else:
-            default_logger.info(f"User already active - Status: {user.status.value}")
+            logger.info(f"User already active - Status: {user.status.value}")
         
         # IMPORTANT: Sign out the user so they have to login manually
         # This prevents automatic login after password setup and ensures clean state
         try:
             supabase.auth.sign_out()
-            default_logger.info(f"User signed out after invitation acceptance to force manual login")
+            logger.info(f"User signed out after invitation acceptance to force manual login")
         except Exception as signout_error:
-            default_logger.warning(f"Failed to sign out user after invitation: {str(signout_error)}")
+            logger.warning(f"Failed to sign out user after invitation: {str(signout_error)}")
             # Continue anyway, this is not critical
         
-        default_logger.info(f"Invitation acceptance completed successfully - User: {user.email}, Status: {user.status.value}, Auth ID: {user.auth_user_id}")
+        logger.info(f"Invitation acceptance completed successfully - User: {user.email}, Status: {user.status.value}, Auth ID: {user.auth_user_id}")
         
         return ResetPasswordResponse(
             message="Account setup completed successfully. Please login with your new credentials.",
@@ -643,7 +710,7 @@ async def accept_invitation(
     except HTTPException:
         raise
     except Exception as e:
-        default_logger.error(f"Accept invitation failed with unexpected error: {str(e)}")
+        logger.error(f"Accept invitation failed with unexpected error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to accept invitation. Please try again or contact support."
@@ -706,14 +773,14 @@ async def handle_magic_link(
             except UserNotFoundError:
                 # User doesn't exist in our database but exists in Supabase
                 # This shouldn't happen in normal flow
-                default_logger.warning(f"Magic link user not found in database: {auth_response.user.email}")
+                logger.warning(f"Magic link user not found in database: {auth_response.user.email}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User account not found"
                 )
         
         except Exception as e:
-            default_logger.error(f"Magic link verification failed: {str(e)}")
+            logger.error(f"Magic link verification failed: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired magic link"
@@ -722,7 +789,7 @@ async def handle_magic_link(
     except HTTPException:
         raise
     except Exception as e:
-        default_logger.error(f"Magic link processing failed: {str(e)}")
+        logger.error(f"Magic link processing failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process magic link"
@@ -754,7 +821,7 @@ async def get_current_user_info(
         )
         
     except Exception as e:
-        default_logger.error(f"Failed to get current user info: {str(e)}")
+        logger.error(f"Failed to get current user info: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve user information"

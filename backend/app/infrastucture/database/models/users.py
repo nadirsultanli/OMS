@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, TIMESTAMP, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID as SAUUID, ENUM as PGEnum
+from sqlalchemy.orm import relationship
 from .base import Base
 import uuid
 from enum import Enum
@@ -32,4 +33,7 @@ class User(Base):
     updated_by = Column(SAUUID(as_uuid=True), nullable=True)
     deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
     deleted_by = Column(SAUUID(as_uuid=True), nullable=True)
-    auth_user_id = Column(SAUUID(as_uuid=True), nullable=True) 
+    auth_user_id = Column(SAUUID(as_uuid=True), nullable=True)
+    
+    # Relationships
+    driver_trips = relationship("TripModel", foreign_keys="TripModel.driver_id", back_populates="driver") 
