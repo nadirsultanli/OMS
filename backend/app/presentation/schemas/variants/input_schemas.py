@@ -91,6 +91,20 @@ class CreateBundleRequest(BaseModel):
     default_price: Optional[Decimal] = None
     created_by: Optional[str] = None
 
+class CreateCompleteSetRequest(BaseModel):
+    """Request to create a complete set of atomic variants for a cylinder size"""
+    tenant_id: str
+    product_id: str
+    size: str  # e.g., "13" for 13kg
+    tare_weight_kg: Decimal
+    capacity_kg: Decimal
+    gross_weight_kg: Decimal  # Will be recalculated
+    deposit_amount: Decimal
+    gas_price: Optional[Decimal] = None
+    bundle_price: Optional[Decimal] = None
+    inspection_date: Optional[date] = None
+    created_by: Optional[str] = None
+
 class ProcessOrderLineRequest(BaseModel):
     """Request schema for processing LPG order lines"""
     tenant_id: str
