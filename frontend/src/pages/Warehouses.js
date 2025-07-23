@@ -289,9 +289,9 @@ const Warehouses = () => {
 
       <div className="warehouses-table-container">
         {loading ? (
-          <div className="loading-state">
-            <Loader className="spinner" size={40} />
-            <p>Loading warehouses...</p>
+          <div className="loading-container">
+            <div className="spinner"></div>
+            <p>Loading...</p>
           </div>
         ) : warehouses.length === 0 ? (
           <div className="empty-state">

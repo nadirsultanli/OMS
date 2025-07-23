@@ -14,8 +14,8 @@ body {
 }
 
 .App {
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh; /* Changed to min-height to allow content to extend */
+  /* Removed overflow: hidden to allow scrolling */
 }
 
 /* Remove focus outline for mouse users, keep for keyboard users */
