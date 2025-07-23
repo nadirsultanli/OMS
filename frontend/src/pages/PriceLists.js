@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import priceListService from '../services/priceListService';
 import { extractErrorMessage } from '../utils/errorUtils';
-import { Search, Plus, Eye, Calendar, DollarSign } from 'lucide-react';
+import { Search, Plus, Eye, Edit2, Trash2, Calendar, DollarSign } from 'lucide-react';
 import './PriceLists.css';
 
 const PriceLists = () => {
@@ -11,6 +11,8 @@ const PriceLists = () => {
   const [filteredPriceLists, setFilteredPriceLists] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingPriceList, setEditingPriceList] = useState(null);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
 
@@ -179,8 +181,85 @@ const PriceLists = () => {
     }
   };
 
+  const handleUpdatePriceList = async (e) => {
+    e.preventDefault();
+    setMessage('');
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const priceListData = {
+        name: formData.name.trim(),
+        effective_from: formData.effective_from,
+        effective_to: formData.effective_to || null,
+        active: formData.active,
+        currency: formData.currency
+      };
+      
+      const result = await priceListService.updatePriceList(editingPriceList.id, priceListData);
+      
+      if (result.success) {
+        setMessage('Price list updated successfully!');
+        resetForm();
+        setShowEditForm(false);
+        setEditingPriceList(null);
+        fetchPriceLists();
+      } else {
+        const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
+        setErrors({ general: errorMessage || 'Failed to update price list' });
+      }
+    } catch (error) {
+      console.error('Price list update error:', error);
+      const errorMessage = extractErrorMessage(error.response?.data) || 'An unexpected error occurred. Please try again.';
+      setErrors({ general: errorMessage });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePriceListClick = (priceListId) => {
     navigate(`/price-lists/${priceListId}`);
+  };
+
+  const handleEditClick = (priceList) => {
+    setEditingPriceList(priceList);
+    setFormData({
+      name: priceList.name,
+      effective_from: priceList.effective_from.split('T')[0], // Convert ISO date to YYYY-MM-DD
+      effective_to: priceList.effective_to ? priceList.effective_to.split('T')[0] : '',
+      active: priceList.active,
+      currency: priceList.currency
+    });
+    setShowEditForm(true);
+  };
+
+  const handleDeleteClick = async (priceList) => {
+    if (!window.confirm(`Are you sure you want to delete the price list "${priceList.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await priceListService.deletePriceList(priceList.id);
+      
+      if (result.success) {
+        setMessage('Price list deleted successfully!');
+        fetchPriceLists();
+      } else {
+        const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
+        setErrors({ general: errorMessage || 'Failed to delete price list' });
+      }
+    } catch (error) {
+      console.error('Price list deletion error:', error);
+      const errorMessage = extractErrorMessage(error.response?.data) || 'An unexpected error occurred. Please try again.';
+      setErrors({ general: errorMessage });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetForm = () => {
@@ -332,6 +411,21 @@ const PriceLists = () => {
                     >
                       <Eye size={16} />
                     </button>
+                    <button
+                      onClick={() => handleEditClick(priceList)}
+                      className="action-icon-btn"
+                      title="Edit price list"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(priceList)}
+                      className="action-icon-btn delete"
+                      title="Delete price list"
+                      disabled={loading}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -446,6 +540,119 @@ const PriceLists = () => {
                   disabled={loading}
                 >
                   {loading ? 'Creating...' : 'Create Price List'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Price List Modal */}
+      {showEditForm && editingPriceList && (
+        <div className="modal-overlay" onClick={() => setShowEditForm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit Price List</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowEditForm(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePriceList} className="pricelist-form">
+              <div className="form-grid">
+                <div className="form-group full-width">
+                  <label htmlFor="edit_name">Price List Name *</label>
+                  <input
+                    type="text"
+                    id="edit_name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Enter price list name"
+                    className={errors.name ? 'error' : ''}
+                  />
+                  {errors.name && <span className="error-text">{errors.name}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit_effective_from">Effective From *</label>
+                  <input
+                    type="date"
+                    id="edit_effective_from"
+                    name="effective_from"
+                    value={formData.effective_from}
+                    onChange={handleInputChange}
+                    className={errors.effective_from ? 'error' : ''}
+                  />
+                  {errors.effective_from && <span className="error-text">{errors.effective_from}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit_effective_to">Effective To</label>
+                  <input
+                    type="date"
+                    id="edit_effective_to"
+                    name="effective_to"
+                    value={formData.effective_to}
+                    onChange={handleInputChange}
+                    min={formData.effective_from}
+                    className={errors.effective_to ? 'error' : ''}
+                  />
+                  {errors.effective_to && <span className="error-text">{errors.effective_to}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit_currency">Currency</label>
+                  <select
+                    id="edit_currency"
+                    name="currency"
+                    value={formData.currency}
+                    onChange={handleInputChange}
+                  >
+                    <option value="KES">KES - Kenyan Shilling</option>
+                    <option value="USD">USD - US Dollar</option>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="GBP">GBP - British Pound</option>
+                  </select>
+                </div>
+
+                <div className="form-group checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      id="edit_active"
+                      name="active"
+                      checked={formData.active}
+                      onChange={handleInputChange}
+                    />
+                    <span>Active</span>
+                  </label>
+                  <p className="field-hint">Only one price list can be active at a time</p>
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditForm(false);
+                    setEditingPriceList(null);
+                    resetForm();
+                  }}
+                  className="cancel-btn"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="submit-btn"
+                  disabled={loading}
+                >
+                  {loading ? 'Updating...' : 'Update Price List'}
                 </button>
               </div>
             </form>

@@ -49,7 +49,7 @@ const PriceListDetail = () => {
       // Fetch price lines
       const linesResult = await priceListService.getPriceListLines(priceListId);
       if (linesResult.success) {
-        setPriceLines(linesResult.data.lines || []);
+        setPriceLines(linesResult.data || []);
       } else {
         setError(linesResult.error);
       }
