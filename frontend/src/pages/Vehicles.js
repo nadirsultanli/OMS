@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import vehicleService from '../services/vehicleService';
 import warehouseService from '../services/warehouseService';
+import authService from '../services/authService';
 import './Vehicles.css';
 
 const Vehicles = () => {
@@ -45,7 +46,7 @@ const Vehicles = () => {
     totalPages: 1
   });
 
-  const tenantId = localStorage.getItem('tenantId');
+  const tenantId = authService.getCurrentTenantId();
 
   const vehicleTypes = [
     { value: 'CYLINDER_TRUCK', label: 'Cylinder Truck' },
@@ -95,7 +96,7 @@ const Vehicles = () => {
 
   const fetchWarehouses = async () => {
     try {
-      const result = await warehouseService.getWarehouses(tenantId);
+      const result = await warehouseService.getWarehouses();
       if (result.success) {
         setWarehouses(result.data.results || []);
       }

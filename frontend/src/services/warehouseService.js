@@ -1,10 +1,17 @@
 import api from './api';
+import authService from './authService';
 
 const warehouseService = {
   async getWarehouses(page = 1, limit = 20, filters = {}) {
     try {
+      const tenantId = authService.getCurrentTenantId();
+      if (!tenantId) {
+        throw new Error('No tenant ID found. Please log in again.');
+      }
+
       const { search = '', type = '', status = '' } = filters;
       const params = new URLSearchParams({
+        tenant_id: tenantId,
         page: page.toString(),
         limit: limit.toString()
       });
