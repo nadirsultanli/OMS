@@ -26,8 +26,7 @@ async def create_product(
         tenant_id=str(user.tenant_id) if user else None,
         user_role=user.role.value if user else None,
         product_name=request.name,
-        category=request.category,
-        sku=request.sku
+        category=request.category
     )
     
     try:
@@ -46,6 +45,7 @@ async def create_product(
         # Add created_by to the request data
         request_data = request.dict()
         request_data["created_by"] = str(user.id) if user else None
+        request_data["tenant_id"] = str(user.tenant_id) if user else None
         
         product = await product_service.create_product(**request_data)
         
@@ -56,7 +56,6 @@ async def create_product(
             product_id=str(product.id),
             product_name=product.name,
             category=product.category,
-            sku=product.sku,
             created_by=str(product.created_by) if hasattr(product, 'created_by') else None
         )
         
@@ -68,7 +67,6 @@ async def create_product(
             user_id=str(user.id) if user else None,
             tenant_id=str(user.tenant_id) if user else None,
             product_name=request.name,
-            sku=request.sku,
             error=str(e)
         )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
