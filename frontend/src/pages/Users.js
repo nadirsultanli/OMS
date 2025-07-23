@@ -4,6 +4,7 @@ import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import './Users.css';
 
 const Users = () => {
+  const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
