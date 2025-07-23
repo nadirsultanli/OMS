@@ -20,9 +20,16 @@ async def create_address(
     address_data = request.model_dump()
     address_data['tenant_id'] = current_user.tenant_id
     address_data['created_by'] = current_user.id
-    
-    address = await address_service.create_address(**address_data)
-    return AddressResponse(**address.to_dict())
+    try:
+        address = await address_service.create_address(**address_data)
+        return AddressResponse(**address.to_dict())
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        # Log the error
+        print(f"[DEBUG] Address creation failed: {e}\n{tb}")
+        # Return error details in response (for development only)
+        raise HTTPException(status_code=500, detail={"error": str(e), "traceback": tb})
 
 @router.get("/{address_id}", response_model=AddressResponse)
 async def get_address(address_id: str, address_service: AddressService = Depends(get_address_service)):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Final Comprehensive Test for All Order API Endpoints
+Final Comprehensive Test for All Order API Endpoints (Updated with faster timeouts)
 This script tests all order endpoints with the new JWT token and proper business logic understanding.
 """
 
@@ -10,7 +10,7 @@ import httpx
 from datetime import datetime
 
 # Updated JWT token from the user's request
-JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsImtpZCI6ImtpM3lkOHJRbXpid1VUYkEiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2d3aGV1aGR1eGljcWpudmZ5Z2VqLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI3MDI2ZjRiZC1kZTg4LTQ2ODItYThjNy01ZTg1NGQ0MzAyNjAiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzUzMjcxOTU5LCJpYXQiOjE3NTMyNjgzNTksImVtYWlsIjoibmFkaXJAY2lyY2wudGVhbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWV9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzUzMjY4MzU5fV0sInNlc3Npb25faWQiOiIxOGQzNDIyMS1lZmYzLTQ1ZjAtYWQwOS04YWU1ZDhkMGE3ODYiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.6oP7Qu0lzYvDYWrdFXCjn0BXwOiWQP2OrXraQGUA9OU"
+JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsImtpZCI6ImtpM3lkOHJRbXpid1VUYkEiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2d3aGV1aGR1eGljcWpudmZ5Z2VqLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI3MDI2ZjRiZC1kZTg4LTQ2ODItYThjNy01ZTg1NGQ0MzAyNjAiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzUzMjcyNTg3LCJpYXQiOjE3NTMyNjg5ODcsImVtYWlsIjoibmFkaXJAY2lyY2wudGVhbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWV9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzUzMjY4OTg3fV0sInNlc3Npb25faWQiOiIzMTgwZTU4Zi00MWZkLTRiNjAtOWFmMy1kZjdjMjY0ZjgwODkiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.7EY4YXF__0j7OspvXoO2Av4Q5tDeXrGS7NNvCedvkdM"
 
 # Real data from database - using draft orders for better testing
 DRAFT_ORDER_ID = "b7823383-bd6e-4b0b-a685-1cbd321c6c50"  # Draft order
@@ -103,7 +103,7 @@ async def test_order_execute_endpoint():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -188,7 +188,7 @@ async def test_order_execute_endpoint():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -256,7 +256,7 @@ async def test_order_execute_endpoint():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -313,7 +313,7 @@ async def test_get_order_by_id():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -378,7 +378,7 @@ async def test_get_order_by_id():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -432,7 +432,7 @@ async def test_get_orders_list():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -512,7 +512,7 @@ async def test_get_orders_by_customer():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -585,7 +585,7 @@ async def test_get_orders_by_status():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -661,7 +661,7 @@ async def test_patch_order_status():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -734,7 +734,7 @@ async def test_submit_order_business_logic():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -806,7 +806,7 @@ async def test_approve_order_business_logic():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -884,7 +884,7 @@ async def test_add_order_line_with_draft_order():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -989,7 +989,7 @@ async def test_search_orders():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -1062,7 +1062,7 @@ async def test_get_order_count():
                     "Authorization": f"Bearer {JWT_TOKEN}",
                     "Content-Type": "application/json"
                 },
-                timeout=30.0
+                timeout=10.0
             )
             
             print(f"Status Code: {response.status_code}")
@@ -1119,11 +1119,12 @@ async def test_get_order_count():
 
 async def main():
     """Main test function."""
-    print("🚀 Starting Final Order API Endpoints Test")
+    print("🚀 Starting Final Order API Endpoints Test (Updated with faster timeouts)")
     print(f"🌐 API Base URL: {API_BASE_URL}")
     print(f"🔑 JWT Token: {JWT_TOKEN[:50]}...")
     print(f"⏰ Start Time: {datetime.now()}")
     print(f"📋 Note: This test uses draft orders and accounts for business logic")
+    print(f"⚡ Timeout: 10 seconds per request (reduced from 30 seconds)")
     
     # Test all endpoints
     all_results = []

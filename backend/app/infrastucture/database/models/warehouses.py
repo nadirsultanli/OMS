@@ -22,9 +22,9 @@ class WarehouseModel(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     deleted_by = Column(PostgresUUID(as_uuid=True), nullable=True)
     
-    # Relationships
-    # Note: stock_levels relationship removed to avoid circular import issues
-    # Access stock levels through the repository layer instead
+    # Relationships for trips
+    start_trips = relationship("TripModel", foreign_keys="TripModel.start_wh_id", back_populates="start_warehouse")
+    end_trips = relationship("TripModel", foreign_keys="TripModel.end_wh_id", back_populates="end_warehouse")
     
     def __repr__(self):
         return f"<WarehouseModel(id={self.id}, code='{self.code}', name='{self.name}', tenant_id={self.tenant_id})>" 
