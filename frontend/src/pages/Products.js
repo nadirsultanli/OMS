@@ -76,10 +76,32 @@ const Products = () => {
         const total = result.data.total || 0;
         const totalPages = Math.ceil(total / pagination.limit);
         const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
-        setPagination(prev => ({
-          ...prev,
+        
+        // Debug log to track pagination data
+        console.log('Pagination calculation:', {
           total,
           totalPages,
+          currentPage,
+          limit: pagination.limit,
+          offset: pagination.offset,
+          productsReceived: result.data.products.length
+        });
+        
+        // TEMPORARY WORKAROUND: If we got exactly the limit of products, 
+        // assume there might be more pages
+        let adjustedTotal = total;
+        let adjustedTotalPages = totalPages;
+        if (result.data.products.length === pagination.limit && total === result.data.products.length) {
+          // Backend is probably returning wrong total, estimate higher
+          adjustedTotal = Math.max(total, pagination.offset + pagination.limit + 1);
+          adjustedTotalPages = Math.ceil(adjustedTotal / pagination.limit);
+          console.log('Applied workaround - adjusted total:', adjustedTotal, 'adjusted pages:', adjustedTotalPages);
+        }
+        
+        setPagination(prev => ({
+          ...prev,
+          total: adjustedTotal,
+          totalPages: adjustedTotalPages,
           currentPage
         }));
       } else {
@@ -510,8 +532,8 @@ const Products = () => {
               </tbody>
             </table>
 
-            {/* Pagination Controls */}
-            {pagination.totalPages > 1 && (
+            {/* Pagination Controls - Show if more than 1 page OR if we have max results per page */}
+            {(pagination.totalPages > 1 || filteredProducts.length >= pagination.limit) && (
               <div className="pagination-container">
                 <div className="pagination-info">
                   <span>
