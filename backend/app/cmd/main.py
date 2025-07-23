@@ -19,6 +19,7 @@ from app.presentation.api.warehouses.warehouse import router as warehouse_router
 from app.presentation.api.orders.order import router as order_router
 from app.presentation.api.stock_docs.stock_doc import router as stock_doc_router
 from app.presentation.api.trips.trip import router as trip_router
+from app.presentation.api.trips.monitoring import router as monitoring_router
 from app.presentation.api.vehicles.vehicle import router as vehicle_router
 from app.presentation.api.vehicles.vehicle_warehouse import router as vehicle_warehouse_router
 import sqlalchemy
@@ -119,9 +120,15 @@ setup_logging(app, log_level=LOG_LEVEL)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
+    allow_origins=[
+        "http://localhost:3000",  # React dev server
+        "http://localhost:3001",  # Alternative React dev server
+        "https://omsfrontend.netlify.app",  # Netlify frontend
+        "https://aware-endurance-production.up.railway.app",  # Railway backend (for testing)
+        "http://aware-endurance-production.up.railway.app",  # Railway backend (for testing)
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -139,6 +146,7 @@ app.include_router(warehouse_router, prefix="/api/v1")
 app.include_router(order_router, prefix="/api/v1")
 app.include_router(stock_doc_router, prefix="/api/v1")
 app.include_router(trip_router, prefix="/api/v1")
+app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(vehicle_router, prefix="/api/v1")
 app.include_router(vehicle_warehouse_router, prefix="/api/v1")
 
