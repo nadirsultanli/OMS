@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import customerService from '../services/customerService';
 import fileUploadService from '../services/fileUploadService';
-import { Search, Plus, MoreVertical, Mail, Phone, Building2, CreditCard, Wallet, Eye, Upload, FileText } from 'lucide-react';
+import { Search, Plus, Mail, Phone, Building2, CreditCard, Wallet, Upload, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import './Customers.css';
 
 const Customers = () => {
@@ -13,7 +13,6 @@ const Customers = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
-  const [activeDropdown, setActiveDropdown] = useState(null);
 
   // Filters
   const [filters, setFilters] = useState({
@@ -40,42 +39,34 @@ const Customers = () => {
   // Pagination
   const [pagination, setPagination] = useState({
     total: 0,
-    limit: 100,
-    offset: 0
+    limit: 25,
+    offset: 0,
+    currentPage: 1
   });
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [pagination.limit, pagination.offset, filters]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [customers, filters]);
-
-  // Handle clicking outside dropdown to close it
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (activeDropdown && !event.target.closest('.actions-menu')) {
-        setActiveDropdown(null);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [activeDropdown]);
 
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const result = await customerService.getCustomers({
+      const params = {
         limit: pagination.limit,
         offset: pagination.offset
-      });
+      };
+
+      // Add filters to API request
+      if (filters.search) params.search = filters.search;
+      if (filters.status) params.status = filters.status;
+      if (filters.customer_type) params.customer_type = filters.customer_type;
+
+      const result = await customerService.getCustomers(params);
 
       if (result.success) {
         setCustomers(result.data.customers || []);
+        setFilteredCustomers(result.data.customers || []); // Since filtering is done server-side
         setPagination(prev => ({
           ...prev,
           total: result.data.total || 0
@@ -95,36 +86,6 @@ const Customers = () => {
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...customers];
-
-    // Search filter (name, email, phone)
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(customer => {
-        const nameMatch = customer.name?.toLowerCase().includes(searchTerm);
-        const emailMatch = customer.addresses?.some(addr => 
-          addr.email?.toLowerCase().includes(searchTerm)
-        );
-        const phoneMatch = customer.addresses?.some(addr => 
-          addr.phone?.toLowerCase().includes(searchTerm)
-        );
-        return nameMatch || emailMatch || phoneMatch;
-      });
-    }
-
-    // Status filter
-    if (filters.status) {
-      filtered = filtered.filter(customer => customer.status === filters.status);
-    }
-
-    // Customer type filter
-    if (filters.customer_type) {
-      filtered = filtered.filter(customer => customer.customer_type === filters.customer_type);
-    }
-
-    setFilteredCustomers(filtered);
-  };
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -132,6 +93,8 @@ const Customers = () => {
       ...prev,
       [name]: value
     }));
+    // Reset pagination when filters change
+    resetPaginationOnFilter();
   };
 
   const handleInputChange = (e) => {
@@ -314,41 +277,6 @@ const Customers = () => {
     navigate(`/customers/${customerId}`);
   };
 
-  const handleDropdownToggle = (customerId, event) => {
-    event.stopPropagation();
-    setActiveDropdown(activeDropdown === customerId ? null : customerId);
-  };
-
-  const handleStatusChange = async (customerId, action, event) => {
-    event.stopPropagation();
-    setActiveDropdown(null); // Close dropdown
-    
-    try {
-      switch (action) {
-        case 'approve':
-          await customerService.approveCustomer(customerId);
-          setMessage('Customer approved successfully');
-          break;
-        case 'reject':
-          await customerService.rejectCustomer(customerId);
-          setMessage('Customer rejected');
-          break;
-        case 'inactivate':
-          await customerService.inactivateCustomer(customerId);
-          setMessage('Customer inactivated');
-          break;
-        case 'activate':
-          await customerService.activateCustomer(customerId);
-          setMessage('Customer activated');
-          break;
-        default:
-          break;
-      }
-      fetchCustomers();
-    } catch (error) {
-      setErrors({ general: `Failed to ${action} customer` });
-    }
-  };
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -379,6 +307,62 @@ const Customers = () => {
   const getDefaultAddress = (addresses) => {
     if (!addresses || addresses.length === 0) return null;
     return addresses.find(addr => addr.is_default) || addresses[0];
+  };
+
+  // Pagination functions
+  const handlePageSizeChange = (e) => {
+    const newLimit = parseInt(e.target.value);
+    setPagination(prev => ({
+      ...prev,
+      limit: newLimit,
+      offset: 0,
+      currentPage: 1
+    }));
+  };
+
+  const handlePageChange = (page) => {
+    const newOffset = (page - 1) * pagination.limit;
+    setPagination(prev => ({
+      ...prev,
+      offset: newOffset,
+      currentPage: page
+    }));
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(pagination.total / pagination.limit);
+  };
+
+  const getVisiblePageNumbers = () => {
+    const totalPages = getTotalPages();
+    const current = pagination.currentPage;
+    const delta = 2; // Number of pages to show on each side
+    
+    let start = Math.max(1, current - delta);
+    let end = Math.min(totalPages, current + delta);
+    
+    // Adjust if we're near the beginning or end
+    if (current <= delta + 1) {
+      end = Math.min(totalPages, 2 * delta + 1);
+    }
+    if (current >= totalPages - delta) {
+      start = Math.max(1, totalPages - 2 * delta);
+    }
+    
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    
+    return { pages, start, end, totalPages };
+  };
+
+  const resetPaginationOnFilter = () => {
+    setPagination(prev => ({
+      ...prev,
+      offset: 0,
+      currentPage: 1
+    }));
   };
 
   return (
@@ -471,53 +455,156 @@ const Customers = () => {
             <p>Start by creating your first customer</p>
           </div>
         ) : (
-          <table className="customers-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone Number</th>
-                <th>Customer Type</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCustomers.map((customer) => {
-                const defaultAddress = getDefaultAddress(customer.addresses);
-                return (
-                  <tr key={customer.id}>
-                    <td className="name-cell">{customer.name}</td>
-                    <td className="email-cell">{defaultAddress?.email || '-'}</td>
-                    <td>{defaultAddress?.phone || '-'}</td>
-                    <td>
-                      <span className={getCustomerTypeBadgeClass(customer.customer_type)}>
-                        {customer.customer_type.charAt(0).toUpperCase() + customer.customer_type.slice(1)}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={getStatusBadgeClass(customer.status)}>
-                        {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="date-cell">{formatDate(customer.created_at)}</td>
-                    <td className="actions-cell">
-                      <button
-                        onClick={() => handleCustomerClick(customer.id)}
-                        className="action-icon-btn"
-                        title="View customer details"
-                      >
-                        <Eye size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="table-wrapper">
+            <table className="customers-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone Number</th>
+                  <th>Customer Type</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.map((customer) => {
+                  const defaultAddress = getDefaultAddress(customer.addresses);
+                  return (
+                    <tr 
+                      key={customer.id}
+                      onClick={() => handleCustomerClick(customer.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className="name-cell">{customer.name}</td>
+                      <td className="email-cell">{defaultAddress?.email || '-'}</td>
+                      <td>{defaultAddress?.phone || '-'}</td>
+                      <td>
+                        <span className={getCustomerTypeBadgeClass(customer.customer_type)}>
+                          {customer.customer_type.charAt(0).toUpperCase() + customer.customer_type.slice(1)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={getStatusBadgeClass(customer.status)}>
+                          {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="date-cell">{formatDate(customer.created_at)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && filteredCustomers.length > 0 && (
+        <div className="pagination-container">
+          <div className="pagination-header">
+            <div className="pagination-info">
+              Showing {pagination.offset + 1}-{Math.min(pagination.offset + pagination.limit, pagination.total)} of {pagination.total} results
+            </div>
+            <div className="page-size-selector">
+              <label htmlFor="page-size">Show:</label>
+              <select
+                id="page-size"
+                value={pagination.limit}
+                onChange={handlePageSizeChange}
+                className="page-size-select"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>per page</span>
+            </div>
+          </div>
+
+          <div className="pagination-controls">
+            <button
+              onClick={() => handlePageChange(pagination.currentPage - 1)}
+              disabled={pagination.currentPage === 1}
+              className="pagination-btn"
+            >
+              <ChevronLeft size={16} />
+              Previous
+            </button>
+
+            {(() => {
+              const { pages, start, totalPages } = getVisiblePageNumbers();
+              const controls = [];
+
+              // First page + ellipsis if needed
+              if (start > 1) {
+                controls.push(
+                  <button
+                    key={1}
+                    onClick={() => handlePageChange(1)}
+                    className="pagination-btn"
+                  >
+                    1
+                  </button>
+                );
+                if (start > 2) {
+                  controls.push(
+                    <span key="ellipsis1" className="pagination-ellipsis">
+                      ...
+                    </span>
+                  );
+                }
+              }
+
+              // Visible page numbers
+              pages.forEach(page => {
+                controls.push(
+                  <button
+                    key={page}
+                    onClick={() => handlePageChange(page)}
+                    className={`pagination-btn ${page === pagination.currentPage ? 'active' : ''}`}
+                  >
+                    {page}
+                  </button>
+                );
+              });
+
+              // Ellipsis + last page if needed
+              const end = pages[pages.length - 1] || 0;
+              if (end < totalPages) {
+                if (end < totalPages - 1) {
+                  controls.push(
+                    <span key="ellipsis2" className="pagination-ellipsis">
+                      ...
+                    </span>
+                  );
+                }
+                controls.push(
+                  <button
+                    key={totalPages}
+                    onClick={() => handlePageChange(totalPages)}
+                    className="pagination-btn"
+                  >
+                    {totalPages}
+                  </button>
+                );
+              }
+
+              return controls;
+            })()}
+
+            <button
+              onClick={() => handlePageChange(pagination.currentPage + 1)}
+              disabled={pagination.currentPage === getTotalPages()}
+              className="pagination-btn"
+            >
+              Next
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create Customer Modal */}
       {showCreateForm && (

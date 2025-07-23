@@ -176,6 +176,13 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   overflow: hidden;
+  margin-bottom: 24px; /* Add margin to ensure pagination is visible */
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .users-table {
@@ -567,6 +574,26 @@
   .form-actions {
     flex-direction: column;
   }
+
+  .pagination-container {
+    padding: 16px;
+  }
+
+  .pagination-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .pagination-controls {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .pagination-btn {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -589,24 +616,158 @@
   }
 }
 
+/* Action Buttons */
+.resend-invitation-btn {
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.resend-invitation-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.resend-invitation-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Pagination Styles */
+.pagination-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 24px 32px;
+  margin-top: 20px;
+}
+
+.pagination-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.page-size-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-size-selector label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.page-size-select {
+  padding: 8px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.page-size-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pagination-btn {
+  padding: 8px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f8fafc;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f9fafb;
+}
+
+.pagination-btn.active {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: white;
+  border-color: #2563eb;
+}
+
+.pagination-btn.active:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+}
+
+.pagination-ellipsis {
+  padding: 8px 4px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   .users-header,
   .filters-section,
   .table-container,
-  .modal-content {
+  .modal-content,
+  .pagination-container {
     border: 2px solid #000;
   }
 
   .form-input,
   .form-select,
   .filter-input,
-  .filter-select {
+  .filter-select,
+  .page-size-select {
     border-width: 2px;
   }
 
   .submit-button,
-  .create-user-btn {
+  .create-user-btn,
+  .pagination-btn {
+    background: #000;
+    border: 2px solid #000;
+  }
+
+  .pagination-btn.active {
     background: #000;
     border: 2px solid #000;
   }

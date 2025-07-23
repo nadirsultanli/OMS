@@ -54,6 +54,7 @@ class UserService {
       if (params.limit) queryParams.append('limit', params.limit);
       if (params.offset) queryParams.append('offset', params.offset);
       if (params.role) queryParams.append('role', params.role);
+      if (params.search) queryParams.append('search', params.search);
       if (params.active_only !== undefined) queryParams.append('active_only', params.active_only);
       
       const response = await api.get(`/users/?${queryParams.toString()}`);
