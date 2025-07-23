@@ -27,6 +27,38 @@ from app.services.dependencies.price_lists import get_price_list_service, get_pr
 router = APIRouter(prefix="/price-lists", tags=["Price Lists"])
 
 
+@router.get("", response_model=PriceListListResponse)
+async def get_price_lists(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    price_list_service: PriceListService = Depends(get_price_list_service),
+    user: User = current_user
+):
+    """Get price lists with pagination"""
+    try:
+        # Check if user belongs to the tenant
+        if str(user.tenant_id) != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this tenant"
+            )
+        
+        price_lists = await price_list_service.get_all_price_lists(
+            UUID(tenant_id), limit, offset
+        )
+        
+        price_list_responses = [PriceListResponse(**price_list.to_dict()) for price_list in price_lists]
+        return PriceListListResponse(
+            price_lists=price_list_responses,
+            total=len(price_list_responses),
+            limit=limit,
+            offset=offset
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.post("/", response_model=PriceListResponse)
 async def create_price_list(
     request: CreatePriceListRequest,
@@ -56,38 +88,6 @@ async def create_price_list(
         return PriceListResponse(**price_list.to_dict())
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-
-
-@router.get("/", response_model=PriceListListResponse)
-async def get_price_lists(
-    tenant_id: str = Query(..., description="Tenant ID"),
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-    price_list_service: PriceListService = Depends(get_price_list_service),
-    user: User = current_user
-):
-    """Get price lists with pagination"""
-    try:
-        # Check if user belongs to the tenant
-        if str(user.tenant_id) != tenant_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied to this tenant"
-            )
-        
-        price_lists = await price_list_service.get_all_price_lists(
-            UUID(tenant_id), limit, offset
-        )
-        
-        price_list_responses = [PriceListResponse(**price_list.to_dict()) for price_list in price_lists]
-        return PriceListListResponse(
-            price_lists=price_list_responses,
-            total=len(price_list_responses),
-            limit=limit,
-            offset=offset
-        )
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -247,13 +247,20 @@ async def update_price_list_line(
 ):
     """Update a price list line"""
     try:
-        # Get current line to check access (we'll need to get the price list)
-        lines = await price_list_service.get_price_list_lines(line_id)
-        if not lines:
+        # Get current line to check access
+        current_line = await price_list_service.get_price_list_line_by_id(line_id)
+        if not current_line:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Price list line not found")
         
-        # For simplicity, we'll assume the line belongs to a price list the user has access to
-        # In a real implementation, you'd want to verify this more thoroughly
+        # Get the price list to check tenant access
+        price_list = await price_list_service.get_price_list_by_id(str(current_line.price_list_id))
+        
+        # Check if user belongs to the tenant
+        if str(user.tenant_id) != str(price_list.tenant_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this price list"
+            )
         
         updated_line = await price_list_service.update_price_list_line(
             line_id,
