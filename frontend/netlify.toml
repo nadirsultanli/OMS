@@ -20,7 +20,7 @@
 # API proxy for development (if needed)
 [[redirects]]
   from = "/api/*"
-  to = "https://your-backend-url.com/api/:splat"
+  to = "https://aware-endurance-production.up.railway.app/api/:splat"
   status = 200
   force = false
 
@@ -31,7 +31,7 @@
     X-Frame-Options = "DENY"
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
-    Content-Security-Policy = "default-src 'self'; style-src 'self' 'unsafe-inline' https://api.mapbox.com; script-src 'self' https://api.mapbox.com; img-src 'self' data: https:; connect-src 'self' http://localhost:8000 https://api.mapbox.com https://events.mapbox.com https://*.supabase.co wss://*.supabase.co; font-src 'self' data:;"
+    Content-Security-Policy = "default-src 'self'; style-src 'self' 'unsafe-inline' https://api.mapbox.com; script-src 'self' https://api.mapbox.com; img-src 'self' data: https:; connect-src 'self' http://localhost:8000 https://aware-endurance-production.up.railway.app https://api.mapbox.com https://events.mapbox.com https://*.supabase.co wss://*.supabase.co; font-src 'self' data:;"
 
 # Cache static assets
 [[headers]]
@@ -53,6 +53,9 @@
 # Environment-specific builds
 [context.production]
   command = "npm run build"
+  [context.production.environment]
+    REACT_APP_ENVIRONMENT = "production"
+    REACT_APP_API_URL_PROD = "https://aware-endurance-production.up.railway.app"
 
 [context.deploy-preview]
   command = "npm run build"

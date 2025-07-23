@@ -214,18 +214,32 @@ class ProductRepositoryImpl(ProductRepository):
         await self.session.commit()
         return True
     
-    async def get_products_by_category(self, tenant_id: UUID, category: str) -> List[ProductEntity]:
-        """Get products by category within a tenant"""
-        stmt = select(ProductModel).options(
-            selectinload(ProductModel.variants)
-        ).where(
+    async def get_products_by_category(self, tenant_id: UUID, category: str, limit: int = 100, offset: int = 0) -> List[ProductEntity]:
+        """Get products by category within a tenant with pagination"""
+        stmt = select(ProductModel).where(
             and_(
                 ProductModel.tenant_id == tenant_id,
                 ProductModel.category == category,
                 ProductModel.deleted_at.is_(None)
             )
-        )
+        ).limit(limit).offset(offset)
         
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
+
+    async def count_products(self, tenant_id: UUID, category: Optional[str] = None) -> int:
+        """Count total products for a tenant, optionally filtered by category"""
+        from sqlalchemy import func
+        
+        conditions = [
+            ProductModel.tenant_id == tenant_id,
+            ProductModel.deleted_at.is_(None)
+        ]
+        
+        if category:
+            conditions.append(ProductModel.category == category)
+        
+        stmt = select(func.count(ProductModel.id)).where(and_(*conditions))
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
