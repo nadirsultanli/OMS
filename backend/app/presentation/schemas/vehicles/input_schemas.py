@@ -1,7 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from app.domain.entities.vehicles import VehicleType, Vehicle
+from datetime import datetime
+from app.domain.entities.vehicles import VehicleType
 
 class CreateVehicleRequest(BaseModel):
     tenant_id: UUID
@@ -26,6 +27,24 @@ class UpdateVehicleRequest(BaseModel):
 
 # Vehicle Warehouse Schemas
 
+class VehicleData(BaseModel):
+    """Vehicle data for warehouse operations"""
+    id: UUID = Field(..., description="Vehicle ID")
+    tenant_id: UUID = Field(..., description="Tenant ID")
+    plate: str = Field(..., description="Vehicle plate number")
+    vehicle_type: VehicleType = Field(..., description="Vehicle type")
+    capacity_kg: float = Field(..., description="Weight capacity in kg")
+    capacity_m3: Optional[float] = Field(None, description="Volume capacity in cubic meters")
+    volume_unit: Optional[str] = Field(None, description="Volume unit")
+    depot_id: Optional[UUID] = Field(None, description="Depot ID")
+    active: bool = Field(..., description="Whether vehicle is active")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    created_by: Optional[UUID] = Field(None, description="Created by user ID")
+    updated_at: datetime = Field(..., description="Update timestamp")
+    updated_by: Optional[UUID] = Field(None, description="Updated by user ID")
+    deleted_at: Optional[datetime] = Field(None, description="Deletion timestamp")
+    deleted_by: Optional[UUID] = Field(None, description="Deleted by user ID")
+
 class InventoryItem(BaseModel):
     """Individual inventory item for vehicle loading/unloading"""
     product_id: str = Field(..., description="Product ID")
@@ -40,13 +59,8 @@ class LoadVehicleRequest(BaseModel):
     """Request to load vehicle as warehouse"""
     trip_id: UUID = Field(..., description="Trip ID")
     source_warehouse_id: UUID = Field(..., description="Source warehouse ID")
-    vehicle: Vehicle = Field(..., description="Vehicle object with capacity information")
+    vehicle: VehicleData = Field(..., description="Vehicle object with capacity information")
     inventory_items: List[InventoryItem] = Field(..., description="Inventory items to load")
-    
-    class Config:
-        json_encoders = {
-            Vehicle: lambda v: v.__dict__
-        }
 
 class UnloadVehicleRequest(BaseModel):
     """Request to unload vehicle as warehouse"""
@@ -57,10 +71,5 @@ class UnloadVehicleRequest(BaseModel):
 
 class VehicleCapacityValidationRequest(BaseModel):
     """Request to validate vehicle capacity"""
-    vehicle: Vehicle = Field(..., description="Vehicle object with capacity information")
-    inventory_items: List[InventoryItem] = Field(..., description="Inventory items to validate")
-    
-    class Config:
-        json_encoders = {
-            Vehicle: lambda v: v.__dict__
-        } 
+    vehicle: VehicleData = Field(..., description="Vehicle object with capacity information")
+    inventory_items: List[InventoryItem] = Field(..., description="Inventory items to validate") 

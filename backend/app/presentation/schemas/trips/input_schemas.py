@@ -23,14 +23,14 @@ class CreateTripRequest(BaseModel):
     - 422: Validation error
     """
     trip_no: str = Field(..., description="Human-readable trip number")
-    vehicle_id: UUID = Field(..., description="Vehicle ID (must be available and active)")
-    driver_id: UUID = Field(..., description="Driver ID (must be available for planned date)")
+    vehicle_id: Optional[str] = Field(None, description="Vehicle ID (must be available and active)")
+    driver_id: Optional[str] = Field(None, description="Driver ID (must be available for planned date)")
     planned_date: date = Field(..., description="Date when deliveries will happen")
     start_time: Optional[datetime] = Field(None, description="Planned start time")
     end_time: Optional[datetime] = Field(None, description="Planned end time")
-    starting_warehouse_id: Optional[UUID] = Field(None, description="Starting warehouse for loading")
-    start_wh_id: Optional[UUID] = Field(None, description="Starting warehouse ID")
-    end_wh_id: Optional[UUID] = Field(None, description="Ending warehouse ID")
+    starting_warehouse_id: Optional[str] = Field(None, description="Starting warehouse for loading")
+    start_wh_id: Optional[str] = Field(None, description="Starting warehouse ID")
+    end_wh_id: Optional[str] = Field(None, description="Ending warehouse ID")
     gross_loaded_kg: Optional[Decimal] = Field(None, description="Total loaded weight in kg")
     notes: Optional[str] = Field(None, max_length=1000, description="Special notes or instructions")
 
@@ -49,14 +49,14 @@ class UpdateTripRequest(BaseModel):
     - 422: Validation error
     """
     trip_no: Optional[str] = Field(None, description="Human-readable trip number")
-    vehicle_id: Optional[UUID] = Field(None, description="Vehicle ID")
-    driver_id: Optional[UUID] = Field(None, description="Driver ID")
+    vehicle_id: Optional[str] = Field(None, description="Vehicle ID")
+    driver_id: Optional[str] = Field(None, description="Driver ID")
     planned_date: Optional[date] = Field(None, description="Planned delivery date")
     start_time: Optional[datetime] = Field(None, description="Planned start time")
     end_time: Optional[datetime] = Field(None, description="Planned end time")
-    starting_warehouse_id: Optional[UUID] = Field(None, description="Starting warehouse")
-    start_wh_id: Optional[UUID] = Field(None, description="Starting warehouse ID")
-    end_wh_id: Optional[UUID] = Field(None, description="Ending warehouse ID")
+    starting_warehouse_id: Optional[str] = Field(None, description="Starting warehouse")
+    start_wh_id: Optional[str] = Field(None, description="Starting warehouse ID")
+    end_wh_id: Optional[str] = Field(None, description="Ending warehouse ID")
     gross_loaded_kg: Optional[Decimal] = Field(None, description="Total loaded weight in kg")
     notes: Optional[str] = Field(None, max_length=1000, description="Trip notes")
 

@@ -10,8 +10,8 @@ class VehicleResponse(BaseModel):
     plate: str
     vehicle_type: VehicleType
     capacity_kg: float
-    capacity_m3: float
-    volume_unit: str
+    capacity_m3: Optional[float]
+    volume_unit: Optional[str]
     depot_id: Optional[UUID]
     active: bool
     created_at: datetime
