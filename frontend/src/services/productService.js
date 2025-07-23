@@ -36,7 +36,7 @@ const productService = {
   // Get product by ID
   getProductById: async (productId) => {
     try {
-      const response = await api.get(`/products/${productId}/`);
+      const response = await api.get(`/products/${productId}`);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching product:', error);
@@ -70,7 +70,7 @@ const productService = {
   // Update product
   updateProduct: async (productId, productData) => {
     try {
-      const response = await api.put(`/products/${productId}/`, productData);
+      const response = await api.put(`/products/${productId}`, productData);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error updating product:', error);
@@ -81,7 +81,7 @@ const productService = {
   // Delete product
   deleteProduct: async (productId) => {
     try {
-      await api.delete(`/products/${productId}/`);
+      await api.delete(`/products/${productId}`);
       return { success: true };
     } catch (error) {
       console.error('Error deleting product:', error);
