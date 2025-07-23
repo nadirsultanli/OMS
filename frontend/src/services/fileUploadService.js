@@ -2,29 +2,48 @@ import supabaseAuthService from './supabaseAuthService';
 
 class FileUploadService {
   constructor() {
-    this.supabase = supabaseAuthService.getClient();
     this.bucketName = 'customer-documents';
+  }
+
+  // Get the current supabase client with authentication
+  getSupabaseClient() {
+    return supabaseAuthService.getClient();
   }
 
   // Upload file to Supabase Storage
   async uploadFile(file, customerId, tenantId) {
     try {
+      const supabase = this.getSupabaseClient();
+      
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('User not authenticated');
+      }
+
       // Create a unique file name
       const fileExt = file.name.split('.').pop();
       const fileName = `${tenantId}/${customerId}/incorporation_doc_${Date.now()}.${fileExt}`;
 
+      console.log('Uploading file:', fileName, 'to bucket:', this.bucketName);
+
       // Upload file to Supabase Storage
-      const { data, error } = await this.supabase.storage
+      const { data, error } = await supabase.storage
         .from(this.bucketName)
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase storage upload error:', error);
+        throw error;
+      }
+
+      console.log('File uploaded successfully:', data);
 
       // Get the public URL
-      const { data: { publicUrl } } = this.supabase.storage
+      const { data: { publicUrl } } = supabase.storage
         .from(this.bucketName)
         .getPublicUrl(fileName);
 
@@ -37,7 +56,7 @@ class FileUploadService {
       console.error('File upload error:', error);
       return {
         success: false,
-        error: error.message
+        error: error.message || 'File upload failed'
       };
     }
   }
@@ -45,7 +64,9 @@ class FileUploadService {
   // Download file from Supabase Storage
   async downloadFile(filePath) {
     try {
-      const { data, error } = await this.supabase.storage
+      const supabase = this.getSupabaseClient();
+      
+      const { data, error } = await supabase.storage
         .from(this.bucketName)
         .download(filePath);
 
@@ -67,7 +88,9 @@ class FileUploadService {
   // Get signed URL for private file access
   async getSignedUrl(filePath, expiresIn = 3600) {
     try {
-      const { data, error } = await this.supabase.storage
+      const supabase = this.getSupabaseClient();
+      
+      const { data, error } = await supabase.storage
         .from(this.bucketName)
         .createSignedUrl(filePath, expiresIn);
 
@@ -89,7 +112,9 @@ class FileUploadService {
   // Delete file from Supabase Storage
   async deleteFile(filePath) {
     try {
-      const { error } = await this.supabase.storage
+      const supabase = this.getSupabaseClient();
+      
+      const { error } = await supabase.storage
         .from(this.bucketName)
         .remove([filePath]);
 
