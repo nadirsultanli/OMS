@@ -87,11 +87,16 @@ const AuthCallback = () => {
       }
       
       // Default behavior - check if user is already authenticated
-      if (authService.isAuthenticated()) {
+      // But don't redirect to dashboard if we just completed an invitation
+      const justCompletedInvitation = sessionStorage.getItem('justCompletedInvitation');
+      
+      if (authService.isAuthenticated() && !justCompletedInvitation) {
         console.log('AuthCallback - User already authenticated, redirecting to dashboard');
         navigate('/dashboard');
       } else {
-        console.log('AuthCallback - No valid auth flow detected, redirecting to login');
+        console.log('AuthCallback - No valid auth flow detected or just completed invitation, redirecting to login');
+        // Clear the flag if it exists
+        sessionStorage.removeItem('justCompletedInvitation');
         navigate('/login');
       }
     };

@@ -113,6 +113,16 @@ const AcceptInvitation = () => {
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         
+        // Also clear any other auth-related items
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('supabase.auth.expires_at');
+        localStorage.removeItem('supabase.auth.refresh_token');
+        
+        console.log('Cleared all authentication data from localStorage');
+        
+        // Set a flag to prevent dashboard redirect
+        sessionStorage.setItem('justCompletedInvitation', 'true');
+        
         // Redirect to login page after 2 seconds
         setTimeout(() => {
           navigate('/login', { 
