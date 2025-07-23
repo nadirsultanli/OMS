@@ -3,7 +3,7 @@ from typing import Optional
 from decimal import Decimal
 
 class CreateProductRequest(BaseModel):
-    tenant_id: str
+    tenant_id: Optional[str] = None
     name: str
     category: Optional[str] = None
     unit_of_measure: str = "PCS"
