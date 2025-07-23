@@ -73,26 +73,42 @@ const CustomerDetail = () => {
 
   const handleDownloadDocument = async (filePath) => {
     try {
-      // Get a signed URL for the file
-      const result = await fileUploadService.getSignedUrl(filePath);
+      setLoading(true);
+      console.log('Downloading file:', filePath);
       
-      if (result.success && result.signedUrl) {
-        // Create a temporary link element and trigger download
-        const link = document.createElement('a');
-        link.href = result.signedUrl;
-        link.download = 'incorporation_document';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      // Try the blob download method first (better for user experience)
+      let result = await fileUploadService.downloadFileAsBlob(filePath);
+      
+      if (!result.success) {
+        console.warn('Blob download failed, trying signed URL method:', result.error);
         
-        setMessage('Download started...');
-        setTimeout(() => setMessage(''), 3000);
+        // Fallback to signed URL with download parameter
+        result = await fileUploadService.getDownloadUrl(filePath);
+        
+        if (result.success && result.downloadUrl) {
+          // Create a link with download attribute to force download
+          const link = document.createElement('a');
+          link.href = result.downloadUrl;
+          link.download = filePath.split('/').pop() || 'document.pdf';
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          setMessage('File download started!');
+        } else {
+          throw new Error(result.error || 'Failed to get download URL');
+        }
       } else {
-        setErrors({ general: 'Failed to download document. Please try again.' });
+        setMessage('File downloaded successfully!');
       }
+      
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Download error:', error);
-      setErrors({ general: 'Failed to download document. Please try again.' });
+      setErrors({ general: 'An error occurred while downloading the file' });
+    } finally {
+      setLoading(false);
     }
   };
 
