@@ -4,7 +4,6 @@ from uuid import UUID
 from app.domain.entities.addresses import AddressType
 
 class CreateAddressRequest(BaseModel):
-    tenant_id: UUID
     customer_id: UUID
     address_type: AddressType
     street: str
@@ -15,7 +14,7 @@ class CreateAddressRequest(BaseModel):
     access_instructions: Optional[str] = None
     coordinates: Optional[Union[str, List[float]]] = None
     is_default: bool = False
-    created_by: Optional[UUID] = None
+    # tenant_id and created_by will be set from user context
 
     @field_validator('coordinates')
     def validate_coordinates(cls, v):

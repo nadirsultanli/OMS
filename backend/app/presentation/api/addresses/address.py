@@ -37,8 +37,20 @@ async def get_address(address_id: str, address_service: AddressService = Depends
     return AddressResponse(**address.to_dict())
 
 @router.get("/", response_model=AddressListResponse)
-async def get_addresses(limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0), address_service: AddressService = Depends(get_address_service)):
-    addresses = await address_service.get_all_addresses(limit, offset)
+async def get_addresses(
+    customer_id: Optional[str] = Query(None, description="Filter addresses by customer ID"),
+    limit: int = Query(100, ge=1, le=1000), 
+    offset: int = Query(0, ge=0), 
+    address_service: AddressService = Depends(get_address_service),
+    current_user: User = Depends(get_current_user)
+):
+    if customer_id:
+        # Get addresses for specific customer (service expects string)
+        addresses = await address_service.get_addresses_by_customer(customer_id)
+    else:
+        # Get all addresses for the tenant
+        addresses = await address_service.get_all_addresses(limit, offset)
+    
     address_responses = [AddressResponse(**address.to_dict()) for address in addresses]
     return AddressListResponse(addresses=address_responses, total=len(address_responses), limit=limit, offset=offset)
 
