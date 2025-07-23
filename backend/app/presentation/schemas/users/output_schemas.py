@@ -2,6 +2,12 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.domain.entities.users import UserRoleType, UserStatus
 
+class TenantInfo(BaseModel):
+    """Tenant information to include in login response"""
+    id: str
+    name: str
+    base_currency: str
+
 class UserResponse(BaseModel):
     id: str
     tenant_id: str
@@ -28,7 +34,8 @@ class LoginResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user_id: str
-    tenant_id: str
+    tenant_id: str  # Keep for backward compatibility
+    tenant: TenantInfo  # New tenant information
     email: str
     role: str
     full_name: Optional[str]
