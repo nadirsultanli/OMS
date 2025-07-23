@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import userService from '../services/userService';
-import Logo from '../assets/Logo.svg';
-import { Search } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import './Users.css';
 
 const Users = () => {
-  const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -29,28 +27,31 @@ const Users = () => {
   // Pagination
   const [pagination, setPagination] = useState({
     total: 0,
-    limit: 100,
-    offset: 0
+    limit: 25,
+    offset: 0,
+    currentPage: 1
   });
 
   useEffect(() => {
     fetchUsers();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [users, filters]);
+  }, [pagination.limit, pagination.offset, filters]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const result = await userService.getUsers({
+      const params = {
         limit: pagination.limit,
         offset: pagination.offset
-      });
+      };
+
+      // Add filters to API request
+      if (filters.search) params.search = filters.search;
+      if (filters.role) params.role = filters.role;
+
+      const result = await userService.getUsers(params);
 
       if (result.success) {
-        setUsers(result.data.users || []);
+        setFilteredUsers(result.data.users || []); // Since filtering is done server-side
         setPagination(prev => ({
           ...prev,
           total: result.data.total || 0
@@ -65,25 +66,6 @@ const Users = () => {
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...users];
-
-    // Search filter (name, email, phone)
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(user =>
-        user.full_name?.toLowerCase().includes(searchTerm) ||
-        user.email?.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Role filter
-    if (filters.role) {
-      filtered = filtered.filter(user => user.role === filters.role);
-    }
-
-    setFilteredUsers(filtered);
-  };
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -91,6 +73,8 @@ const Users = () => {
       ...prev,
       [name]: value
     }));
+    // Reset pagination when filters change
+    resetPaginationOnFilter();
   };
 
   const handleInputChange = (e) => {
@@ -265,6 +249,62 @@ const Users = () => {
     return statusNames[status] || status;
   };
 
+  // Pagination functions
+  const handlePageSizeChange = (e) => {
+    const newLimit = parseInt(e.target.value);
+    setPagination(prev => ({
+      ...prev,
+      limit: newLimit,
+      offset: 0,
+      currentPage: 1
+    }));
+  };
+
+  const handlePageChange = (page) => {
+    const newOffset = (page - 1) * pagination.limit;
+    setPagination(prev => ({
+      ...prev,
+      offset: newOffset,
+      currentPage: page
+    }));
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(pagination.total / pagination.limit);
+  };
+
+  const getVisiblePageNumbers = () => {
+    const totalPages = getTotalPages();
+    const current = pagination.currentPage;
+    const delta = 2; // Number of pages to show on each side
+    
+    let start = Math.max(1, current - delta);
+    let end = Math.min(totalPages, current + delta);
+    
+    // Adjust if we're near the beginning or end
+    if (current <= delta + 1) {
+      end = Math.min(totalPages, 2 * delta + 1);
+    }
+    if (current >= totalPages - delta) {
+      start = Math.max(1, totalPages - 2 * delta);
+    }
+    
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    
+    return { pages, start, end, totalPages };
+  };
+
+  const resetPaginationOnFilter = () => {
+    setPagination(prev => ({
+      ...prev,
+      offset: 0,
+      currentPage: 1
+    }));
+  };
+
   return (
     <div className="users-container">
       <div className="users-header">
@@ -335,21 +375,26 @@ const Users = () => {
             <div className="loading-spinner"></div>
             <p>Loading users...</p>
           </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="empty-state">
+            <h3>No users found</h3>
+            <p>{filters.search || filters.role ? 'No users found matching your filters.' : 'Start by creating your first user'}</p>
+          </div>
         ) : (
-          <table className="users-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
+          <div className="table-wrapper">
+            <table className="users-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((user) => (
                   <tr key={user.id}>
                     <td className="name-cell">{user.full_name || '-'}</td>
                     <td className="email-cell">{user.email}</td>
@@ -377,18 +422,119 @@ const Users = () => {
                       )}
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="6" className="empty-state">
-                    {filters.search || filters.role ? 'No users found matching your filters.' : 'No users found.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && filteredUsers.length > 0 && (
+        <div className="pagination-container">
+          <div className="pagination-header">
+            <div className="pagination-info">
+              Showing {pagination.offset + 1}-{Math.min(pagination.offset + pagination.limit, pagination.total)} of {pagination.total} results
+            </div>
+            <div className="page-size-selector">
+              <label htmlFor="page-size">Show:</label>
+              <select
+                id="page-size"
+                value={pagination.limit}
+                onChange={handlePageSizeChange}
+                className="page-size-select"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>per page</span>
+            </div>
+          </div>
+
+          <div className="pagination-controls">
+            <button
+              onClick={() => handlePageChange(pagination.currentPage - 1)}
+              disabled={pagination.currentPage === 1}
+              className="pagination-btn"
+            >
+              <ChevronLeft size={16} />
+              Previous
+            </button>
+
+            {(() => {
+              const { pages, start, totalPages } = getVisiblePageNumbers();
+              const controls = [];
+
+              // First page + ellipsis if needed
+              if (start > 1) {
+                controls.push(
+                  <button
+                    key={1}
+                    onClick={() => handlePageChange(1)}
+                    className="pagination-btn"
+                  >
+                    1
+                  </button>
+                );
+                if (start > 2) {
+                  controls.push(
+                    <span key="ellipsis1" className="pagination-ellipsis">
+                      ...
+                    </span>
+                  );
+                }
+              }
+
+              // Visible page numbers
+              pages.forEach(page => {
+                controls.push(
+                  <button
+                    key={page}
+                    onClick={() => handlePageChange(page)}
+                    className={`pagination-btn ${page === pagination.currentPage ? 'active' : ''}`}
+                  >
+                    {page}
+                  </button>
+                );
+              });
+
+              // Ellipsis + last page if needed
+              const end = pages[pages.length - 1] || 0;
+              if (end < totalPages) {
+                if (end < totalPages - 1) {
+                  controls.push(
+                    <span key="ellipsis2" className="pagination-ellipsis">
+                      ...
+                    </span>
+                  );
+                }
+                controls.push(
+                  <button
+                    key={totalPages}
+                    onClick={() => handlePageChange(totalPages)}
+                    className="pagination-btn"
+                  >
+                    {totalPages}
+                  </button>
+                );
+              }
+
+              return controls;
+            })()}
+
+            <button
+              onClick={() => handlePageChange(pagination.currentPage + 1)}
+              disabled={pagination.currentPage === getTotalPages()}
+              className="pagination-btn"
+            >
+              Next
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create User Modal */}
       {showCreateForm && (
