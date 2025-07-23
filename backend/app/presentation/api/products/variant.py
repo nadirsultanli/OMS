@@ -12,7 +12,8 @@ from app.presentation.schemas.variants.input_schemas import (
     CreateCylinderVariantsRequest,
     CreateGasServiceRequest,
     CreateDepositRequest,
-    CreateBundleRequest
+    CreateBundleRequest,
+    CreateCompleteSetRequest
 )
 from app.presentation.schemas.variants.output_schemas import (
     VariantResponse, 
@@ -92,7 +93,7 @@ async def get_variants(
         offset=offset
     )
 
-@router.put("/{variant_id}", response_model=VariantResponse)
+@router.put("/{variant_id}/", response_model=VariantResponse)
 async def update_variant(
     variant_id: str, 
     request: UpdateVariantRequest, 
@@ -115,7 +116,7 @@ async def update_variant(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-@router.delete("/{variant_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{variant_id}/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_variant(
     variant_id: str, 
     variant_service: VariantService = Depends(get_variant_service),
@@ -350,7 +351,7 @@ async def get_bundle_variants(
     )
 
 # New Atomic SKU Endpoints
-@router.post("/atomic/cylinder-set", response_model=AtomicVariantSetResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/atomic/cylinder-set/", response_model=AtomicVariantSetResponse, status_code=status.HTTP_201_CREATED)
 async def create_cylinder_variant_set(
     request: CreateCylinderVariantsRequest,
     variant_service: VariantService = Depends(get_variant_service)
@@ -360,13 +361,15 @@ async def create_cylinder_variant_set(
     This creates both EMPTY and FULL variants for inventory tracking.
     """
     try:
+        # Note: gross_weight_kg is calculated automatically in the service
+        # EMPTY = tare_weight, FULL = tare_weight + capacity
         empty_variant, full_variant = await variant_service.create_atomic_cylinder_variants(
             tenant_id=request.tenant_id,
             product_id=request.product_id,
             size=request.size,
             tare_weight_kg=float(request.tare_weight_kg),
             capacity_kg=float(request.capacity_kg),
-            gross_weight_kg=float(request.gross_weight_kg),
+            gross_weight_kg=0,  # This parameter is ignored in the new logic
             inspection_date=request.inspection_date,
             created_by=request.created_by
         )
@@ -380,7 +383,7 @@ async def create_cylinder_variant_set(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-@router.post("/atomic/gas-service", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/atomic/gas-service/", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
 async def create_gas_service_variant(
     request: CreateGasServiceRequest,
     variant_service: VariantService = Depends(get_variant_service)
@@ -404,7 +407,7 @@ async def create_gas_service_variant(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-@router.post("/atomic/deposit", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/atomic/deposit/", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
 async def create_deposit_variant(
     request: CreateDepositRequest,
     variant_service: VariantService = Depends(get_variant_service)
@@ -427,7 +430,7 @@ async def create_deposit_variant(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-@router.post("/atomic/bundle", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/atomic/bundle/", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
 async def create_bundle_variant(
     request: CreateBundleRequest,
     variant_service: VariantService = Depends(get_variant_service)
@@ -451,19 +454,9 @@ async def create_bundle_variant(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-@router.post("/atomic/complete-set", response_model=AtomicVariantSetResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/atomic/complete-set/", response_model=AtomicVariantSetResponse, status_code=status.HTTP_201_CREATED)
 async def create_complete_variant_set(
-    tenant_id: str,
-    product_id: str,
-    size: str,
-    tare_weight_kg: float,
-    capacity_kg: float,
-    gross_weight_kg: float,
-    deposit_amount: float,
-    gas_price: Optional[float] = None,
-    bundle_price: Optional[float] = None,
-    inspection_date: Optional[str] = None,
-    created_by: Optional[str] = None,
+    request: CreateCompleteSetRequest,
     variant_service: VariantService = Depends(get_variant_service)
 ):
     """
@@ -474,49 +467,47 @@ async def create_complete_variant_set(
     
     try:
         # Parse inspection date if provided
-        inspection_date_obj = None
-        if inspection_date:
-            inspection_date_obj = datetime.fromisoformat(inspection_date).date()
+        inspection_date_obj = request.inspection_date
         
         # Create cylinder variants (EMPTY and FULL)
         empty_variant, full_variant = await variant_service.create_atomic_cylinder_variants(
-            tenant_id=tenant_id,
-            product_id=product_id,
-            size=size,
-            tare_weight_kg=tare_weight_kg,
-            capacity_kg=capacity_kg,
-            gross_weight_kg=gross_weight_kg,
+            tenant_id=request.tenant_id,
+            product_id=request.product_id,
+            size=request.size,
+            tare_weight_kg=float(request.tare_weight_kg),
+            capacity_kg=float(request.capacity_kg),
+            gross_weight_kg=0,  # This will be recalculated correctly
             inspection_date=inspection_date_obj,
-            created_by=created_by
+            created_by=request.created_by
         )
         
         # Create gas service variant
         gas_variant = await variant_service.create_gas_service_variant(
-            tenant_id=tenant_id,
-            product_id=product_id,
-            size=size,
+            tenant_id=request.tenant_id,
+            product_id=request.product_id,
+            size=request.size,
             requires_exchange=True,
-            default_price=gas_price,
-            created_by=created_by
+            default_price=float(request.gas_price) if request.gas_price else None,
+            created_by=request.created_by
         )
         
         # Create deposit variant
         deposit_variant = await variant_service.create_deposit_variant(
-            tenant_id=tenant_id,
-            product_id=product_id,
-            size=size,
-            deposit_amount=deposit_amount,
-            created_by=created_by
+            tenant_id=request.tenant_id,
+            product_id=request.product_id,
+            size=request.size,
+            deposit_amount=float(request.deposit_amount),
+            created_by=request.created_by
         )
         
         # Create bundle variant
         bundle_variant = await variant_service.create_bundle_variant(
-            tenant_id=tenant_id,
-            product_id=product_id,
-            size=size,
+            tenant_id=request.tenant_id,
+            product_id=request.product_id,
+            size=request.size,
             bundle_type="OUTRIGHT",
-            default_price=bundle_price,
-            created_by=created_by
+            default_price=float(request.bundle_price) if request.bundle_price else None,
+            created_by=request.created_by
         )
         
         return AtomicVariantSetResponse(
