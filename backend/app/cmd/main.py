@@ -19,6 +19,8 @@ from app.presentation.api.warehouses.warehouse import router as warehouse_router
 from app.presentation.api.orders.order import router as order_router
 from app.presentation.api.stock_docs.stock_doc import router as stock_doc_router
 from app.presentation.api.trips.trip import router as trip_router
+from app.presentation.api.vehicles.vehicle import router as vehicle_router
+from app.presentation.api.vehicles.vehicle_warehouse import router as vehicle_warehouse_router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
 
@@ -137,6 +139,8 @@ app.include_router(warehouse_router, prefix="/api/v1")
 app.include_router(order_router, prefix="/api/v1")
 app.include_router(stock_doc_router, prefix="/api/v1")
 app.include_router(trip_router, prefix="/api/v1")
+app.include_router(vehicle_router, prefix="/api/v1")
+app.include_router(vehicle_warehouse_router, prefix="/api/v1")
 
 
 def custom_openapi():

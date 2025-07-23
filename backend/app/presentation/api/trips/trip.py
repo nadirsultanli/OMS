@@ -415,4 +415,275 @@ async def delete_trip_stop(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         default_logger.error(f"Unexpected error deleting trip stop: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# Trip Planning and Loading endpoints
+
+@router.post("/{trip_id}/plan", status_code=200)
+async def create_trip_plan(
+    trip_id: UUID = Path(..., description="Trip ID"),
+    request: dict = ...,  # Should contain vehicle_id, vehicle_capacity_kg, orders
+    current_user: User = Depends(get_current_user),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """Create trip plan with order assignment and capacity validation"""
+    try:
+        # Get existing trip to check tenant ownership
+        existing_trip = await trip_service.get_trip_by_id(trip_id)
+        if existing_trip.tenant_id != current_user.tenant_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        vehicle_id = UUID(request["vehicle_id"])
+        vehicle_capacity_kg = Decimal(str(request["vehicle_capacity_kg"]))
+        order_ids = [UUID(order_id) for order_id in request.get("order_ids", [])]
+        order_details = request.get("order_details", [])
+        
+        # Create trip plan
+        trip_plan = await trip_service.create_trip_plan(
+            trip_id=trip_id,
+            vehicle_id=vehicle_id,
+            vehicle_capacity_kg=vehicle_capacity_kg
+        )
+        
+        # Add orders if provided
+        if order_ids and order_details:
+            trip_plan = await trip_service.add_orders_to_trip_plan(
+                trip_plan=trip_plan,
+                order_ids=order_ids,
+                order_details=order_details
+            )
+        
+        # Get validation results
+        validation_results = await trip_service.validate_trip_capacity(trip_plan)
+        
+        return {
+            "trip_plan": trip_plan.to_dict(),
+            "validation": validation_results
+        }
+        
+    except TripNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except TripValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        default_logger.error(f"Unexpected error creating trip plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/{trip_id}/load-truck", status_code=200)
+async def load_truck(
+    trip_id: UUID = Path(..., description="Trip ID"),
+    request: dict = ...,  # Should contain truck_inventory_items
+    current_user: User = Depends(get_current_user),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """Load truck with inventory and transition to LOADED status"""
+    try:
+        # Get existing trip to check tenant ownership
+        existing_trip = await trip_service.get_trip_by_id(trip_id)
+        if existing_trip.tenant_id != current_user.tenant_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        truck_inventory_items = request.get("truck_inventory_items", [])
+        
+        # Load truck
+        success = await trip_service.load_truck(
+            trip_id=trip_id,
+            truck_inventory_items=truck_inventory_items,
+            loaded_by=current_user.id
+        )
+        
+        # Get updated trip
+        updated_trip = await trip_service.get_trip_by_id(trip_id)
+        
+        return {
+            "success": success,
+            "trip": TripResponse(**updated_trip.to_dict()),
+            "loaded_items_count": len(truck_inventory_items)
+        }
+        
+    except TripNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except TripStatusTransitionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        default_logger.error(f"Unexpected error loading truck: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/{trip_id}/start", status_code=200)
+async def start_trip(
+    trip_id: UUID = Path(..., description="Trip ID"),
+    request: dict = ...,  # Should contain optional start_location
+    current_user: User = Depends(get_current_user),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """Start trip execution (driver begins delivery)"""
+    try:
+        # Get existing trip to check ownership
+        existing_trip = await trip_service.get_trip_by_id(trip_id)
+        if existing_trip.tenant_id != current_user.tenant_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Check if user is the assigned driver
+        if existing_trip.driver_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Only assigned driver can start trip")
+        
+        start_location = request.get("start_location")
+        if start_location and isinstance(start_location, list) and len(start_location) == 2:
+            start_location = tuple(start_location)
+        
+        # Start trip
+        updated_trip = await trip_service.start_trip(
+            trip_id=trip_id,
+            driver_id=current_user.id,
+            start_location=start_location
+        )
+        
+        return {
+            "trip": TripResponse(**updated_trip.to_dict()),
+            "start_time": updated_trip.start_time.isoformat() if updated_trip.start_time else None
+        }
+        
+    except TripNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except TripStatusTransitionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        default_logger.error(f"Unexpected error starting trip: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/{trip_id}/complete", status_code=200)
+async def complete_trip(
+    trip_id: UUID = Path(..., description="Trip ID"),
+    request: dict = ...,  # Should contain optional end_location, variance_report
+    current_user: User = Depends(get_current_user),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """Complete trip execution"""
+    try:
+        # Get existing trip to check ownership
+        existing_trip = await trip_service.get_trip_by_id(trip_id)
+        if existing_trip.tenant_id != current_user.tenant_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Check if user is the assigned driver
+        if existing_trip.driver_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Only assigned driver can complete trip")
+        
+        end_location = request.get("end_location")
+        if end_location and isinstance(end_location, list) and len(end_location) == 2:
+            end_location = tuple(end_location)
+        
+        # Complete trip
+        updated_trip = await trip_service.complete_trip(
+            trip_id=trip_id,
+            driver_id=current_user.id,
+            end_location=end_location
+        )
+        
+        return {
+            "trip": TripResponse(**updated_trip.to_dict()),
+            "end_time": updated_trip.end_time.isoformat() if updated_trip.end_time else None
+        }
+        
+    except TripNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except TripStatusTransitionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        default_logger.error(f"Unexpected error completing trip: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# Mobile Driver endpoints
+
+@router.get("/{trip_id}/mobile-summary", status_code=200)
+async def get_mobile_trip_summary(
+    trip_id: UUID = Path(..., description="Trip ID"),
+    current_user: User = Depends(get_current_user),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """Get trip summary for mobile driver app (offline-capable)"""
+    try:
+        # Get trip with stops
+        trip = await trip_service.get_trip_by_id(trip_id)
+        if trip.tenant_id != current_user.tenant_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Check if user is the assigned driver
+        if trip.driver_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Only assigned driver can access mobile summary")
+        
+        stops = await trip_service.get_trip_stops_by_trip(trip_id)
+        
+        # Build mobile-friendly summary
+        mobile_summary = {
+            "trip": trip.to_dict(),
+            "stops": [stop.to_dict() for stop in stops],
+            "status": trip.trip_status.value,
+            "can_start": trip.trip_status == TripStatus.LOADED,
+            "can_complete": trip.trip_status == TripStatus.IN_PROGRESS,
+            "total_stops": len(stops),
+            "offline_capable": True,
+            "sync_timestamp": datetime.now().isoformat()
+        }
+        
+        return mobile_summary
+        
+    except TripNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        default_logger.error(f"Unexpected error getting mobile trip summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/{trip_id}/dashboard", status_code=200)
+async def get_trip_dashboard(
+    trip_id: UUID = Path(..., description="Trip ID"),
+    current_user: User = Depends(get_current_user),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """Get real-time trip dashboard for monitoring"""
+    try:
+        # Get trip with stops
+        trip = await trip_service.get_trip_by_id(trip_id)
+        if trip.tenant_id != current_user.tenant_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        stops = await trip_service.get_trip_stops_by_trip(trip_id)
+        
+        # Calculate progress metrics
+        completed_stops = len([s for s in stops if s.departure_time is not None])
+        total_stops = len(stops)
+        progress_pct = (completed_stops / total_stops * 100) if total_stops > 0 else 0
+        
+        # Build dashboard
+        dashboard = {
+            "trip": trip.to_dict(),
+            "progress": {
+                "completed_stops": completed_stops,
+                "total_stops": total_stops,
+                "progress_percentage": round(progress_pct, 1),
+                "is_in_progress": trip.trip_status == TripStatus.IN_PROGRESS,
+                "is_completed": trip.trip_status == TripStatus.COMPLETED
+            },
+            "stops": [stop.to_dict() for stop in stops],
+            "timeline": {
+                "planned_date": trip.planned_date.isoformat() if trip.planned_date else None,
+                "start_time": trip.start_time.isoformat() if trip.start_time else None,
+                "end_time": trip.end_time.isoformat() if trip.end_time else None,
+                "duration_minutes": None
+            },
+            "last_updated": datetime.now().isoformat()
+        }
+        
+        # Calculate duration if trip is started
+        if trip.start_time:
+            end_time = trip.end_time or datetime.now()
+            duration = end_time - trip.start_time
+            dashboard["timeline"]["duration_minutes"] = int(duration.total_seconds() / 60)
+        
+        return dashboard
+        
+    except TripNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        default_logger.error(f"Unexpected error getting trip dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error") 

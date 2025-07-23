@@ -24,6 +24,7 @@ class TripStopModel(Base):
     # Relationships
     trip = relationship("TripModel", back_populates="stops")
     order = relationship("OrderModel", back_populates="trip_stops")
+    deliveries = relationship("DeliveryModel", back_populates="stop")
     # Audit fields without foreign key relationships to avoid circular dependencies
     # created_by, updated_by are UUID references to users but not enforced at DB level
     

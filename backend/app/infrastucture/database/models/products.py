@@ -31,4 +31,6 @@ class Product(Base):
     deleted_by = Column(PGUUID(as_uuid=True), nullable=True)
     
     # Relationships
-    variants = relationship("Variant", back_populates="product", cascade="all, delete-orphan") 
+    variants = relationship("Variant", back_populates="product", cascade="all, delete-orphan")
+    delivery_lines = relationship("DeliveryLineModel", back_populates="product")
+    truck_inventory = relationship("TruckInventoryModel", back_populates="product") 

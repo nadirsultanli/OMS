@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 from app.services.vehicles.vehicle_service import VehicleService
 from app.presentation.schemas.vehicles.input_schemas import CreateVehicleRequest, UpdateVehicleRequest
 from app.presentation.schemas.vehicles.output_schemas import VehicleResponse, VehicleListResponse
@@ -16,11 +16,13 @@ async def create_vehicle(
     vehicle_service: VehicleService = Depends(get_vehicle_service)
 ):
     vehicle = Vehicle(
-        id=UUID.hex(UUID()),
+        id=uuid4(),
         tenant_id=request.tenant_id,
         plate=request.plate,
         vehicle_type=request.vehicle_type,
         capacity_kg=request.capacity_kg,
+        capacity_m3=request.capacity_m3,
+        volume_unit=request.volume_unit,
         depot_id=request.depot_id,
         active=request.active if request.active is not None else True,
         created_at=datetime.now(),
@@ -67,6 +69,8 @@ async def update_vehicle(
         plate=request.plate or existing.plate,
         vehicle_type=request.vehicle_type or existing.vehicle_type,
         capacity_kg=request.capacity_kg if request.capacity_kg is not None else existing.capacity_kg,
+        capacity_m3=request.capacity_m3 if request.capacity_m3 is not None else existing.capacity_m3,
+        volume_unit=request.volume_unit if request.volume_unit is not None else existing.volume_unit,
         depot_id=request.depot_id if request.depot_id is not None else existing.depot_id,
         active=request.active if request.active is not None else existing.active,
         created_at=existing.created_at,

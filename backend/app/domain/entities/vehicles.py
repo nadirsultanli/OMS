@@ -15,6 +15,8 @@ class Vehicle:
     plate: str
     vehicle_type: VehicleType
     capacity_kg: float
+    capacity_m3: Optional[float]  # Volume capacity in cubic meters
+    volume_unit: Optional[str]  # Unit for volume (m3, ft3, etc.)
     depot_id: Optional[UUID]
     active: bool
     created_at: datetime

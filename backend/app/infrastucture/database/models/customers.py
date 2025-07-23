@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Integer, Numeric, TIMESTAMP, Enum as SAEnum, text
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID as SAUUID
 from .base import Base
 import uuid
@@ -32,3 +33,6 @@ class Customer(Base):
     updated_by = Column(SAUUID(as_uuid=True), nullable=True)
     deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
     deleted_by = Column(SAUUID(as_uuid=True), nullable=True)
+    
+    # Relationships
+    deliveries = relationship("DeliveryModel", back_populates="customer")

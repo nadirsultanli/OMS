@@ -42,6 +42,8 @@ class VehicleRepositoryImpl(VehicleRepository):
             plate=vehicle.plate,
             vehicle_type=vehicle.vehicle_type.value,
             capacity_kg=vehicle.capacity_kg,
+            capacity_m3=vehicle.capacity_m3,
+            volume_unit=vehicle.volume_unit,
             depot_id=vehicle.depot_id,
             active=vehicle.active,
             created_at=vehicle.created_at,
@@ -62,7 +64,7 @@ class VehicleRepositoryImpl(VehicleRepository):
         if not obj:
             return None
         for field in [
-            "tenant_id", "plate", "vehicle_type", "capacity_kg", "depot_id", "active", "created_at", "created_by", "updated_at", "updated_by", "deleted_at", "deleted_by"
+            "tenant_id", "plate", "vehicle_type", "capacity_kg", "capacity_m3", "volume_unit", "depot_id", "active", "created_at", "created_by", "updated_at", "updated_by", "deleted_at", "deleted_by"
         ]:
             setattr(obj, field, getattr(vehicle, field))
         obj.updated_at = datetime.now()
@@ -86,6 +88,8 @@ class VehicleRepositoryImpl(VehicleRepository):
             plate=obj.plate,
             vehicle_type=VehicleType(obj.vehicle_type),
             capacity_kg=float(obj.capacity_kg),
+            capacity_m3=float(obj.capacity_m3) if obj.capacity_m3 else None,
+            volume_unit=obj.volume_unit,
             depot_id=obj.depot_id,
             active=obj.active,
             created_at=obj.created_at,
