@@ -10,6 +10,8 @@
   transition: all 0.5s ease-in-out;
   padding: 0;
   overflow-x: hidden;
+  overflow-y: auto; /* Ensure vertical scrolling is allowed */
+  min-height: 100vh; /* Ensure content can extend beyond viewport */
 }
 
 .main-content.sidebar-collapsed {

@@ -3,6 +3,8 @@
   padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
+  min-height: calc(100vh - 48px); /* Ensure container can extend beyond viewport */
+  overflow: visible; /* Allow content to overflow and be scrollable */
 }
 
 /* Header */
@@ -143,7 +145,8 @@
   background-color: white;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
-  overflow: hidden;
+  overflow: visible; /* Allow table content to be scrollable */
+  margin-bottom: 24px; /* Add margin to ensure pagination is visible */
 }
 
 /* Loading and Empty States */
