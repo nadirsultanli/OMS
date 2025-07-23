@@ -1,5 +1,5 @@
 .customers-container {
-  min-height: 100vh;
+  min-height: 100vh; /* Keep min-height to ensure proper background coverage */
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   padding: 20px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -178,12 +178,12 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   overflow: hidden;
+  margin-bottom: 24px; /* Add margin to ensure pagination is visible */
 }
 
 .table-wrapper {
-  max-height: 600px;
-  overflow-y: auto;
   overflow-x: auto;
+  max-height: none; /* Allow table to expand to its natural height */
 }
 
 .customers-table {

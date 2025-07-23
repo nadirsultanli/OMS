@@ -119,7 +119,10 @@ const StockDashboard = () => {
         <div className="page-header">
           <h1>Stock Management Dashboard</h1>
         </div>
-        <div className="loading-spinner">Loading dashboard...</div>
+        <div className="loading-container">
+          <div className="spinner"></div>
+          <p>Loading...</p>
+        </div>
       </div>
     );
   }

@@ -161,6 +161,7 @@
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
+  margin-bottom: 24px; /* Add margin to ensure pagination is visible */
 }
 
 .vehicles-table {
