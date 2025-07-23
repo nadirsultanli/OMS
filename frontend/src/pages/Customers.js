@@ -39,15 +39,18 @@ const Customers = () => {
   // Pagination
   const [pagination, setPagination] = useState({
     total: 0,
-    limit: 25,
+    limit: 100, // Increased default to show more items
     offset: 0,
     currentPage: 1
   });
 
   useEffect(() => {
     fetchCustomers();
-  }, [pagination.limit, pagination.offset, filters]);
+  }, [pagination.limit, pagination.offset]);
 
+  useEffect(() => {
+    applyFilters();
+  }, [customers, filters]);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -57,8 +60,7 @@ const Customers = () => {
         offset: pagination.offset
       };
 
-      // Add filters to API request
-      if (filters.search) params.search = filters.search;
+      // Only add non-search filters to API request (since backend search may not work)
       if (filters.status) params.status = filters.status;
       if (filters.customer_type) params.customer_type = filters.customer_type;
 
@@ -66,7 +68,6 @@ const Customers = () => {
 
       if (result.success) {
         setCustomers(result.data.customers || []);
-        setFilteredCustomers(result.data.customers || []); // Since filtering is done server-side
         setPagination(prev => ({
           ...prev,
           total: result.data.total || 0
@@ -84,6 +85,24 @@ const Customers = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...customers];
+
+    // Apply search filter (client-side)
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(customer =>
+        customer.name?.toLowerCase().includes(searchTerm) ||
+        customer.addresses?.some(addr => 
+          addr.email?.toLowerCase().includes(searchTerm) ||
+          addr.phone?.toLowerCase().includes(searchTerm)
+        )
+      );
+    }
+
+    setFilteredCustomers(filtered);
   };
 
 

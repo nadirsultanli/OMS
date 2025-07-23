@@ -27,14 +27,18 @@ const Users = () => {
   // Pagination
   const [pagination, setPagination] = useState({
     total: 0,
-    limit: 25,
+    limit: 100, // Increased default to show more items
     offset: 0,
     currentPage: 1
   });
 
   useEffect(() => {
     fetchUsers();
-  }, [pagination.limit, pagination.offset, filters]);
+  }, [pagination.limit, pagination.offset]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [users, filters]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -44,14 +48,13 @@ const Users = () => {
         offset: pagination.offset
       };
 
-      // Add filters to API request
-      if (filters.search) params.search = filters.search;
+      // Only add role filter to API request (since backend search may not work)
       if (filters.role) params.role = filters.role;
 
       const result = await userService.getUsers(params);
 
       if (result.success) {
-        setFilteredUsers(result.data.users || []); // Since filtering is done server-side
+        setUsers(result.data.users || []);
         setPagination(prev => ({
           ...prev,
           total: result.data.total || 0
@@ -64,6 +67,21 @@ const Users = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...users];
+
+    // Apply search filter (client-side)
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(user =>
+        user.full_name?.toLowerCase().includes(searchTerm) ||
+        user.email?.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    setFilteredUsers(filtered);
   };
 
 

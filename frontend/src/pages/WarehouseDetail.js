@@ -150,8 +150,8 @@ const WarehouseDetail = () => {
   if (loading) {
     return (
       <div className="warehouse-detail-loading">
-        <Loader className="spinner" size={40} />
-        <p>Loading warehouse details...</p>
+        <div className="spinner"></div>
+        <p>Loading...</p>
       </div>
     );
   }
