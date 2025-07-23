@@ -4,15 +4,16 @@ from uuid import UUID
 from app.domain.entities.customers import CustomerType
 
 class CreateCustomerRequest(BaseModel):
-    tenant_id: UUID
     customer_type: CustomerType
     name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
     tax_pin: Optional[str] = None
     incorporation_doc: Optional[str] = None
     credit_days: Optional[int] = None
     credit_limit: Optional[float] = None
     owner_sales_rep_id: Optional[UUID] = None
-    created_by: Optional[UUID] = None
+    # tenant_id and created_by will be set from user context, not from request
 
 class UpdateCustomerRequest(BaseModel):
     customer_type: Optional[CustomerType] = None
