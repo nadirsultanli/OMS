@@ -50,7 +50,13 @@ const Products = () => {
   }, [pagination.offset, pagination.limit]);
 
   useEffect(() => {
-    applyFilters();
+    // When filters change, reset to first page and fetch new data
+    if (filters.search || filters.category) {
+      applyFilters();
+    } else {
+      // If no filters, show all products
+      setFilteredProducts(products);
+    }
   }, [products, filters]);
 
   const fetchProducts = async () => {
@@ -126,6 +132,13 @@ const Products = () => {
     setFilters(prev => ({
       ...prev,
       [name]: value
+    }));
+    
+    // Reset pagination when filters change
+    setPagination(prev => ({
+      ...prev,
+      offset: 0,
+      currentPage: 1
     }));
   };
 

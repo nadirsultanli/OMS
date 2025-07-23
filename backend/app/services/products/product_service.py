@@ -92,10 +92,16 @@ class ProductService:
     async def get_products_by_category(
         self, 
         tenant_id: UUID, 
-        category: str
+        category: str,
+        limit: int = 100,
+        offset: int = 0
     ) -> List[Product]:
-        """Get products by category"""
-        return await self.product_repository.get_products_by_category(tenant_id, category)
+        """Get products by category with pagination"""
+        return await self.product_repository.get_products_by_category(tenant_id, category, limit, offset)
+
+    async def count_products(self, tenant_id: UUID, category: Optional[str] = None) -> int:
+        """Count total products for a tenant, optionally filtered by category"""
+        return await self.product_repository.count_products(tenant_id, category)
     
     async def update_product(
         self,
