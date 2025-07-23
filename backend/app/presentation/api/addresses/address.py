@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import Optional
 from uuid import UUID
+from pydantic import BaseModel
 from app.services.addresses.address_service import AddressService, AddressNotFoundError, AddressAlreadyExistsError
 from app.presentation.schemas.addresses.input_schemas import CreateAddressRequest, UpdateAddressRequest
 from app.presentation.schemas.addresses.output_schemas import AddressResponse, AddressListResponse
@@ -10,6 +11,9 @@ from app.services.dependencies.auth import get_current_user
 from app.domain.entities.users import User
 
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
+
+class SetDefaultAddressRequest(BaseModel):
+    customer_id: str
 
 @router.post("/", response_model=AddressResponse, status_code=status.HTTP_201_CREATED)
 async def create_address(
@@ -103,8 +107,12 @@ async def delete_address(
     return None
 
 @router.post("/{address_id}/set_default", status_code=status.HTTP_200_OK)
-async def set_default_address(address_id: str, customer_id: str, address_service: AddressService = Depends(get_address_service)):
-    success = await address_service.set_default_address(customer_id, address_id)
+async def set_default_address(
+    address_id: str, 
+    request: SetDefaultAddressRequest,
+    address_service: AddressService = Depends(get_address_service)
+):
+    success = await address_service.set_default_address(request.customer_id, address_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Address with ID {address_id} not found or could not be set as default")
     return {"success": True} 

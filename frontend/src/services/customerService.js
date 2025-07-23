@@ -225,9 +225,11 @@ class CustomerService {
     }
   }
 
-  async setDefaultAddress(addressId) {
+  async setDefaultAddress(addressId, customerId) {
     try {
-      const response = await api.post(`/addresses/${addressId}/set_default`);
+      const response = await api.post(`/addresses/${addressId}/set_default`, {
+        customer_id: customerId
+      });
       return response.data;
     } catch (error) {
       console.error('Error setting default address:', error);

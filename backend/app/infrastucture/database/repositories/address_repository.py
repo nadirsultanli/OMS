@@ -79,7 +79,7 @@ class AddressRepository(AddressRepositoryInterface):
         obj = result.scalar_one_or_none()
         if not obj:
             return None
-        
+            
         # ENFORCE SINGLE DEFAULT ADDRESS PER CUSTOMER
         # If this address is being set as default, unset ALL other default addresses for this customer
         if address.is_default and not obj.is_default:
