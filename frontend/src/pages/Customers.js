@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import customerService from '../services/customerService';
-import { Search, Plus, MoreVertical, Mail, Phone, Building2, CreditCard, Wallet, Eye } from 'lucide-react';
+import fileUploadService from '../services/fileUploadService';
+import { Search, Plus, MoreVertical, Mail, Phone, Building2, CreditCard, Wallet, Eye, Upload, FileText } from 'lucide-react';
 import './Customers.css';
 
 const Customers = () => {
@@ -31,6 +32,10 @@ const Customers = () => {
     credit_limit: '',
     owner_sales_rep_id: ''
   });
+
+  // File state for incorporation document
+  const [incorporationFile, setIncorporationFile] = useState(null);
+  const [fileError, setFileError] = useState('');
 
   // Pagination
   const [pagination, setPagination] = useState({
@@ -145,6 +150,29 @@ const Customers = () => {
     }
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file
+      const validation = fileUploadService.validateFile(file);
+      if (!validation.valid) {
+        setFileError(validation.error);
+        setIncorporationFile(null);
+        e.target.value = ''; // Clear the input
+      } else {
+        setFileError('');
+        setIncorporationFile(file);
+        // Clear any existing error
+        if (errors.incorporation_doc) {
+          setErrors(prev => ({
+            ...prev,
+            incorporation_doc: ''
+          }));
+        }
+      }
+    }
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -163,6 +191,10 @@ const Customers = () => {
       }
       if (!formData.credit_limit || formData.credit_limit < 0) {
         newErrors.credit_limit = 'Valid credit limit is required for credit customers';
+      }
+      // Incorporation document is mandatory for credit customers
+      if (!incorporationFile) {
+        newErrors.incorporation_doc = 'Incorporation document is required for credit customers';
       }
     }
 
@@ -197,12 +229,33 @@ const Customers = () => {
         console.warn('Using fallback tenant_id:', tenantId);
       }
       
+      // Generate a temporary customer ID for file upload
+      const tempCustomerId = `temp_${Date.now()}`;
+      let fileUploadPath = null;
+
+      // Upload file if present
+      if (incorporationFile) {
+        const uploadResult = await fileUploadService.uploadFile(
+          incorporationFile,
+          tempCustomerId,
+          tenantId
+        );
+
+        if (!uploadResult.success) {
+          setErrors({ general: `File upload failed: ${uploadResult.error}` });
+          setLoading(false);
+          return;
+        }
+
+        fileUploadPath = uploadResult.path;
+      }
+
       const customerData = {
         tenant_id: tenantId,
         name: formData.name.trim(),
         customer_type: formData.customer_type,
         tax_pin: formData.tax_pin?.trim() || null,
-        incorporation_doc: formData.incorporation_doc?.trim() || null,
+        incorporation_doc: fileUploadPath,
         credit_days: formData.customer_type === 'credit' ? parseInt(formData.credit_days) : null,
         credit_limit: formData.customer_type === 'credit' ? parseFloat(formData.credit_limit) : null,
         owner_sales_rep_id: formData.owner_sales_rep_id || currentUser.id,
@@ -234,6 +287,8 @@ const Customers = () => {
           credit_limit: '',
           owner_sales_rep_id: ''
         });
+        setIncorporationFile(null);
+        setFileError('');
         setShowCreateForm(false);
 
         // Refresh customers list
@@ -522,15 +577,44 @@ const Customers = () => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="incorporation_doc">Incorporation Document</label>
-                  <input
-                    type="text"
-                    id="incorporation_doc"
-                    name="incorporation_doc"
-                    value={formData.incorporation_doc}
-                    onChange={handleInputChange}
-                    placeholder="Document reference"
-                  />
+                  <label htmlFor="incorporation_doc">
+                    Incorporation Document 
+                    {formData.customer_type === 'credit' && <span className="required"> *</span>}
+                  </label>
+                  <div className="file-input-wrapper">
+                    <input
+                      type="file"
+                      id="incorporation_doc"
+                      name="incorporation_doc"
+                      onChange={handleFileChange}
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      className={`file-input ${errors.incorporation_doc ? 'error' : ''}`}
+                    />
+                    <label htmlFor="incorporation_doc" className="file-input-label">
+                      <Upload size={20} />
+                      <span>
+                        {incorporationFile ? incorporationFile.name : 'Choose file...'}
+                      </span>
+                    </label>
+                  </div>
+                  {fileError && <span className="error-text">{fileError}</span>}
+                  {errors.incorporation_doc && <span className="error-text">{errors.incorporation_doc}</span>}
+                  {incorporationFile && (
+                    <div className="file-preview">
+                      <FileText size={16} />
+                      <span className="file-name">{incorporationFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIncorporationFile(null);
+                          document.getElementById('incorporation_doc').value = '';
+                        }}
+                        className="remove-file"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {formData.customer_type === 'credit' && (
