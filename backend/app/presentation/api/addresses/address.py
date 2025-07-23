@@ -11,8 +11,17 @@ from app.domain.entities.users import User
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
 
 @router.post("/", response_model=AddressResponse, status_code=status.HTTP_201_CREATED)
-async def create_address(request: CreateAddressRequest, address_service: AddressService = Depends(get_address_service)):
-    address = await address_service.create_address(**request.model_dump())
+async def create_address(
+    request: CreateAddressRequest, 
+    address_service: AddressService = Depends(get_address_service),
+    current_user: User = Depends(get_current_user)
+):
+    # Add tenant_id and created_by from current user
+    address_data = request.model_dump()
+    address_data['tenant_id'] = current_user.tenant_id
+    address_data['created_by'] = current_user.id
+    
+    address = await address_service.create_address(**address_data)
     return AddressResponse(**address.to_dict())
 
 @router.get("/{address_id}", response_model=AddressResponse)
