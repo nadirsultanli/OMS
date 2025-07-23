@@ -149,9 +149,25 @@ async def update_product(
     """Update a product"""
     start_time = time.time()
     
+    logger.info(
+        "Updating product",
+        user_id=str(user.id) if user else None,
+        tenant_id=str(user.tenant_id) if user else None,
+        user_role=user.role.value if user else None,
+        product_id=product_id
+    )
+    
     try:
         # Only Sales Rep and Tenant Admin can edit products
         if user and user.role.value not in ["sales_rep", "tenant_admin"]:
+            logger.error(
+                "Failed to update product - insufficient permissions",
+                user_id=str(user.id),
+                tenant_id=str(user.tenant_id),
+                user_role=user.role.value,
+                product_id=product_id,
+                required_roles=["sales_rep", "tenant_admin"]
+            )
             raise HTTPException(status_code=403, detail="Only Sales Rep and Tenant Admin can edit products.")
         
         auth_time = time.time()
@@ -173,15 +189,36 @@ async def update_product(
         response = ProductResponse(**product.to_dict())
         
         total_time = time.time() - start_time
-        logger.info(f"Product update total time: {total_time:.3f}s (auth: {auth_time - start_time:.3f}s, service: {service_time - service_start:.3f}s, response: {time.time() - response_start:.3f}s)")
+        logger.info(
+            "Product updated successfully",
+            user_id=str(user.id) if user else None,
+            tenant_id=str(user.tenant_id) if user else None,
+            product_id=product_id,
+            updated_by=str(updated_by) if updated_by else None,
+            total_time=f"{total_time:.3f}s"
+        )
         
         return response
     except ProductNotFoundError as e:
+        logger.error(
+            "Failed to update product - product not found",
+            user_id=str(user.id) if user else None,
+            product_id=product_id,
+            error=str(e)
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         total_time = time.time() - start_time
-        logger.error(f"Product update failed after {total_time:.3f}s: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        logger.error(
+            "Failed to update product - unexpected error",
+            user_id=str(user.id) if user else None,
+            tenant_id=str(user.tenant_id) if user else None,
+            product_id=product_id,
+            error=str(e),
+            error_type=type(e).__name__,
+            total_time=f"{total_time:.3f}s"
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(
@@ -192,16 +229,54 @@ async def delete_product(
     """Delete a product"""
     try:
         # Only Tenant Admin can delete products
-        if current_user and current_user.role.value not in ["tenant_admin"]:
+        if user and user.role.value not in ["tenant_admin"]:
+            logger.error(
+                "Failed to delete product - insufficient permissions",
+                user_id=str(user.id),
+                tenant_id=str(user.tenant_id),
+                user_role=user.role.value,
+                product_id=product_id,
+                required_roles=["tenant_admin"]
+            )
             raise HTTPException(status_code=403, detail="Only Tenant Admin can delete products.")
         
-        deleted_by = current_user.id if current_user else None
+        deleted_by = user.id if user else None
         success = await product_service.delete_product(product_id, deleted_by=deleted_by)
         if not success:
+            logger.error(
+                "Failed to delete product - product not found",
+                user_id=str(user.id) if user else None,
+                tenant_id=str(user.tenant_id) if user else None,
+                product_id=product_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, 
                 detail=f"Product with ID {product_id} not found"
             )
+        
+        logger.info(
+            "Product deleted successfully",
+            user_id=str(user.id) if user else None,
+            tenant_id=str(user.tenant_id) if user else None,
+            product_id=product_id,
+            deleted_by=str(deleted_by) if deleted_by else None
+        )
         return None
     except ProductNotFoundError as e:
+        logger.error(
+            "Failed to delete product - product not found",
+            user_id=str(user.id) if user else None,
+            product_id=product_id,
+            error=str(e)
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to delete product - unexpected error",
+            user_id=str(user.id) if user else None,
+            tenant_id=str(user.tenant_id) if user else None,
+            product_id=product_id,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")

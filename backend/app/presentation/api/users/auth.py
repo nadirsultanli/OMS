@@ -13,7 +13,8 @@ from app.presentation.schemas.users import (
     RefreshTokenResponse,
     LogoutRequest,
     SignupRequest,
-    UserResponse
+    UserResponse,
+    TenantInfo
 )
 from app.presentation.schemas.users.password_reset_schemas import (
     ForgotPasswordRequest,
@@ -23,6 +24,8 @@ from app.presentation.schemas.users.password_reset_schemas import (
 )
 from app.services.dependencies.users import get_user_service
 from app.services.dependencies.railway_users import get_railway_user_service, should_use_railway_mode
+from app.services.dependencies.tenants import get_tenant_service
+from app.services.tenants.tenant_service import TenantService
 from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
 from decouple import config
 from app.domain.entities.users import UserStatus
@@ -86,7 +89,10 @@ auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @auth_router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest):
+async def login(
+    request: LoginRequest,
+    tenant_service: TenantService = Depends(get_tenant_service)
+):
     """User login endpoint using Supabase Auth"""
     
     # Use Railway mode (Supabase SDK) for authentication
@@ -193,16 +199,39 @@ async def login(request: LoginRequest):
         )
         
         try:
+            # Fetch tenant information safely
+            try:
+                tenant = await tenant_service.get_tenant_by_id(str(user.tenant_id))
+                tenant_info = TenantInfo(
+                    id=str(tenant.id),
+                    name=tenant.name,
+                    base_currency=tenant.base_currency
+                )
+                logger.debug("Tenant information fetched successfully", tenant_id=str(user.tenant_id))
+            except Exception as tenant_error:
+                # Fallback to basic tenant info if fetch fails
+                logger.warning(
+                    "Failed to fetch tenant information, using fallback", 
+                    tenant_id=str(user.tenant_id),
+                    error=str(tenant_error)
+                )
+                tenant_info = TenantInfo(
+                    id=str(user.tenant_id),
+                    name="Unknown",
+                    base_currency="KES"  # Default currency
+                )
+            
             response = LoginResponse(
                 access_token=auth_response.session.access_token,
                 refresh_token=auth_response.session.refresh_token,
                 user_id=str(user.id),
-                tenant_id=str(user.tenant_id),
+                tenant_id=str(user.tenant_id),  # Keep for backward compatibility
+                tenant=tenant_info,  # New tenant information
                 email=user.email,
                 role=user.role.value,
                 full_name=user.full_name
             )
-            logger.debug("Login response created successfully")
+            logger.debug("Login response created successfully with tenant info")
             return response
         except Exception as e:
             logger.error(
