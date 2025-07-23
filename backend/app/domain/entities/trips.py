@@ -12,6 +12,9 @@ class TripStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    
+    def __str__(self):
+        return self.value
 
 @dataclass
 class Trip:
