@@ -2,6 +2,11 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.domain.entities.users import UserRoleType, UserStatus
 
+class TenantInfo(BaseModel):
+    id: str
+    name: str
+    base_currency: str
+
 class UserResponse(BaseModel):
     id: str
     tenant_id: str
@@ -32,6 +37,7 @@ class LoginResponse(BaseModel):
     email: str
     role: str
     full_name: Optional[str]
+    tenant: Optional[TenantInfo] = None
 
 class RefreshTokenResponse(BaseModel):
     access_token: str
