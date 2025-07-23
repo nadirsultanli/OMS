@@ -234,12 +234,14 @@
 /* Badges */
 .role-badge,
 .status-badge {
+  display: inline-block;
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-align: center;
 }
 
 .role-badge.admin {
@@ -252,14 +254,50 @@
   color: #2563eb;
 }
 
+.role-badge.sales {
+  background-color: #e0e7ff;
+  color: #6366f1;
+}
+
+.role-badge.dispatcher {
+  background-color: #fce7f3;
+  color: #ec4899;
+}
+
+.role-badge.accounts {
+  background-color: #d4f4dd;
+  color: #16a34a;
+}
+
+.role-badge.default {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
 .status-badge.active {
   background-color: #d1fae5;
   color: #065f46;
 }
 
-.status-badge.inactive {
+.status-badge.pending {
+  background-color: #fed7aa;
+  color: #ea580c;
+}
+
+.status-badge.inactive,
+.status-badge.deactivated {
   background-color: #fecaca;
   color: #dc2626;
+}
+
+.status-badge.deleted {
+  background-color: #e5e7eb;
+  color: #6b7280;
+}
+
+.status-badge.default {
+  background-color: #f3f4f6;
+  color: #374151;
 }
 
 /* Loading State */

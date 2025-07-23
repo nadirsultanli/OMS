@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import customerService from '../services/customerService';
+import fileUploadService from '../services/fileUploadService';
 import MapboxAddressInput from '../components/MapboxAddressInput';
 import { 
   ArrowLeft, 
@@ -13,7 +14,9 @@ import {
   Edit,
   Trash2,
   Star,
-  StarOff
+  StarOff,
+  FileText,
+  Download
 } from 'lucide-react';
 import './CustomerDetail.css';
 
@@ -65,6 +68,31 @@ const CustomerDetail = () => {
       setAddresses([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadDocument = async (filePath) => {
+    try {
+      // Get a signed URL for the file
+      const result = await fileUploadService.getSignedUrl(filePath);
+      
+      if (result.success && result.signedUrl) {
+        // Create a temporary link element and trigger download
+        const link = document.createElement('a');
+        link.href = result.signedUrl;
+        link.download = 'incorporation_document';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setMessage('Download started...');
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setErrors({ general: 'Failed to download document. Please try again.' });
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      setErrors({ general: 'Failed to download document. Please try again.' });
     }
   };
 
@@ -429,7 +457,18 @@ const CustomerDetail = () => {
               {customer.incorporation_doc && (
                 <div className="info-item">
                   <label>Incorporation Document</label>
-                  <span>{customer.incorporation_doc}</span>
+                  <div className="document-download">
+                    <FileText size={16} />
+                    <span>Document Available</span>
+                    <button
+                      onClick={() => handleDownloadDocument(customer.incorporation_doc)}
+                      className="download-btn"
+                      title="Download incorporation document"
+                    >
+                      <Download size={16} />
+                      Download
+                    </button>
+                  </div>
                 </div>
               )}
               
