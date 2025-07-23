@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from app.services.users import UserService
+from app.services.tenants.tenant_service import TenantService
 from app.domain.exceptions.users import (
     UserNotFoundError,
     UserAuthenticationError,
@@ -22,6 +23,7 @@ from app.presentation.schemas.users.password_reset_schemas import (
     ResetPasswordResponse
 )
 from app.services.dependencies.users import get_user_service
+from app.services.dependencies.tenants import get_tenant_service
 from app.services.dependencies.railway_users import get_railway_user_service, should_use_railway_mode
 from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
 from decouple import config
@@ -86,7 +88,10 @@ auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @auth_router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest):
+async def login(
+    request: LoginRequest,
+    tenant_service: TenantService = Depends(get_tenant_service)
+):
     """User login endpoint using Supabase Auth"""
     
     # Use Railway mode (Supabase SDK) for authentication
@@ -183,6 +188,28 @@ async def login(request: LoginRequest):
                 detail="Account is inactive, please activate your account or contact your administrator"
             )
         
+        # Fetch tenant information to include in response
+        tenant_info = None
+        try:
+            tenant = await tenant_service.get_tenant_by_id(str(user.tenant_id))
+            tenant_info = {
+                "id": str(tenant.id),
+                "name": tenant.name,
+                "base_currency": tenant.base_currency
+            }
+            logger.debug(
+                "Tenant information fetched successfully",
+                tenant_id=str(tenant.id),
+                tenant_name=tenant.name
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch tenant information",
+                tenant_id=str(user.tenant_id),
+                error=str(e)
+            )
+            # Continue without tenant info - not critical for login
+        
         logger.info(
             "User logged in successfully",
             user_id=str(user.id),
@@ -200,7 +227,8 @@ async def login(request: LoginRequest):
                 tenant_id=str(user.tenant_id),
                 email=user.email,
                 role=user.role.value,
-                full_name=user.full_name
+                full_name=user.full_name,
+                tenant=tenant_info
             )
             logger.debug("Login response created successfully")
             return response
