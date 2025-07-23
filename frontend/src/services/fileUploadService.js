@@ -85,6 +85,51 @@ class FileUploadService {
     }
   }
 
+  // Download file as blob to force download instead of opening in browser
+  async downloadFileAsBlob(filePath) {
+    try {
+      const supabase = this.getSupabaseClient();
+      
+      // Download the file as a blob
+      const { data, error } = await supabase.storage
+        .from(this.bucketName)
+        .download(filePath);
+
+      if (error) {
+        console.error('File download error:', error);
+        throw error;
+      }
+
+      // Create a blob URL and trigger download
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Extract filename from path
+      const fileName = filePath.split('/').pop() || 'document.pdf';
+      link.download = fileName;
+      
+      // Add to DOM, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      URL.revokeObjectURL(url);
+
+      return {
+        success: true,
+        message: 'File downloaded successfully'
+      };
+    } catch (error) {
+      console.error('File download error:', error);
+      return {
+        success: false,
+        error: error.message || 'Download failed'
+      };
+    }
+  }
+
   // Get signed URL for private file access
   async getSignedUrl(filePath, expiresIn = 3600) {
     try {
@@ -161,6 +206,36 @@ class FileUploadService {
     return {
       valid: true
     };
+  }
+
+  // Get a download URL that forces download instead of opening in browser
+  async getDownloadUrl(filePath) {
+    try {
+      const supabase = this.getSupabaseClient();
+      
+      // Get a signed URL with a download parameter
+      const { data, error } = await supabase.storage
+        .from(this.bucketName)
+        .createSignedUrl(filePath, 3600, {
+          download: true
+        });
+
+      if (error) {
+        console.error('Get download URL error:', error);
+        throw error;
+      }
+
+      return {
+        success: true,
+        downloadUrl: data.signedUrl
+      };
+    } catch (error) {
+      console.error('Get download URL error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 }
 
