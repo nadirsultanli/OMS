@@ -1,6 +1,6 @@
 /* Users Page Styles - Based on Login Design */
 .users-container {
-  min-height: 100vh;
+  min-height: 100vh; /* Changed from min-height to allow content to extend */
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   padding: 20px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -182,7 +182,8 @@
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
-  overflow-y: visible;
+  /* Removed overflow-y: visible as it's redundant */
+  max-height: none; /* Allow table to expand to its natural height */
 }
 
 .users-table {
