@@ -39,6 +39,11 @@ class ProductRepository(ABC):
         pass
     
     @abstractmethod
-    async def get_products_by_category(self, tenant_id: UUID, category: str) -> List[Product]:
-        """Get products by category within a tenant"""
+    async def get_products_by_category(self, tenant_id: UUID, category: str, limit: int = 100, offset: int = 0) -> List[Product]:
+        """Get products by category within a tenant with pagination"""
+        pass
+
+    @abstractmethod
+    async def count_products(self, tenant_id: UUID, category: Optional[str] = None) -> int:
+        """Count total products for a tenant, optionally filtered by category"""
         pass 
