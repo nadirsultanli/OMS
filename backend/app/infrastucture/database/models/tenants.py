@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, TIMESTAMP, Enum as SAEnum, text
 from sqlalchemy.dialects.postgresql import UUID as SAUUID
+from sqlalchemy.orm import relationship
 from .base import Base
 import uuid
 from enum import Enum
@@ -26,4 +27,7 @@ class Tenant(Base):
     updated_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
     updated_by = Column(SAUUID(as_uuid=True), nullable=True)
     deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
-    deleted_by = Column(SAUUID(as_uuid=True), nullable=True) 
+    deleted_by = Column(SAUUID(as_uuid=True), nullable=True)
+    
+    # Relationships
+    trips = relationship("TripModel", back_populates="tenant") 

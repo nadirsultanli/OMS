@@ -11,7 +11,9 @@ from app.presentation.schemas.warehouses.input_schemas import CreateWarehouseReq
 from app.presentation.schemas.warehouses.output_schemas import WarehouseResponse, WarehouseListResponse
 from app.services.dependencies.warehouses import get_warehouse_service
 from app.core.user_context import UserContext, user_context, get_optional_user_context
+from app.infrastucture.logs.logger import get_logger
 
+logger = get_logger("warehouses_api")
 router = APIRouter(prefix="/warehouses", tags=["Warehouses"])
 
 
@@ -22,6 +24,17 @@ async def create_warehouse(
     context: UserContext = user_context
 ):
     """Create a new warehouse with business rule validation"""
+    logger.info(
+        "Creating new warehouse",
+        user_id=context.user_id,
+        tenant_id=context.tenant_id,
+        warehouse_code=request.code,
+        warehouse_name=request.name,
+        warehouse_type=request.type,
+        location=request.location,
+        unlimited_stock=request.unlimited_stock or False
+    )
+    
     try:
         # Parse warehouse type if provided
         warehouse_type = None
@@ -29,6 +42,14 @@ async def create_warehouse(
             try:
                 warehouse_type = WarehouseType(request.type.upper())
             except ValueError:
+                logger.error(
+                    "Failed to create warehouse - invalid warehouse type",
+                    user_id=context.user_id,
+                    tenant_id=context.tenant_id,
+                    warehouse_code=request.code,
+                    invalid_type=request.type,
+                    valid_types=["FIL", "STO", "MOB", "BLK"]
+                )
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid warehouse type: {request.type}. Must be one of: FIL, STO, MOB, BLK"
@@ -44,16 +65,57 @@ async def create_warehouse(
             created_by=context.user_id
         )
         
+        logger.info(
+            "Warehouse created successfully",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            warehouse_id=str(warehouse.id),
+            warehouse_code=warehouse.code,
+            warehouse_name=warehouse.name,
+            warehouse_type=warehouse_type.value if warehouse_type else None,
+            location=warehouse.location if hasattr(warehouse, 'location') else None,
+            unlimited_stock=warehouse.unlimited_stock if hasattr(warehouse, 'unlimited_stock') else None
+        )
+        
         return WarehouseResponse(**warehouse.to_dict())
         
     except WarehouseValidationError as e:
+        logger.error(
+            "Failed to create warehouse - validation error",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            warehouse_code=request.code,
+            error=str(e)
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except WarehouseAlreadyExistsError as e:
+        logger.error(
+            "Failed to create warehouse - warehouse already exists",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            warehouse_code=request.code,
+            error=str(e)
+        )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except WarehouseCreationError as e:
+        logger.error(
+            "Failed to create warehouse - creation error",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            warehouse_code=request.code,
+            error=str(e)
+        )
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Unexpected error: {str(e)}")
+        logger.error(
+            "Failed to create warehouse - unexpected error",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            warehouse_code=request.code,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.get("/{warehouse_id}", response_model=WarehouseResponse)

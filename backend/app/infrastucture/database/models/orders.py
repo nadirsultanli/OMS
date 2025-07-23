@@ -53,6 +53,7 @@ class OrderModel(Base):
         cascade="all, delete-orphan",
         lazy="selectin"
     )
+    trip_stops = relationship("TripStopModel", back_populates="order")
     
     # Constraints
     __table_args__ = (

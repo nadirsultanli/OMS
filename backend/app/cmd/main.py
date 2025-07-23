@@ -18,6 +18,7 @@ from app.presentation.api.price_lists.price_list import router as price_list_rou
 from app.presentation.api.warehouses.warehouse import router as warehouse_router
 from app.presentation.api.orders.order import router as order_router
 from app.presentation.api.stock_docs.stock_doc import router as stock_doc_router
+from app.presentation.api.trips.trip import router as trip_router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
 
@@ -102,6 +103,10 @@ app = FastAPI(
         {
             "name": "Stock Documents",
             "description": "Stock document management, transfers, conversions, and inventory operations"
+        },
+        {
+            "name": "Trips",
+            "description": "Trip management, vehicle routing, and delivery operations"
         }
     ]
 )
@@ -131,6 +136,7 @@ app.include_router(price_list_router, prefix="/api/v1")
 app.include_router(warehouse_router, prefix="/api/v1")
 app.include_router(order_router, prefix="/api/v1")
 app.include_router(stock_doc_router, prefix="/api/v1")
+app.include_router(trip_router, prefix="/api/v1")
 
 
 def custom_openapi():
@@ -252,7 +258,7 @@ async def debug_database():
                     "database_url_configured": True,
                     "database_url_format": database_url[:50] + "..." if len(database_url) > 50 else database_url,
                     "connection_test": "✓ Success",
-                    "test_query_result": dict(row) if row else None,
+                    "test_query_result": dict(row._mapping) if row else None,
                     "timestamp": str(datetime.now())
                 }
                 

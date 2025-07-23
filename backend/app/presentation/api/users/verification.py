@@ -8,13 +8,12 @@ from app.presentation.schemas.users.verification_schemas import (
 from app.services.users.user_service import UserService
 from app.services.dependencies.railway_users import get_railway_user_service
 from app.infrastucture.database.connection import get_supabase_admin_client_sync
-from app.infrastucture.logs.logger import default_logger
+from app.infrastucture.logs.logger import get_logger
 import secrets
 from app.domain.entities.users import UserStatus
 
+logger = get_logger("verification_api")
 verification_router = APIRouter(prefix="/verification", tags=["verification"])
-
-logger = default_logger
 
 
 @verification_router.post("/verify-email", response_model=VerifyEmailResponse)
