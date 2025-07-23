@@ -1,8 +1,10 @@
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.openapi.utils import get_openapi
 from decouple import config
 from app.core.logging_config import setup_logging, get_request_logger
@@ -120,17 +122,39 @@ setup_logging(app, log_level=LOG_LEVEL)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # React dev server
-        "http://localhost:3001",  # Alternative React dev server
-        "https://omsfrontend.netlify.app",  # Netlify frontend
-        "https://aware-endurance-production.up.railway.app",  # Railway backend (for testing)
-        "http://aware-endurance-production.up.railway.app",  # Railway backend (for testing)
-    ],
+    allow_origins=["*"],  # Allow all origins for now - configure properly for production
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
+
+# Custom exception handler to ensure CORS headers are always included
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+    # Ensure CORS headers are present
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    default_logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
+    # Ensure CORS headers are present
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1")
@@ -173,6 +197,19 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
+@app.options("/{path:path}")
+async def options_handler(request: Request, path: str):
+    return JSONResponse(
+        status_code=200,
+        content="OK",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
+
 @app.get("/")
 async def root():
     return {
@@ -185,6 +222,14 @@ async def root():
 async def health_check():
     return {
         "status": "healthy"
+    }
+
+@app.get("/cors-test")
+async def cors_test():
+    """Test endpoint to verify CORS headers"""
+    return {
+        "message": "CORS test successful",
+        "timestamp": datetime.now().isoformat()
     }
 
 
