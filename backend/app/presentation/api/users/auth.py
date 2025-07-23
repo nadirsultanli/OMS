@@ -499,24 +499,48 @@ async def accept_invitation(
         auth_response = None
         
         try:
-            # Method 1: Try direct password update with access_token first (most reliable for invitations)
-            default_logger.info("Attempting direct password update with invitation token")
-            auth_response = supabase.auth.update_user({
-                "password": request.password
-            }, access_token=request.token)
+            # Method 1: Try to decode the JWT to get user info first
+            default_logger.info("Attempting to decode JWT token to get user info")
+            import jwt
+            import base64
+            import json
+            
+            # Decode the JWT token to get user ID
+            token_parts = request.token.split('.')
+            if len(token_parts) != 3:
+                raise Exception("Invalid JWT token format")
+            
+            # Decode the payload
+            payload = json.loads(base64.b64decode(token_parts[1] + '==').decode('utf-8'))
+            user_id = payload.get('sub')
+            user_email = payload.get('email')
+            
+            default_logger.info(f"JWT decoded - User ID: {user_id}, Email: {user_email}")
+            
+            if not user_id:
+                raise Exception("No user ID found in JWT token")
+            
+            # Method 2: Use admin client to update password directly
+            default_logger.info("Using admin client to update password")
+            from app.infrastucture.database.connection import get_supabase_admin_client_sync
+            admin_supabase = get_supabase_admin_client_sync()
+            
+            auth_response = admin_supabase.auth.admin.update_user_by_id(
+                user_id,
+                {"password": request.password}
+            )
             
             if not auth_response.user:
-                raise Exception("Direct password update failed - no user returned")
+                raise Exception("Admin password update failed - no user returned")
                 
-            default_logger.info(f"Direct password update successful for user: {auth_response.user.email}")
+            default_logger.info(f"Admin password update successful for user: {auth_response.user.email}")
             
-        except Exception as direct_error:
-            default_logger.error(f"Direct password update failed: {str(direct_error)}")
+        except Exception as admin_error:
+            default_logger.error(f"Admin password update failed: {str(admin_error)}")
             
-            # Method 2: Try setting session first, then updating password
+            # Method 3: Fallback to regular client with session
             try:
-                default_logger.info("Attempting session-based password update with invitation token")
-                # For invitation tokens, we should not set refresh token to the same value
+                default_logger.info("Attempting session-based password update as fallback")
                 session_response = supabase.auth.set_session(request.token, None)
                 
                 if not session_response.user:
@@ -532,7 +556,7 @@ async def accept_invitation(
                 if not auth_response.user:
                     raise Exception("Password update failed - no user returned")
                     
-                default_logger.info(f"Session-based password update successful for user: {auth_response.user.email}")
+                default_logger.info(f"Session-based password update successful for user: {session_response.user.email}")
                 
             except Exception as session_error:
                 default_logger.error(f"Session-based password update also failed: {str(session_error)}")
