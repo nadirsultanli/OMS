@@ -12,7 +12,7 @@ class TripModel(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     trip_no = Column(Text, nullable=False)
-    trip_status = Column(ENUM(TripStatus, name='trip_status'), nullable=False, default=TripStatus.DRAFT)
+    trip_status = Column(ENUM(TripStatus, name='trip_status', create_type=False, native_enum=True), nullable=False, default=TripStatus.DRAFT)
     vehicle_id = Column(UUID(as_uuid=True), ForeignKey("vehicles.id"), nullable=True)
     driver_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     planned_date = Column(Date, nullable=True)
