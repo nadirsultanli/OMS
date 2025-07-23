@@ -41,6 +41,10 @@ class TripModel(Base):
     # Trip stops relationship
     stops = relationship("TripStopModel", back_populates="trip", cascade="all, delete-orphan")
     
+    # Trip inventory and deliveries relationships
+    truck_inventory = relationship("TruckInventoryModel", back_populates="trip", cascade="all, delete-orphan")
+    deliveries = relationship("DeliveryModel", back_populates="trip", cascade="all, delete-orphan")
+    
     # Constraints
     __table_args__ = (
         UniqueConstraint("tenant_id", "trip_no", name="uq_trips_tenant_trip_no"),

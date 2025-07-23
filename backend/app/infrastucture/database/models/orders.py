@@ -54,6 +54,7 @@ class OrderModel(Base):
         lazy="selectin"
     )
     trip_stops = relationship("TripStopModel", back_populates="order")
+    deliveries = relationship("DeliveryModel", back_populates="order")
     
     # Constraints
     __table_args__ = (
@@ -94,6 +95,7 @@ class OrderLineModel(Base):
     
     # Relationships
     order: Mapped["OrderModel"] = relationship("OrderModel", back_populates="order_lines")
+    delivery_lines: Mapped[List["DeliveryLineModel"]] = relationship("DeliveryLineModel", back_populates="order_line")
     
     # Constraints
     __table_args__ = (

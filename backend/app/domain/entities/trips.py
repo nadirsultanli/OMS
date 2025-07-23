@@ -8,6 +8,7 @@ from decimal import Decimal
 class TripStatus(str, Enum):
     DRAFT = "draft"
     PLANNED = "planned"
+    LOADED = "loaded"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"

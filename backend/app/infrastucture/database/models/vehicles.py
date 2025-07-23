@@ -17,6 +17,8 @@ class Vehicle(Base):
     plate = Column(String, nullable=False)
     vehicle_type = Column(SAEnum(VehicleType, name="vehicle_type", values_callable=lambda x: [e.value for e in x]), nullable=False)
     capacity_kg = Column(Numeric(10, 2), nullable=False)
+    capacity_m3 = Column(Numeric(10, 2), nullable=True)  # Volume capacity in cubic meters
+    volume_unit = Column(String(10), nullable=True, default="m3")  # Unit for volume (m3, ft3, etc.)
     depot_id = Column(SAUUID(as_uuid=True), ForeignKey("warehouses.id"), nullable=True)
     active = Column(Boolean, nullable=False, server_default=text("true"))
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
@@ -28,6 +30,7 @@ class Vehicle(Base):
     
     # Relationships
     trips = relationship("TripModel", back_populates="vehicle")
+    truck_inventory = relationship("TruckInventoryModel", back_populates="vehicle")
     
     __table_args__ = (
         # Unique constraint on (tenant_id, plate)

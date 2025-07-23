@@ -1,9 +1,12 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime, date
 from decimal import Decimal
 from app.domain.entities.trips import Trip, TripStatus
 from app.domain.entities.trip_stops import TripStop
+from app.domain.entities.truck_inventory import TruckInventory
+from app.domain.entities.deliveries import Delivery, DeliveryLine, DeliveryStatus
+from app.domain.entities.trip_planning import TripPlan, TripPlanningLine, TripPlanningValidationResult
 from app.domain.repositories.trip_repository import TripRepository
 from app.domain.exceptions.trips.trip_exceptions import (
     TripNotFoundError,
@@ -309,7 +312,8 @@ class TripService:
         """Validate if status transition is allowed"""
         valid_transitions = {
             TripStatus.DRAFT: [TripStatus.PLANNED, TripStatus.CANCELLED],
-            TripStatus.PLANNED: [TripStatus.IN_PROGRESS, TripStatus.CANCELLED],
+            TripStatus.PLANNED: [TripStatus.LOADED, TripStatus.CANCELLED],
+            TripStatus.LOADED: [TripStatus.IN_PROGRESS, TripStatus.CANCELLED],
             TripStatus.IN_PROGRESS: [TripStatus.COMPLETED, TripStatus.CANCELLED],
             TripStatus.COMPLETED: [],  # No further transitions allowed
             TripStatus.CANCELLED: []   # No further transitions allowed
@@ -330,4 +334,225 @@ class TripService:
         if not (-180 <= lon <= 180) or not (-90 <= lat <= 90):
             return False
         
-        return True 
+        return True
+    
+    # Trip Planning Methods
+    
+    async def create_trip_plan(self, trip_id: UUID, vehicle_id: UUID, vehicle_capacity_kg: Decimal) -> TripPlan:
+        """Create a new trip plan for order assignment and capacity planning"""
+        try:
+            # Validate trip exists and is in correct status
+            trip = await self.get_trip_by_id(trip_id)
+            if trip.trip_status not in [TripStatus.DRAFT, TripStatus.PLANNED]:
+                raise TripValidationError(
+                    f"Cannot create trip plan for trip in status: {trip.trip_status.value}"
+                )
+            
+            # Create trip plan
+            trip_plan = TripPlan.create(
+                trip_id=trip_id,
+                vehicle_id=vehicle_id,
+                vehicle_capacity_kg=vehicle_capacity_kg
+            )
+            
+            default_logger.info(f"Trip plan created", trip_id=str(trip_id), vehicle_id=str(vehicle_id))
+            return trip_plan
+            
+        except Exception as e:
+            default_logger.error(f"Failed to create trip plan: {str(e)}", trip_id=str(trip_id))
+            raise
+    
+    async def add_orders_to_trip_plan(
+        self, 
+        trip_plan: TripPlan, 
+        order_ids: List[UUID],
+        order_details: List[Dict[str, Any]]  # Order details with product info
+    ) -> TripPlan:
+        """Add orders to trip plan and create planning lines"""
+        try:
+            # Add orders to plan
+            for order_id in order_ids:
+                trip_plan.add_order(order_id)
+            
+            # Create planning lines from order details
+            product_totals = {}
+            for order_detail in order_details:
+                for line in order_detail.get("lines", []):
+                    product_key = (UUID(line["product_id"]), UUID(line["variant_id"]))
+                    
+                    if product_key not in product_totals:
+                        product_totals[product_key] = {
+                            "product_id": UUID(line["product_id"]),
+                            "variant_id": UUID(line["variant_id"]),
+                            "product_name": line["product_name"],
+                            "variant_name": line["variant_name"],
+                            "ordered_qty": Decimal("0"),
+                            "unit_weight_kg": Decimal(str(line.get("unit_weight_kg", "0"))),
+                            "unit_volume_m3": Decimal(str(line.get("unit_volume_m3", "0")))
+                        }
+                    
+                    product_totals[product_key]["ordered_qty"] += Decimal(str(line["qty"]))
+            
+            # Create planning lines
+            for product_data in product_totals.values():
+                planning_line = TripPlanningLine(
+                    product_id=product_data["product_id"],
+                    variant_id=product_data["variant_id"],
+                    product_name=product_data["product_name"],
+                    variant_name=product_data["variant_name"],
+                    ordered_qty=product_data["ordered_qty"],
+                    planned_qty=product_data["ordered_qty"],  # Default to ordered quantity
+                    unit_weight_kg=product_data["unit_weight_kg"],
+                    unit_volume_m3=product_data["unit_volume_m3"]
+                )
+                trip_plan.add_planning_line(planning_line)
+            
+            # Validate the plan
+            trip_plan.validate_plan()
+            
+            default_logger.info(
+                f"Orders added to trip plan", 
+                trip_id=str(trip_plan.trip_id),
+                order_count=len(order_ids),
+                validation_result=trip_plan.validation_result.value
+            )
+            
+            return trip_plan
+            
+        except Exception as e:
+            default_logger.error(f"Failed to add orders to trip plan: {str(e)}", trip_id=str(trip_plan.trip_id))
+            raise
+    
+    async def validate_trip_capacity(self, trip_plan: TripPlan) -> Dict[str, Any]:
+        """Validate trip capacity and return detailed validation results"""
+        validation_result = trip_plan.validate_plan()
+        utilization = trip_plan.get_utilization_percentage()
+        
+        return {
+            "is_valid": validation_result == TripPlanningValidationResult.VALID,
+            "validation_result": validation_result.value,
+            "validation_messages": trip_plan.validation_messages,
+            "total_weight_kg": float(trip_plan.total_weight_kg),
+            "total_volume_m3": float(trip_plan.total_volume_m3),
+            "vehicle_capacity_kg": float(trip_plan.vehicle_capacity_kg),
+            "vehicle_capacity_m3": float(trip_plan.vehicle_capacity_m3),
+            "weight_utilization_pct": utilization["weight_utilization_pct"],
+            "volume_utilization_pct": utilization["volume_utilization_pct"],
+            "planning_lines": [line.to_dict() for line in trip_plan.planning_lines]
+        }
+    
+    async def load_truck(self, trip_id: UUID, truck_inventory_items: List[Dict[str, Any]], loaded_by: UUID) -> bool:
+        """Load truck with inventory and transition trip to LOADED status"""
+        try:
+            # Validate trip exists and is in PLANNED status
+            trip = await self.get_trip_by_id(trip_id)
+            if trip.trip_status != TripStatus.PLANNED:
+                raise TripStatusTransitionError(
+                    current_status=trip.trip_status.value,
+                    target_status=TripStatus.LOADED.value,
+                    message="Trip must be in PLANNED status to load truck"
+                )
+            
+            # Create truck inventory records
+            total_weight = Decimal("0")
+            for item in truck_inventory_items:
+                truck_inventory = TruckInventory.create(
+                    trip_id=trip_id,
+                    vehicle_id=trip.vehicle_id,
+                    product_id=UUID(item["product_id"]),
+                    variant_id=UUID(item["variant_id"]),
+                    loaded_qty=Decimal(str(item["loaded_qty"])),
+                    empties_expected_qty=Decimal(str(item.get("empties_expected_qty", "0"))),
+                    created_by=loaded_by
+                )
+                
+                # Calculate weight (this should be validated against vehicle capacity)
+                unit_weight = Decimal(str(item.get("unit_weight_kg", "0")))
+                total_weight += truck_inventory.loaded_qty * unit_weight
+            
+            # Update trip status to LOADED and record total weight
+            await self.update_trip(
+                trip_id=trip_id,
+                updated_by=loaded_by,
+                trip_status=TripStatus.LOADED,
+                gross_loaded_kg=total_weight
+            )
+            
+            default_logger.info(
+                f"Truck loaded successfully", 
+                trip_id=str(trip_id),
+                total_weight_kg=float(total_weight),
+                item_count=len(truck_inventory_items)
+            )
+            
+            return True
+            
+        except Exception as e:
+            default_logger.error(f"Failed to load truck: {str(e)}", trip_id=str(trip_id))
+            raise
+    
+    async def start_trip(self, trip_id: UUID, driver_id: UUID, start_location: Optional[tuple] = None) -> Trip:
+        """Start trip execution (driver begins delivery)"""
+        try:
+            # Validate trip exists and is in LOADED status
+            trip = await self.get_trip_by_id(trip_id)
+            if trip.trip_status != TripStatus.LOADED:
+                raise TripStatusTransitionError(
+                    current_status=trip.trip_status.value,
+                    target_status=TripStatus.IN_PROGRESS.value,
+                    message="Trip must be LOADED before starting"
+                )
+            
+            # Update trip status and set start time
+            updated_trip = await self.update_trip(
+                trip_id=trip_id,
+                updated_by=driver_id,
+                trip_status=TripStatus.IN_PROGRESS,
+                start_time=datetime.now()
+            )
+            
+            default_logger.info(
+                f"Trip started", 
+                trip_id=str(trip_id),
+                driver_id=str(driver_id),
+                start_location=start_location
+            )
+            
+            return updated_trip
+            
+        except Exception as e:
+            default_logger.error(f"Failed to start trip: {str(e)}", trip_id=str(trip_id))
+            raise
+    
+    async def complete_trip(self, trip_id: UUID, driver_id: UUID, end_location: Optional[tuple] = None) -> Trip:
+        """Complete trip execution"""
+        try:
+            # Validate trip exists and is in IN_PROGRESS status
+            trip = await self.get_trip_by_id(trip_id)
+            if trip.trip_status != TripStatus.IN_PROGRESS:
+                raise TripStatusTransitionError(
+                    current_status=trip.trip_status.value,
+                    target_status=TripStatus.COMPLETED.value,
+                    message="Trip must be IN_PROGRESS to complete"
+                )
+            
+            # Update trip status and set end time
+            updated_trip = await self.update_trip(
+                trip_id=trip_id,
+                updated_by=driver_id,
+                trip_status=TripStatus.COMPLETED,
+                end_time=datetime.now()
+            )
+            
+            default_logger.info(
+                f"Trip completed", 
+                trip_id=str(trip_id),
+                driver_id=str(driver_id),
+                end_location=end_location
+            )
+            
+            return updated_trip
+            
+        except Exception as e:
+            default_logger.error(f"Failed to complete trip: {str(e)}", trip_id=str(trip_id))
+            raise 
