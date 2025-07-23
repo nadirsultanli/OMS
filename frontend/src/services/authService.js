@@ -183,21 +183,26 @@ class AuthService {
     }
   }
 
-  // Accept invitation with token and set password
+  // Accept invitation with JWT token and set password
   async acceptInvitation(token, password, confirmPassword) {
     try {
+      console.log('Sending accept invitation request with JWT token:', token ? 'present' : 'missing');
+      console.log('Token length:', token ? token.length : 0);
+      
       const response = await api.post('/auth/accept-invitation', {
         token,
         password,
         confirm_password: confirmPassword
       });
       
+      console.log('Accept invitation response:', response.data);
       return {
         success: true,
         data: response.data
       };
     } catch (error) {
       console.error('Accept invitation error:', error);
+      console.error('Error response:', error.response?.data);
       return {
         success: false,
         error: this.extractErrorMessage(error.response?.data) || 'Failed to accept invitation. Please try again.'

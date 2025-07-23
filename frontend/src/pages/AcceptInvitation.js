@@ -61,9 +61,24 @@ const AcceptInvitation = () => {
       setToken(finalToken);
       console.log('AcceptInvitation - Token set successfully');
       
-      // For verification tokens, we can't decode them to get email
-      // The email will be available after the invitation is accepted
-      console.log('AcceptInvitation - Verification token detected, email will be available after acceptance');
+      // Try to decode the JWT token to get user email for display
+      try {
+        const tokenParts = finalToken.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(atob(tokenParts[1]));
+          console.log('AcceptInvitation - JWT Token payload:', { 
+            email: payload.email, 
+            sub: payload.sub,
+            name: payload.user_metadata?.name,
+            role: payload.user_metadata?.role
+          });
+          if (payload.email) {
+            setUserEmail(payload.email);
+          }
+        }
+      } catch (e) {
+        console.log('AcceptInvitation - Could not decode JWT token for email extraction:', e);
+      }
     } else {
       console.warn('AcceptInvitation - No valid invitation token found');
       console.warn('AcceptInvitation - Expected: token with type=invite or just token parameter');
@@ -147,7 +162,7 @@ const AcceptInvitation = () => {
           isLoading={isLoading}
           errors={errors}
           title="Welcome to LPG-OMS"
-          description="Set up your password to complete your account"
+          description={userEmail ? `Set up your password for ${userEmail}` : 'Set up your password to complete your account'}
           buttonText="Complete Account Setup"
           loadingText="Setting Up Account..."
         />

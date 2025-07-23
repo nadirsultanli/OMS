@@ -486,9 +486,10 @@ async def accept_invitation(
     request: ResetPasswordRequest,
     user_service: UserService = Depends(get_user_service)
 ):
-    """Accept invitation and set password using Supabase token"""
+    """Accept invitation and set password using Supabase JWT token"""
     try:
-        default_logger.info(f"Starting invitation acceptance process")
+        default_logger.info(f"Starting invitation acceptance process with JWT token: {request.token[:20]}...")
+        default_logger.info(f"JWT token length: {len(request.token)}")
         
         # Get Supabase client
         supabase = get_supabase_client_sync()
