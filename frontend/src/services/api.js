@@ -13,6 +13,11 @@ const getApiUrl = () => {
     url = 'http://localhost:8000';
   }
 
+  // Force HTTPS for Railway production URLs
+  if (url.includes('railway.app') && url.startsWith('http://')) {
+    url = url.replace('http://', 'https://');
+  }
+
   // Ensure the URL ends with /api/v1
   if (!url.endsWith('/api/v1')) {
     // Remove trailing slash if present
