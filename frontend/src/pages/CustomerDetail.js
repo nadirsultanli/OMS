@@ -105,19 +105,33 @@ const CustomerDetail = () => {
   const validateAddressForm = () => {
     const newErrors = {};
 
-    if (!addressForm.street) newErrors.street = 'Street address is required';
-    if (!addressForm.city) newErrors.city = 'City is required';
-    if (!addressForm.country) newErrors.country = 'Country is required';
+    if (!addressForm.street || addressForm.street.trim() === '') {
+      newErrors.street = 'Street address is required';
+    }
+    if (!addressForm.city || addressForm.city.trim() === '') {
+      newErrors.city = 'City is required';
+    }
+    if (!addressForm.country || addressForm.country.trim() === '') {
+      newErrors.country = 'Country is required';
+    }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const isValid = Object.keys(newErrors).length === 0;
+    console.log('Form validation result:', { isValid, errors: newErrors, formData: addressForm });
+    return isValid;
   };
 
   const handleCreateAddress = async (e) => {
     e.preventDefault();
+    console.log('Form submitted!', { addressForm, errors });
     setMessage('');
 
-    if (!validateAddressForm()) return;
+    const isValid = validateAddressForm();
+    console.log('Validation result:', isValid);
+    if (!isValid) {
+      console.log('Form validation failed, not submitting');
+      return;
+    }
 
     setLoading(true);
     try {

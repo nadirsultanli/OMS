@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import Optional
 from uuid import UUID
@@ -20,6 +21,18 @@ async def create_address(
     address_data = request.model_dump()
     address_data['tenant_id'] = current_user.tenant_id
     address_data['created_by'] = current_user.id
+    
+    # BUSINESS RULE: Validate single default address constraint
+    if address_data.get('is_default', False):
+        # Check if customer already has a default address
+        existing_addresses = await address_service.get_addresses_by_customer(str(address_data['customer_id']))
+        existing_defaults = [addr for addr in existing_addresses if addr.is_default]
+        if existing_defaults:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Customer already has a default address. Setting this address as default will automatically unset the existing default address."
+            )
+    
     try:
         address = await address_service.create_address(**address_data)
         return AddressResponse(**address.to_dict())
@@ -55,8 +68,27 @@ async def get_addresses(
     return AddressListResponse(addresses=address_responses, total=len(address_responses), limit=limit, offset=offset)
 
 @router.put("/{address_id}", response_model=AddressResponse)
-async def update_address(address_id: str, request: UpdateAddressRequest, address_service: AddressService = Depends(get_address_service)):
-    address = await address_service.update_address(address_id, **request.model_dump(exclude_unset=True))
+async def update_address(
+    address_id: str, 
+    request: UpdateAddressRequest, 
+    address_service: AddressService = Depends(get_address_service)
+):
+    # BUSINESS RULE: Validate single default address constraint for updates
+    update_data = request.model_dump(exclude_unset=True)
+    if update_data.get('is_default', False):
+        # Get the current address to check if it's already default
+        current_address = await address_service.get_address_by_id(address_id)
+        if not current_address.is_default:
+            # Check if customer already has a default address (excluding current one)
+            existing_addresses = await address_service.get_addresses_by_customer(str(current_address.customer_id))
+            existing_defaults = [addr for addr in existing_addresses if addr.is_default and str(addr.id) != address_id]
+            if existing_defaults:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Customer already has a default address. Setting this address as default will automatically unset the existing default address."
+                )
+    
+    address = await address_service.update_address(address_id, **update_data)
     return AddressResponse(**address.to_dict())
 
 @router.delete("/{address_id}", status_code=status.HTTP_204_NO_CONTENT)
