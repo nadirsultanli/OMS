@@ -173,8 +173,22 @@ class CustomerService {
   // Address-related methods
   async getCustomerAddresses(customerId) {
     try {
-      const response = await api.get(`/addresses?customer_id=${customerId}`);
-      return response.data;
+      // TEMPORARY WORKAROUND: Fetch all addresses and filter client-side
+      // TODO: Remove this once server supports customer_id query parameter
+      const response = await api.get('/addresses');
+      
+      // Filter addresses for the specific customer
+      const customerAddresses = response.data.addresses.filter(
+        address => address.customer_id === customerId
+      );
+      
+      // Return in the same format as the original endpoint would
+      return {
+        addresses: customerAddresses,
+        total: customerAddresses.length,
+        limit: response.data.limit,
+        offset: response.data.offset
+      };
     } catch (error) {
       console.error('Error fetching customer addresses:', error);
       throw error;
@@ -183,7 +197,7 @@ class CustomerService {
 
   async createAddress(addressData) {
     try {
-      const response = await api.post('/addresses', addressData);
+      const response = await api.post('/addresses/', addressData);
       return response.data;
     } catch (error) {
       console.error('Error creating address:', error);
