@@ -221,7 +221,8 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {
-        "status": "healthy"
+        "status": "healthy",
+        "address_endpoints_enabled": True
     }
 
 @app.get("/cors-test")

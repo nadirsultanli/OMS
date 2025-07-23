@@ -175,7 +175,7 @@ class CustomerService {
     try {
       // TEMPORARY WORKAROUND: Fetch all addresses and filter client-side
       // TODO: Remove this once server supports customer_id query parameter
-      const response = await api.get('/addresses');
+      const response = await api.get('/addresses/');
       
       // Filter addresses for the specific customer
       const customerAddresses = response.data.addresses.filter(
