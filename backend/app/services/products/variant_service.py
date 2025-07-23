@@ -102,7 +102,7 @@ class VariantService:
         created_by: Optional[str] = None
     ) -> tuple[Variant, Variant]:
         """Create both EMPTY and FULL variants for a cylinder size"""
-        # Create EMPTY variant
+        # Create EMPTY variant - no gross weight (empty cylinders don't have gross weight)
         empty_variant = await self.create_variant(
             tenant_id=tenant_id,
             product_id=product_id,
@@ -114,11 +114,12 @@ class VariantService:
             revenue_category=RevenueCategory.ASSET_SALE,
             tare_weight_kg=tare_weight_kg,
             capacity_kg=capacity_kg,
+            gross_weight_kg=None,  # EMPTY cylinders have no gross weight
             inspection_date=inspection_date,
             created_by=created_by
         )
         
-        # Create FULL variant
+        # Create FULL variant - gross weight equals tare + capacity (cylinder + gas)
         full_variant = await self.create_variant(
             tenant_id=tenant_id,
             product_id=product_id,
@@ -130,7 +131,7 @@ class VariantService:
             revenue_category=RevenueCategory.ASSET_SALE,
             tare_weight_kg=tare_weight_kg,
             capacity_kg=capacity_kg,
-            gross_weight_kg=gross_weight_kg,
+            gross_weight_kg=tare_weight_kg + capacity_kg,  # Full cylinder = tare + gas weight
             inspection_date=inspection_date,
             created_by=created_by
         )
@@ -280,9 +281,21 @@ class VariantService:
     async def update_variant(
         self,
         variant_id: str,
+        # Basic fields
         sku: Optional[str] = None,
+        # New atomic model fields
+        sku_type: Optional[SKUType] = None,
+        state_attr: Optional[StateAttribute] = None,
+        requires_exchange: Optional[bool] = None,
+        is_stock_item: Optional[bool] = None,
+        bundle_components: Optional[List[dict]] = None,
+        revenue_category: Optional[RevenueCategory] = None,
+        affects_inventory: Optional[bool] = None,
+        default_price: Optional[float] = None,
+        # Legacy fields
         status: Optional[ProductStatus] = None,
         scenario: Optional[ProductScenario] = None,
+        # Physical attributes
         tare_weight_kg: Optional[float] = None,
         capacity_kg: Optional[float] = None,
         gross_weight_kg: Optional[float] = None,
@@ -302,14 +315,26 @@ class VariantService:
             tenant_id=current_variant.tenant_id,
             product_id=current_variant.product_id,
             sku=sku if sku is not None else current_variant.sku,
+            # New atomic model fields
+            sku_type=sku_type if sku_type is not None else current_variant.sku_type,
+            state_attr=state_attr if state_attr is not None else current_variant.state_attr,
+            requires_exchange=requires_exchange if requires_exchange is not None else current_variant.requires_exchange,
+            is_stock_item=is_stock_item if is_stock_item is not None else current_variant.is_stock_item,
+            bundle_components=bundle_components if bundle_components is not None else current_variant.bundle_components,
+            revenue_category=revenue_category if revenue_category is not None else current_variant.revenue_category,
+            affects_inventory=affects_inventory if affects_inventory is not None else current_variant.affects_inventory,
+            default_price=default_price if default_price is not None else current_variant.default_price,
+            # Legacy fields
             status=status if status is not None else current_variant.status,
             scenario=scenario if scenario is not None else current_variant.scenario,
+            # Physical attributes
             tare_weight_kg=tare_weight_kg if tare_weight_kg is not None else current_variant.tare_weight_kg,
             capacity_kg=capacity_kg if capacity_kg is not None else current_variant.capacity_kg,
             gross_weight_kg=gross_weight_kg if gross_weight_kg is not None else current_variant.gross_weight_kg,
             deposit=deposit if deposit is not None else current_variant.deposit,
             inspection_date=inspection_date if inspection_date is not None else current_variant.inspection_date,
             active=active if active is not None else current_variant.active,
+            # Audit fields
             created_at=current_variant.created_at,
             created_by=current_variant.created_by,
             updated_at=datetime.utcnow(),
