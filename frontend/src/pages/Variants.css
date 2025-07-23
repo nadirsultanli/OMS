@@ -221,6 +221,11 @@
   background: #f5f5f5;
 }
 
+.icon-button.edit:hover {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
 .icon-button.delete:hover {
   background: #ffebee;
   color: #c62828;

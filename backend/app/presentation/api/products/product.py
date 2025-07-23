@@ -139,7 +139,7 @@ async def get_products(
         logger.error(f"Get products failed after {total_time:.3f}s: {str(e)}")
         raise
 
-@router.put("/{product_id}", response_model=ProductResponse)
+@router.put("/{product_id}/", response_model=ProductResponse)
 async def update_product(
     product_id: str, 
     request: UpdateProductRequest, 
@@ -220,7 +220,7 @@ async def update_product(
         )
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{product_id}/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(
     product_id: str, 
     product_service: ProductService = Depends(get_product_service),
