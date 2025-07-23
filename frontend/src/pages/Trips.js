@@ -73,7 +73,7 @@ const Trips = () => {
   const fetchTrips = async () => {
     setLoading(true);
     try {
-      const result = await tripService.getTrips(tenantId, {
+      const result = await tripService.getTrips({
         limit: pagination.limit,
         offset: (pagination.currentPage - 1) * pagination.limit,
         status: filters.status || undefined,
