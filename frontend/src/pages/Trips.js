@@ -217,7 +217,8 @@ const Trips = () => {
 
   const handlePlanTrip = (trip) => {
     setSelectedTrip(trip);
-    setShowPlanModal(true);
+    // TODO: Implement trip planning modal
+    console.log('Plan trip:', trip);
   };
 
   const handleStartTrip = async (tripId) => {
