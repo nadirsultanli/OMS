@@ -42,6 +42,21 @@ class UserRepository(ABC):
         pass
     
     @abstractmethod
+    async def get_users_by_tenant(self, tenant_id: str) -> List[User]:
+        """Get all users for a specific tenant"""
+        pass
+    
+    @abstractmethod
+    async def get_active_users_by_tenant(self, tenant_id: str) -> List[User]:
+        """Get active users for a specific tenant"""
+        pass
+    
+    @abstractmethod
+    async def get_users_by_role_and_tenant(self, role: UserRoleType, tenant_id: str) -> List[User]:
+        """Get users by role for a specific tenant"""
+        pass
+    
+    @abstractmethod
     async def create_user(self, user: User) -> User:
         """Create a new user"""
         pass
