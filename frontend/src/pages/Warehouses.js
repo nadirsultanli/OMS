@@ -52,11 +52,18 @@ const Warehouses = () => {
       };
       const response = await warehouseService.getWarehouses(currentPage, warehousesPerPage, filters);
       console.log('Warehouses fetched:', response); // Debug log
-      setWarehouses(response.warehouses || []);
-      setTotalPages(Math.ceil((response.total || 0) / warehousesPerPage));
+      
+      if (response.success) {
+        setWarehouses(response.data.warehouses || []);
+        setTotalPages(Math.ceil((response.data.total || 0) / warehousesPerPage));
+      } else {
+        setError(response.error || 'Failed to load warehouses');
+        setWarehouses([]);
+      }
     } catch (error) {
       console.error('Error fetching warehouses:', error);
       setError('Failed to load warehouses');
+      setWarehouses([]);
     } finally {
       setLoading(false);
     }
