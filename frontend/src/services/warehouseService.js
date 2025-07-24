@@ -6,25 +6,24 @@ const warehouseService = {
     try {
       const tenantId = authService.getCurrentTenantId();
       if (!tenantId) {
-        throw new Error('No tenant ID found. Please log in again.');
+        return { success: false, error: 'No tenant ID found. Please log in again.' };
       }
 
       const { search = '', type = '', status = '' } = filters;
       const params = new URLSearchParams({
-        tenant_id: tenantId,
-        page: page.toString(),
-        limit: limit.toString()
+        limit: limit.toString(),
+        offset: ((page - 1) * limit).toString()
       });
 
       if (search) params.append('search', search);
-      if (type) params.append('type', type);
+      if (type) params.append('warehouse_type', type);
       if (status) params.append('status', status);
 
       const response = await api.get(`/warehouses/?${params}`);
-      return response.data;
+      return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching warehouses:', error);
-      throw error;
+      return { success: false, error: error.response?.data?.detail || error.message || 'Failed to fetch warehouses' };
     }
   },
 
