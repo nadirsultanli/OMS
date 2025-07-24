@@ -221,6 +221,7 @@ const CustomerDetail = () => {
         customer_id: customerId,
         tenant_id: tenantId,
         created_by: currentUser.id,
+        is_default: false, // Always set to false since we removed the checkbox
         // Format coordinates as PostgreSQL POINT if they exist
         coordinates: addressForm.coordinates ? 
           `POINT(${addressForm.coordinates[0]} ${addressForm.coordinates[1]})` : 
@@ -308,6 +309,7 @@ const CustomerDetail = () => {
     try {
       const addressData = {
         ...addressForm,
+        is_default: editingAddress.is_default, // Keep the existing default status when updating
         // Format coordinates as PostgreSQL POINT if they exist
         coordinates: addressForm.coordinates ? 
           `POINT(${addressForm.coordinates[0]} ${addressForm.coordinates[1]})` : 
@@ -566,7 +568,14 @@ const CustomerDetail = () => {
               </div>
             ) : (
               <div className="addresses-grid">
-                {addresses.map((address) => (
+                {addresses
+                  .sort((a, b) => {
+                    // Sort so default address comes first
+                    if (a.is_default && !b.is_default) return -1;
+                    if (!a.is_default && b.is_default) return 1;
+                    return 0;
+                  })
+                  .map((address) => (
                   <div key={address.id} className={`address-card ${address.is_default ? 'default' : ''}`}>
                     <div className="address-header">
                       <div className="address-type">
@@ -768,17 +777,6 @@ const CustomerDetail = () => {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="is_default"
-                      checked={addressForm.is_default}
-                      onChange={handleAddressInputChange}
-                    />
-                    Set as default address
-                  </label>
-                </div>
               </div>
 
               <div className="form-actions">
