@@ -11,6 +11,7 @@ const warehouseService = {
 
       const { search = '', type = '', status = '' } = filters;
       const params = new URLSearchParams({
+        tenant_id: tenantId,
         limit: limit.toString(),
         offset: ((page - 1) * limit).toString()
       });

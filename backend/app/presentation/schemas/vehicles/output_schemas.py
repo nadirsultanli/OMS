@@ -24,6 +24,8 @@ class VehicleResponse(BaseModel):
 class VehicleListResponse(BaseModel):
     vehicles: List[VehicleResponse]
     total: int
+    limit: int
+    offset: int
 
 # Vehicle Warehouse Response Schemas
 

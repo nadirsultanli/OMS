@@ -64,10 +64,22 @@ async def get_vehicle(vehicle_id: UUID, vehicle_service: VehicleService = Depend
 async def list_vehicles(
     tenant_id: UUID = Query(...),
     active: Optional[bool] = Query(None),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     vehicle_service: VehicleService = Depends(get_vehicle_service)
 ):
     vehicles = await vehicle_service.get_all_vehicles(tenant_id, active)
-    return VehicleListResponse(vehicles=[VehicleResponse(**v.__dict__) for v in vehicles], total=len(vehicles))
+    
+    # Apply pagination
+    total = len(vehicles)
+    paginated_vehicles = vehicles[offset:offset + limit]
+    
+    return VehicleListResponse(
+        vehicles=[VehicleResponse(**v.__dict__) for v in paginated_vehicles], 
+        total=total,
+        limit=limit,
+        offset=offset
+    )
 
 @router.put("/{vehicle_id}", response_model=VehicleResponse)
 async def update_vehicle(
