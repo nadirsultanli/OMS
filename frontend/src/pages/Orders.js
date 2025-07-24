@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import orderService from '../services/orderService';
 import customerService from '../services/customerService';
 import variantService from '../services/variantService';
+import priceListService from '../services/priceListService';
 import { extractErrorMessage } from '../utils/errorUtils';
 import { Search, Plus, Edit2, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Truck, X } from 'lucide-react';
 import './Orders.css';
@@ -11,6 +12,8 @@ const Orders = () => {
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [variants, setVariants] = useState([]);
+  const [priceLists, setPriceLists] = useState([]);
+  const [selectedPriceList, setSelectedPriceList] = useState('');
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -59,6 +62,7 @@ const Orders = () => {
     fetchOrders();
     fetchCustomers();
     fetchVariants();
+    fetchPriceLists();
   }, []);
 
   useEffect(() => {
@@ -111,13 +115,93 @@ const Orders = () => {
 
   const fetchVariants = async () => {
     try {
-      const result = await variantService.getVariants();
+      const result = await variantService.getVariants('332072c1-5405-4f09-a56f-a631defa911b');
       if (result.success) {
+        console.log('Variants fetched:', result.data);
         setVariants(result.data.variants || []);
+      } else {
+        console.error('Failed to fetch variants:', result.error);
       }
     } catch (error) {
       console.error('Failed to fetch variants:', error);
     }
+  };
+
+  const fetchPriceLists = async () => {
+    try {
+      const result = await priceListService.getPriceLists('332072c1-5405-4f09-a56f-a631defa911b');
+      if (result.success) {
+        console.log('Price lists fetched:', result.data);
+        setPriceLists(result.data.price_lists || []);
+      } else {
+        console.error('Failed to fetch price lists:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch price lists:', error);
+    }
+  };
+
+  const getVariantDisplayName = (variant) => {
+    if (!variant) return 'Unknown Variant';
+    
+    // For ASSET type variants, show SKU with state
+    if (variant.sku_type === 'ASSET') {
+      return `${variant.sku} (${variant.state_attr || variant.status})`;
+    }
+    
+    // For other types, show SKU with type
+    return `${variant.sku} (${variant.sku_type || 'N/A'})`;
+  };
+
+  const getPriceForVariant = async (variantId, gasType = null) => {
+    if (!selectedPriceList) return null;
+    
+    try {
+      const result = await priceListService.getPriceListLines(selectedPriceList);
+      if (result.success) {
+        const lines = result.data || [];
+        
+        // First try to find by variant_id
+        let priceLine = lines.find(line => line.variant_id === variantId);
+        
+        // If not found and gas_type is provided, try to find by gas_type
+        if (!priceLine && gasType) {
+          priceLine = lines.find(line => line.gas_type === gasType);
+        }
+        
+        return priceLine ? priceLine.min_unit_price : null;
+      }
+    } catch (error) {
+      console.error('Failed to get price for variant:', error);
+    }
+    
+    return null;
+  };
+
+  const handlePriceListChange = (priceListId) => {
+    setSelectedPriceList(priceListId);
+    
+    // Update all order lines with new prices
+    if (priceListId && formData.order_lines.length > 0) {
+      updateAllOrderLinePrices();
+    }
+  };
+
+  const updateAllOrderLinePrices = async () => {
+    const updatedLines = await Promise.all(
+      formData.order_lines.map(async (line) => {
+        if (line.variant_id) {
+          const price = await getPriceForVariant(line.variant_id, line.gas_type);
+          return { ...line, list_price: price || line.list_price };
+        }
+        return line;
+      })
+    );
+    
+    setFormData(prev => ({
+      ...prev,
+      order_lines: updatedLines
+    }));
   };
 
   const applyFilters = () => {
@@ -183,14 +267,29 @@ const Orders = () => {
 
     // Validate order lines
     formData.order_lines.forEach((line, index) => {
-      if (!line.variant_id && !line.gas_type) {
+      // Check if at least one of variant_id or gas_type is provided
+      if (!line.variant_id && (!line.gas_type || line.gas_type.trim() === '')) {
         newErrors[`line_${index}_product`] = 'Product or gas type is required';
       }
-      if (!line.qty_ordered || parseFloat(line.qty_ordered) <= 0) {
-        newErrors[`line_${index}_qty`] = 'Quantity must be greater than 0';
+      
+      // Validate quantity - must be a positive number
+      const qty = parseFloat(line.qty_ordered);
+      if (!line.qty_ordered || line.qty_ordered.trim() === '' || isNaN(qty) || qty <= 0) {
+        newErrors[`line_${index}_qty`] = 'Quantity must be a valid number greater than 0';
       }
-      if (!line.list_price || parseFloat(line.list_price) < 0) {
-        newErrors[`line_${index}_price`] = 'Price must be non-negative';
+      
+      // Validate list price - must be a non-negative number
+      const listPrice = parseFloat(line.list_price);
+      if (!line.list_price || line.list_price.trim() === '' || isNaN(listPrice) || listPrice < 0) {
+        newErrors[`line_${index}_price`] = 'List price must be a valid non-negative number';
+      }
+      
+      // Validate manual unit price (optional) - if provided, must be valid
+      if (line.manual_unit_price && line.manual_unit_price.trim() !== '') {
+        const manualPrice = parseFloat(line.manual_unit_price);
+        if (isNaN(manualPrice) || manualPrice < 0) {
+          newErrors[`line_${index}_manual_price`] = 'Manual price must be a valid non-negative number';
+        }
       }
     });
 
@@ -209,8 +308,49 @@ const Orders = () => {
     setLoading(true);
 
     try {
-      console.log('Creating order with data:', formData);
-      const result = await orderService.createOrder(formData);
+      // Clean the form data before sending
+      let cleanedData;
+      try {
+        cleanedData = {
+          ...formData,
+          order_lines: formData.order_lines.map(line => {
+            // Ensure all required fields are present and valid
+            const cleanedLine = {
+              // Required fields - must have values
+              qty_ordered: parseFloat(line.qty_ordered) || 0,
+              list_price: parseFloat(line.list_price) || 0,
+              
+              // Optional fields - can be null
+              variant_id: line.variant_id && line.variant_id.trim() !== '' ? line.variant_id : null,
+              gas_type: line.gas_type && line.gas_type.trim() !== '' ? line.gas_type : null,
+              manual_unit_price: line.manual_unit_price && line.manual_unit_price.trim() !== '' ? parseFloat(line.manual_unit_price) : null
+            };
+            
+            // Validate that at least one of variant_id or gas_type is provided
+            if (!cleanedLine.variant_id && !cleanedLine.gas_type) {
+              throw new Error('Each order line must have either a product or gas type');
+            }
+            
+            // Validate that quantity and price are positive
+            if (cleanedLine.qty_ordered <= 0) {
+              throw new Error('Quantity must be greater than 0');
+            }
+            
+            if (cleanedLine.list_price < 0) {
+              throw new Error('List price must be non-negative');
+            }
+            
+            return cleanedLine;
+          })
+        };
+      } catch (validationError) {
+        console.error('Data validation error:', validationError);
+        setErrors({ general: validationError.message });
+        return;
+      }
+
+      console.log('Creating order with cleaned data:', cleanedData);
+      const result = await orderService.createOrder(cleanedData);
       console.log('Order creation result:', result);
       
       if (result.success) {
@@ -245,7 +385,48 @@ const Orders = () => {
     setLoading(true);
 
     try {
-      const result = await orderService.updateOrder(selectedOrder.id, formData);
+      // Clean the form data before sending
+      let cleanedData;
+      try {
+        cleanedData = {
+          ...formData,
+          order_lines: formData.order_lines.map(line => {
+            // Ensure all required fields are present and valid
+            const cleanedLine = {
+              // Required fields - must have values
+              qty_ordered: parseFloat(line.qty_ordered) || 0,
+              list_price: parseFloat(line.list_price) || 0,
+              
+              // Optional fields - can be null
+              variant_id: line.variant_id && line.variant_id.trim() !== '' ? line.variant_id : null,
+              gas_type: line.gas_type && line.gas_type.trim() !== '' ? line.gas_type : null,
+              manual_unit_price: line.manual_unit_price && line.manual_unit_price.trim() !== '' ? parseFloat(line.manual_unit_price) : null
+            };
+            
+            // Validate that at least one of variant_id or gas_type is provided
+            if (!cleanedLine.variant_id && !cleanedLine.gas_type) {
+              throw new Error('Each order line must have either a product or gas type');
+            }
+            
+            // Validate that quantity and price are positive
+            if (cleanedLine.qty_ordered <= 0) {
+              throw new Error('Quantity must be greater than 0');
+            }
+            
+            if (cleanedLine.list_price < 0) {
+              throw new Error('List price must be non-negative');
+            }
+            
+            return cleanedLine;
+          })
+        };
+      } catch (validationError) {
+        console.error('Data validation error:', validationError);
+        setErrors({ general: validationError.message });
+        return;
+      }
+
+      const result = await orderService.updateOrder(selectedOrder.id, cleanedData);
       
       if (result.success) {
         setMessage('Order updated successfully!');
@@ -376,13 +557,76 @@ const Orders = () => {
     }));
   };
 
-  const updateOrderLine = (index, field, value) => {
+  const updateOrderLine = async (index, field, value) => {
+    // Handle numeric fields - only allow valid numbers or empty strings
+    let processedValue = value;
+    if (['qty_ordered', 'list_price', 'manual_unit_price'].includes(field)) {
+      // Allow empty string or valid numbers
+      if (value === '' || value === null || value === undefined) {
+        processedValue = '';
+      } else {
+        // Only allow digits, decimal points, and minus signs
+        const numericRegex = /^[0-9]*\.?[0-9]*$/;
+        if (!numericRegex.test(value)) {
+          // If it's not a valid numeric string, don't update the field
+          return;
+        }
+        
+        const numValue = parseFloat(value);
+        if (isNaN(numValue)) {
+          // If it's not a valid number, don't update the field
+          return;
+        }
+        
+        // For quantity, don't allow negative values
+        if (field === 'qty_ordered' && numValue < 0) {
+          return;
+        }
+        
+        // For prices, don't allow negative values
+        if ((field === 'list_price' || field === 'manual_unit_price') && numValue < 0) {
+          return;
+        }
+        
+        processedValue = value; // Keep the string value for the input
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       order_lines: prev.order_lines.map((line, i) => 
-        i === index ? { ...line, [field]: value } : line
+        i === index ? { ...line, [field]: processedValue } : line
       )
     }));
+
+    // If variant_id is changed and we have a price list selected, fetch the price
+    if (field === 'variant_id' && value && selectedPriceList) {
+      const price = await getPriceForVariant(value);
+      if (price !== null) {
+        setFormData(prev => ({
+          ...prev,
+          order_lines: prev.order_lines.map((line, i) => 
+            i === index ? { ...line, list_price: price } : line
+          )
+        }));
+      }
+    }
+
+    // If gas_type is changed and we have a variant selected, try to get price by gas type
+    if (field === 'gas_type' && value && selectedPriceList) {
+      const currentLine = formData.order_lines[index];
+      if (currentLine.variant_id) {
+        const price = await getPriceForVariant(currentLine.variant_id, value);
+        if (price !== null) {
+          setFormData(prev => ({
+            ...prev,
+            order_lines: prev.order_lines.map((line, i) => 
+              i === index ? { ...line, list_price: price } : line
+            )
+          }));
+        }
+      }
+    }
   };
 
   const getCustomerName = (customerId) => {
@@ -632,6 +876,25 @@ const Orders = () => {
                   </div>
 
                   <div className="form-group">
+                    <label htmlFor="price_list">Price List</label>
+                    <select
+                      id="price_list"
+                      name="price_list"
+                      value={selectedPriceList}
+                      onChange={(e) => handlePriceListChange(e.target.value)}
+                      className="form-select"
+                    >
+                      <option value="">Select Price List</option>
+                      {priceLists.map(priceList => (
+                        <option key={priceList.id} value={priceList.id}>
+                          {priceList.name} ({priceList.currency})
+                        </option>
+                      ))}
+                    </select>
+                    <small className="form-text">Select a price list to auto-populate prices</small>
+                  </div>
+
+                  <div className="form-group">
                     <label htmlFor="requested_date">Requested Date</label>
                     <input
                       type="date"
@@ -699,12 +962,12 @@ const Orders = () => {
                         <label>Product</label>
                         <select
                           value={line.variant_id}
-                          onChange={(e) => updateOrderLine(index, 'variant_id', e.target.value)}
+                          onChange={async (e) => await updateOrderLine(index, 'variant_id', e.target.value)}
                           className={errors[`line_${index}_product`] ? 'error' : ''}
                         >
                           <option value="">Select Product</option>
                           {variants.map(variant => (
-                            <option key={variant.id} value={variant.id}>{variant.name}</option>
+                            <option key={variant.id} value={variant.id}>{getVariantDisplayName(variant)}</option>
                           ))}
                         </select>
                         {errors[`line_${index}_product`] && (
@@ -717,7 +980,7 @@ const Orders = () => {
                         <input
                           type="text"
                           value={line.gas_type}
-                          onChange={(e) => updateOrderLine(index, 'gas_type', e.target.value)}
+                          onChange={async (e) => await updateOrderLine(index, 'gas_type', e.target.value)}
                           placeholder="Enter gas type for bulk orders"
                         />
                       </div>
@@ -727,7 +990,7 @@ const Orders = () => {
                         <input
                           type="number"
                           value={line.qty_ordered}
-                          onChange={(e) => updateOrderLine(index, 'qty_ordered', e.target.value)}
+                          onChange={async (e) => await updateOrderLine(index, 'qty_ordered', e.target.value)}
                           min="0"
                           step="0.01"
                           className={errors[`line_${index}_qty`] ? 'error' : ''}
@@ -743,7 +1006,7 @@ const Orders = () => {
                         <input
                           type="number"
                           value={line.list_price}
-                          onChange={(e) => updateOrderLine(index, 'list_price', e.target.value)}
+                          onChange={async (e) => await updateOrderLine(index, 'list_price', e.target.value)}
                           min="0"
                           step="0.01"
                           className={errors[`line_${index}_price`] ? 'error' : ''}
@@ -759,11 +1022,15 @@ const Orders = () => {
                         <input
                           type="number"
                           value={line.manual_unit_price}
-                          onChange={(e) => updateOrderLine(index, 'manual_unit_price', e.target.value)}
+                          onChange={async (e) => await updateOrderLine(index, 'manual_unit_price', e.target.value)}
                           min="0"
                           step="0.01"
                           placeholder="Optional price override"
+                          className={errors[`line_${index}_manual_price`] ? 'error' : ''}
                         />
+                        {errors[`line_${index}_manual_price`] && (
+                          <span className="error-text">{errors[`line_${index}_manual_price`]}</span>
+                        )}
                       </div>
                     </div>
                   </div>

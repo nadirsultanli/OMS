@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { extractErrorMessage } from '../utils/errorUtils';
 import './StockPhysicalCountModal.css';
 
 const StockPhysicalCountModal = ({ isOpen, onClose, onSuccess, selectedStockLevel }) => {
@@ -57,7 +58,7 @@ const StockPhysicalCountModal = ({ isOpen, onClose, onSuccess, selectedStockLeve
       onSuccess(response.data);
       onClose();
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to reconcile physical count');
+      setError(extractErrorMessage(err.response?.data) || err.message || 'Failed to reconcile physical count');
     } finally {
       setLoading(false);
     }
@@ -163,7 +164,7 @@ const StockPhysicalCountModal = ({ isOpen, onClose, onSuccess, selectedStockLeve
 
             {error && (
               <div className="error-message">
-                {error}
+                {typeof error === 'string' ? error : 'An error occurred'}
               </div>
             )}
           </div>

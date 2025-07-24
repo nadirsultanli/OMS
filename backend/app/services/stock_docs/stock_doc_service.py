@@ -192,22 +192,8 @@ class StockDocService:
 
     async def post_stock_doc(self, doc_id: str, user: User) -> bool:
         """Post stock document (finalize and apply stock movements)"""
-        stock_doc = await self.get_stock_doc_by_id(doc_id, user.tenant_id)
-        
-        if not stock_doc.can_be_posted():
-            raise StockDocPostingError(doc_id, f"Document cannot be posted in status {stock_doc.doc_status}")
-
-        # Validate stock availability for issue operations
-        if stock_doc.doc_type in [StockDocType.ISS_LOAD, StockDocType.ISS_SALE, StockDocType.TRF_WH, StockDocType.TRF_TRUCK]:
-            await self._validate_stock_availability(stock_doc)
-
-        # Update status to posted
-        return await self.stock_doc_repository.update_stock_doc_status(
-            doc_id, 
-            StockDocStatus.POSTED, 
-            user.id,
-            datetime.utcnow()
-        )
+        # Use the comprehensive post_stock_document method
+        return await self.post_stock_document(user, doc_id)
 
     async def cancel_stock_doc(self, doc_id: str, user: User) -> bool:
         """Cancel stock document"""
@@ -409,42 +395,56 @@ class StockDocService:
 
     async def post_stock_document(self, user: User, doc_id: str) -> bool:
         """Post stock document and update inventory levels"""
-        stock_doc = await self.get_stock_doc_by_id(doc_id, user.tenant_id)
-        
-        # Validate document can be posted
-        if stock_doc.doc_status == StockDocStatus.POSTED:
-            raise StockDocStatusTransitionError(
-                stock_doc.doc_status.value, StockDocStatus.POSTED.value, doc_id
-            )
-        
-        if not stock_doc.can_transition_to(StockDocStatus.POSTED):
-            raise StockDocStatusTransitionError(
-                stock_doc.doc_status.value, StockDocStatus.POSTED.value, doc_id
-            )
+        try:
+            stock_doc = await self.get_stock_doc_by_id(doc_id, user.tenant_id)
+            
+            # Validate document can be posted
+            if stock_doc.doc_status == StockDocStatus.POSTED:
+                raise StockDocStatusTransitionError(
+                    stock_doc.doc_status.value, StockDocStatus.POSTED.value, doc_id
+                )
+            
+            if not stock_doc.can_be_posted():
+                raise StockDocStatusTransitionError(
+                    stock_doc.doc_status.value, StockDocStatus.POSTED.value, doc_id
+                )
 
-        # Update stock levels if stock level repository is available
-        if self.stock_level_repository:
-            try:
-                await self._update_stock_levels_for_posting(user, stock_doc)
-            except Exception as e:
-                raise StockDocPostingError(doc_id, f"Failed to update stock levels: {str(e)}")
+            # Update stock levels if stock level repository is available
+            if self.stock_level_repository:
+                try:
+                    await self._update_stock_levels_for_posting(user, stock_doc)
+                except Exception as e:
+                    raise StockDocPostingError(doc_id, f"Failed to update stock levels: {str(e)}")
 
-        # Update document status to POSTED
-        success = await self.stock_doc_repository.update_stock_doc_status(
-            doc_id, StockDocStatus.POSTED, user.id, datetime.utcnow()
-        )
-        
-        if not success:
-            raise StockDocPostingError(doc_id, "Failed to update document status")
-        
-        return success
+            # Update document status to POSTED
+            success = await self.stock_doc_repository.update_stock_doc_status(
+                doc_id, StockDocStatus.POSTED, user.id, datetime.utcnow()
+            )
+            
+            if not success:
+                raise StockDocPostingError(doc_id, "Failed to update document status")
+            
+            return success
+            
+        except Exception as e:
+            # Log the specific error for debugging
+            from app.infrastucture.logs.logger import get_logger
+            logger = get_logger("stock_doc_service")
+            logger.error(
+                "Error in post_stock_document",
+                doc_id=doc_id,
+                user_id=str(user.id),
+                error=str(e),
+                error_type=type(e).__name__
+            )
+            raise
 
     async def _update_stock_levels_for_posting(self, user: User, stock_doc: StockDoc) -> None:
         """Update stock levels based on document type and lines"""
         if not self.stock_level_repository:
             return
 
-        for line in stock_doc.doc_lines:
+        for line in stock_doc.stock_doc_lines:
             if not line.variant_id:
                 continue  # Skip lines without variant (e.g., gas-only lines)
 
@@ -464,30 +464,69 @@ class StockDocService:
         quantity = line.quantity
         unit_cost = line.unit_cost or Decimal('0')
 
-        if doc_type == StockDocType.REC_FIL:
-            # Receipt: Increase ON_HAND stock
+        if doc_type in [StockDocType.REC_FILL, StockDocType.REC_SUPP, StockDocType.REC_RET]:
+            # External receipts: Increase ON_HAND stock at destination
             await self.stock_level_repository.update_stock_quantity(
                 user.tenant_id, stock_doc.dest_wh_id, line.variant_id, 
                 StockStatus.ON_HAND, quantity, unit_cost
             )
 
-        elif doc_type == StockDocType.ISS_FIL:
-            # Issue: Decrease ON_HAND stock
+        elif doc_type in [StockDocType.ISS_LOAD, StockDocType.ISS_SALE]:
+            # External issues: Decrease ON_HAND stock from source
             await self.stock_level_repository.update_stock_quantity(
                 user.tenant_id, stock_doc.source_wh_id, line.variant_id, 
                 StockStatus.ON_HAND, -quantity
             )
 
-        elif doc_type == StockDocType.XFER:
-            # Transfer: Move from IN_TRANSIT to ON_HAND at destination
-            await self.stock_level_repository.transfer_stock_between_statuses(
-                user.tenant_id, stock_doc.dest_wh_id, line.variant_id,
-                StockStatus.IN_TRANSIT, StockStatus.ON_HAND, quantity
+        elif doc_type == StockDocType.TRF_WH:
+            # Warehouse transfer: Move from source to destination
+            if stock_doc.source_wh_id and stock_doc.dest_wh_id:
+                # Decrease from source
+                await self.stock_level_repository.update_stock_quantity(
+                    user.tenant_id, stock_doc.source_wh_id, line.variant_id, 
+                    StockStatus.ON_HAND, -quantity
+                )
+                # Increase at destination
+                await self.stock_level_repository.update_stock_quantity(
+                    user.tenant_id, stock_doc.dest_wh_id, line.variant_id, 
+                    StockStatus.ON_HAND, quantity, unit_cost
+                )
+
+        elif doc_type == StockDocType.TRF_TRUCK:
+            # Truck transfer: Handle based on source/destination
+            if stock_doc.source_wh_id and stock_doc.dest_wh_id:
+                # Full transfer: source to destination
+                await self.stock_level_repository.update_stock_quantity(
+                    user.tenant_id, stock_doc.source_wh_id, line.variant_id, 
+                    StockStatus.ON_HAND, -quantity
+                )
+                await self.stock_level_repository.update_stock_quantity(
+                    user.tenant_id, stock_doc.dest_wh_id, line.variant_id, 
+                    StockStatus.ON_HAND, quantity, unit_cost
+                )
+            elif stock_doc.source_wh_id:
+                # Load to truck: ON_HAND to TRUCK_STOCK
+                await self.stock_level_repository.transfer_stock_between_statuses(
+                    user.tenant_id, stock_doc.source_wh_id, line.variant_id,
+                    StockStatus.ON_HAND, StockStatus.TRUCK_STOCK, quantity
+                )
+            elif stock_doc.dest_wh_id:
+                # Unload from truck: TRUCK_STOCK to ON_HAND
+                await self.stock_level_repository.transfer_stock_between_statuses(
+                    user.tenant_id, stock_doc.dest_wh_id, line.variant_id,
+                    StockStatus.TRUCK_STOCK, StockStatus.ON_HAND, quantity
+                )
+
+        elif doc_type in [StockDocType.ADJ_SCRAP, StockDocType.ADJ_VARIANCE]:
+            # Adjustments: Update ON_HAND stock (can be positive or negative)
+            await self.stock_level_repository.update_stock_quantity(
+                user.tenant_id, stock_doc.dest_wh_id, line.variant_id, 
+                StockStatus.ON_HAND, quantity, unit_cost
             )
 
+        # Handle frontend compatibility aliases
         elif doc_type == StockDocType.CONV_FIL:
             # Conversion: This handles EMPTY <-> FULL conversion
-            # This is complex and needs separate handling
             await self._handle_conversion_posting(user, stock_doc, line)
 
         elif doc_type == StockDocType.LOAD_MOB:
@@ -495,13 +534,6 @@ class StockDocService:
             await self.stock_level_repository.transfer_stock_between_statuses(
                 user.tenant_id, stock_doc.source_wh_id, line.variant_id,
                 StockStatus.ON_HAND, StockStatus.TRUCK_STOCK, quantity
-            )
-
-        elif doc_type == StockDocType.UNLD_MOB:
-            # Unload mobile: Move from TRUCK_STOCK to ON_HAND
-            await self.stock_level_repository.transfer_stock_between_statuses(
-                user.tenant_id, stock_doc.dest_wh_id, line.variant_id,
-                StockStatus.TRUCK_STOCK, StockStatus.ON_HAND, quantity
             )
 
     async def _handle_conversion_posting(
@@ -529,7 +561,7 @@ class StockDocService:
 
         # Move stock to IN_TRANSIT status if stock level repository is available
         if self.stock_level_repository:
-            for line in stock_doc.doc_lines:
+            for line in stock_doc.stock_doc_lines:
                 if line.variant_id:
                     await self.stock_level_repository.transfer_stock_between_statuses(
                         user.tenant_id, stock_doc.source_wh_id, line.variant_id,

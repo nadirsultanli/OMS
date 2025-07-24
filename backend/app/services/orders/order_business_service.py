@@ -308,7 +308,7 @@ class OrderBusinessService:
                 gas_type=line_data.get('gas_type'),
                 qty_ordered=Decimal(str(line_data.get('qty_ordered', 0))),
                 list_price=Decimal(str(line_data.get('list_price', 0))),
-                manual_unit_price=Decimal(str(line_data.get('manual_unit_price', 0))) if line_data.get('manual_unit_price') else None,
+                manual_unit_price=Decimal(str(line_data.get('manual_unit_price'))) if line_data.get('manual_unit_price') is not None and str(line_data.get('manual_unit_price')).strip() != '' else None,
                 created_by=user.id
             )
             

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { extractErrorMessage } from '../utils/errorUtils';
 import './StockTransferModal.css';
 
 const StockTransferModal = ({ isOpen, onClose, onSuccess, selectedStockLevel, warehouses }) => {
@@ -89,7 +90,7 @@ const StockTransferModal = ({ isOpen, onClose, onSuccess, selectedStockLevel, wa
       onSuccess(response.data);
       onClose();
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to transfer stock');
+      setError(extractErrorMessage(err.response?.data) || err.message || 'Failed to transfer stock');
     } finally {
       setLoading(false);
     }
@@ -225,7 +226,7 @@ const StockTransferModal = ({ isOpen, onClose, onSuccess, selectedStockLevel, wa
 
             {error && (
               <div className="error-message">
-                {error}
+                {typeof error === 'string' ? error : 'An error occurred'}
               </div>
             )}
           </div>

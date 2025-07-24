@@ -1,5 +1,6 @@
 from datetime import date
 from typing import List, Optional
+import traceback
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse
@@ -157,9 +158,14 @@ async def create_order(
             tenant_id=str(current_user.tenant_id),
             customer_id=str(request.customer_id),
             error=str(e),
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
+            stack_trace=traceback.format_exc()
         )
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create order")
+        # Return more detailed error for debugging
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to create order: {str(e)}"
+        )
 
 
 @router.post("/execute", response_model=ExecuteOrderResponse, status_code=status.HTTP_200_OK)

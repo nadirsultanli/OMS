@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import stockService from '../services/stockService';
 import warehouseService from '../services/warehouseService';
+import { extractErrorMessage } from '../utils/errorUtils';
 import './StockDashboard.css';
 
 const StockDashboard = () => {
@@ -141,7 +142,7 @@ const StockDashboard = () => {
         </div>
       </div>
 
-      {error && <div className="alert alert-danger">{error}</div>}
+      {error && <div className="alert alert-danger">{typeof error === 'string' ? error : 'An error occurred'}</div>}
 
       {/* Summary Cards */}
       <div className="summary-section">

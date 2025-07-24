@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { extractErrorMessage } from '../utils/errorUtils';
 import './StockReserveModal.css';
 
 const StockReserveModal = ({ isOpen, onClose, onSuccess, selectedStockLevel }) => {
@@ -61,7 +62,7 @@ const StockReserveModal = ({ isOpen, onClose, onSuccess, selectedStockLevel }) =
       onSuccess(response.data);
       onClose();
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to reserve stock');
+      setError(extractErrorMessage(err.response?.data) || err.message || 'Failed to reserve stock');
     } finally {
       setLoading(false);
     }
@@ -140,7 +141,7 @@ const StockReserveModal = ({ isOpen, onClose, onSuccess, selectedStockLevel }) =
 
             {error && (
               <div className="error-message">
-                {error}
+                {typeof error === 'string' ? error : 'An error occurred'}
               </div>
             )}
           </div>

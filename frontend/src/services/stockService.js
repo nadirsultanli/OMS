@@ -108,6 +108,15 @@ class StockService {
     return response.data;
   }
 
+  async getStockDocumentsByRefAndStatus(refDocId = null, status = null) {
+    const payload = {};
+    if (refDocId) payload.ref_doc_id = refDocId;
+    if (status) payload.status = status;
+
+    const response = await api.post('/stock-docs/get', payload);
+    return response.data;
+  }
+
   async getStockDocument(docId) {
     const response = await api.get(`/stock-docs/${docId}`);
     return response.data;

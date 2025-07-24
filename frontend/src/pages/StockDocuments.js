@@ -1,22 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import stockService from '../services/stockService';
 import warehouseService from '../services/warehouseService';
+import CreateStockDocModal from '../components/CreateStockDocModal';
+import StockDocDetailsModal from '../components/StockDocDetailsModal';
+import EditStockDocModal from '../components/EditStockDocModal';
+import { extractErrorMessage } from '../utils/errorUtils';
 import './StockDocuments.css';
 
 const STOCK_DOC_TYPES = [
-  { value: 'REC_FIL', label: 'Receive to Filling', description: 'External receipt' },
-  { value: 'ISS_FIL', label: 'Issue from Filling', description: 'External issue' },
-  { value: 'XFER', label: 'Transfer', description: 'Between warehouses' },
-  { value: 'CONV_FIL', label: 'Conversion', description: 'Empty ⇄ Full' },
-  { value: 'LOAD_MOB', label: 'Load Mobile', description: 'Load truck' },
-  { value: 'UNLD_MOB', label: 'Unload Mobile', description: 'Unload truck' }
+  { value: 'REC_SUPP', label: 'Receive from Supplier', description: 'External receipt' },
+  { value: 'REC_RET', label: 'Receive Return', description: 'External receipt' },
+  { value: 'ISS_LOAD', label: 'Issue for Load', description: 'External issue' },
+  { value: 'ISS_SALE', label: 'Issue for Sale', description: 'External issue' },
+  { value: 'ADJ_SCRAP', label: 'Adjustment Scrap', description: 'Stock adjustment' },
+  { value: 'ADJ_VARIANCE', label: 'Adjustment Variance', description: 'Stock adjustment' },
+  { value: 'REC_FILL', label: 'Receive to Filling', description: 'External receipt' },
+  { value: 'TRF_WH', label: 'Transfer Warehouse', description: 'Between warehouses' },
+  { value: 'TRF_TRUCK', label: 'Transfer Truck', description: 'Truck operations' },
+  // Frontend compatibility aliases
+  { value: 'CONV_FIL', label: 'Conversion Fill', description: 'Empty ⇄ Full' },
+  { value: 'LOAD_MOB', label: 'Load Mobile', description: 'Load truck' }
 ];
 
 const STOCK_DOC_STATUS = [
+  { value: 'open', label: 'Open', className: 'status-draft' },
+  { value: 'posted', label: 'Posted', className: 'status-posted' },
+  { value: 'cancelled', label: 'Cancelled', className: 'status-cancelled' },
+  // Frontend compatibility aliases
   { value: 'DRAFT', label: 'Draft', className: 'status-draft' },
   { value: 'CONFIRMED', label: 'Confirmed', className: 'status-confirmed' },
-  { value: 'POSTED', label: 'Posted', className: 'status-posted' },
-  { value: 'CANCELLED', label: 'Cancelled', className: 'status-cancelled' },
   { value: 'IN_TRANSIT', label: 'In Transit', className: 'status-transit' },
   { value: 'RECEIVED', label: 'Received', className: 'status-received' }
 ];
@@ -41,6 +53,7 @@ const StockDocuments = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -100,13 +113,35 @@ const StockDocuments = () => {
   };
 
   const getStatusLabel = (status) => {
-    const statusObj = STOCK_DOC_STATUS.find(s => s.value === status);
-    return statusObj ? statusObj.label : status;
+    // Map backend status to frontend display
+    const statusMap = {
+      'open': 'Open',
+      'posted': 'Posted', 
+      'cancelled': 'Cancelled',
+      'DRAFT': 'Draft',
+      'CONFIRMED': 'Confirmed',
+      'POSTED': 'Posted',
+      'CANCELLED': 'Cancelled',
+      'IN_TRANSIT': 'In Transit',
+      'RECEIVED': 'Received'
+    };
+    return statusMap[status] || status || 'Unknown';
   };
 
   const getStatusClassName = (status) => {
-    const statusObj = STOCK_DOC_STATUS.find(s => s.value === status);
-    return statusObj ? statusObj.className : 'status-default';
+    // Map backend status to CSS class
+    const classMap = {
+      'open': 'status-draft',
+      'posted': 'status-posted',
+      'cancelled': 'status-cancelled',
+      'DRAFT': 'status-draft',
+      'CONFIRMED': 'status-confirmed', 
+      'POSTED': 'status-posted',
+      'CANCELLED': 'status-cancelled',
+      'IN_TRANSIT': 'status-transit',
+      'RECEIVED': 'status-received'
+    };
+    return classMap[status] || 'status-default';
   };
 
   const getWarehouseName = (warehouseId) => {
@@ -123,7 +158,7 @@ const StockDocuments = () => {
       setSuccess('Document posted successfully');
       await loadStockDocuments();
     } catch (err) {
-      setError('Failed to post document: ' + err.message);
+      setError('Failed to post document: ' + (extractErrorMessage(err.response?.data) || err.message));
     }
   };
 
@@ -143,15 +178,26 @@ const StockDocuments = () => {
   };
 
   const canPost = (doc) => {
-    return doc.status === 'CONFIRMED';
+    return doc.doc_status === 'open' || doc.status === 'open';
   };
 
   const canCancel = (doc) => {
-    return ['DRAFT', 'CONFIRMED'].includes(doc.status);
+    const status = doc.doc_status || doc.status;
+    return ['open', 'DRAFT', 'CONFIRMED'].includes(status);
   };
 
   const canEdit = (doc) => {
-    return doc.status === 'DRAFT';
+    const status = doc.doc_status || doc.status;
+    return status === 'open' || status === 'DRAFT';
+  };
+
+  const handleEditDocument = (doc) => {
+    setSelectedDoc(doc);
+    setShowEditModal(true);
+  };
+
+  const handleEditSuccess = () => {
+    loadStockDocuments();
   };
 
   if (loading && stockDocs.length === 0) {
@@ -181,7 +227,7 @@ const StockDocuments = () => {
 
       {error && (
         <div className="alert alert-danger">
-          {error}
+          {typeof error === 'string' ? error : 'An error occurred'}
           <button className="alert-close" onClick={() => setError(null)}>×</button>
         </div>
       )}
@@ -273,19 +319,19 @@ const StockDocuments = () => {
         <div className="summary-card">
           <div className="summary-label">Draft</div>
           <div className="summary-value">
-            {stockDocs.filter(doc => doc.status === 'DRAFT').length}
+            {stockDocs.filter(doc => (doc.doc_status || doc.status) === 'open').length}
           </div>
         </div>
         <div className="summary-card">
           <div className="summary-label">Confirmed</div>
           <div className="summary-value">
-            {stockDocs.filter(doc => doc.status === 'CONFIRMED').length}
+            {stockDocs.filter(doc => (doc.doc_status || doc.status) === 'CONFIRMED').length}
           </div>
         </div>
         <div className="summary-card">
           <div className="summary-label">Posted</div>
           <div className="summary-value">
-            {stockDocs.filter(doc => doc.status === 'POSTED').length}
+            {stockDocs.filter(doc => (doc.doc_status || doc.status) === 'posted').length}
           </div>
         </div>
       </div>
@@ -328,8 +374,8 @@ const StockDocuments = () => {
                     </div>
                   </td>
                   <td>
-                    <span className={`doc-status ${getStatusClassName(doc.status)}`}>
-                      {getStatusLabel(doc.status)}
+                    <span className={`doc-status ${getStatusClassName(doc.doc_status || doc.status)}`}>
+                      {getStatusLabel(doc.doc_status || doc.status)}
                     </span>
                   </td>
                   <td>{getWarehouseName(doc.from_warehouse_id)}</td>
@@ -353,7 +399,10 @@ const StockDocuments = () => {
                       </button>
                       
                       {canEdit(doc) && (
-                        <button className="btn btn-sm btn-outline-secondary">
+                        <button 
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => handleEditDocument(doc)}
+                        >
                           Edit
                         </button>
                       )}
@@ -384,7 +433,37 @@ const StockDocuments = () => {
         </table>
       </div>
 
-      {/* Modals would be added here - CreateStockDocModal, StockDocDetailsModal, etc. */}
+      {/* Modals */}
+      <CreateStockDocModal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+        }}
+        onSuccess={(response) => {
+          setSuccess('Stock document created successfully');
+          loadStockDocuments();
+          setTimeout(() => setSuccess(null), 5000);
+        }}
+      />
+
+      <StockDocDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedDoc(null);
+        }}
+        selectedDoc={selectedDoc}
+      />
+
+      <EditStockDocModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedDoc(null);
+        }}
+        document={selectedDoc}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 };
