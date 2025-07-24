@@ -170,6 +170,17 @@ const variantService = {
     }
   },
 
+  // Get bundle components for bundle explosion
+  getBundleComponents: async (variantId) => {
+    try {
+      const response = await api.get(`/variants/${variantId}/bundle-components`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error fetching bundle components:', error);
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to fetch bundle components' };
+    }
+  },
+
   // Helper functions for UI display
   getSkuTypeLabel: (skuType) => {
     const labels = {

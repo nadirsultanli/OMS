@@ -16,6 +16,7 @@ import PriceLists from './pages/PriceLists';
 import PriceListDetail from './pages/PriceListDetail';
 import Variants from './pages/Variants';
 import Orders from './pages/Orders';
+import OrderDetailView from './pages/OrderDetailView';
 import StockDashboard from './pages/StockDashboard';
 import StockLevels from './pages/StockLevels';
 import StockDocuments from './pages/StockDocuments';
@@ -154,6 +155,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Orders />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders/:orderId"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <OrderDetailView />
                   </Layout>
                 </ProtectedRoute>
               }

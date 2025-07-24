@@ -102,6 +102,7 @@ class TripSummaryResponse(BaseModel):
     start_time: Optional[datetime] = Field(None, description="Actual start time")
     end_time: Optional[datetime] = Field(None, description="Actual end time")
     gross_loaded_kg: Optional[Decimal] = Field(None, description="Total loaded weight")
+    order_count: int = Field(0, description="Number of orders assigned to this trip")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     

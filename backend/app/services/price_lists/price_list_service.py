@@ -123,6 +123,9 @@ class PriceListService:
         variant_id: Optional[str] = None,
         gas_type: Optional[str] = None,
         min_unit_price: Decimal = Decimal('0'),
+        tax_code: str = 'TX_STD',
+        tax_rate: Decimal = Decimal('23.00'),
+        is_tax_inclusive: bool = False,
         created_by: Optional[UUID] = None
     ) -> PriceListLineEntity:
         """Create a new price list line"""
@@ -139,6 +142,9 @@ class PriceListService:
             variant_id=UUID(variant_id) if variant_id else None,
             gas_type=gas_type,
             min_unit_price=min_unit_price,
+            tax_code=tax_code,
+            tax_rate=tax_rate,
+            is_tax_inclusive=is_tax_inclusive,
             created_at=datetime.utcnow(),
             created_by=created_by,
             updated_at=datetime.utcnow(),

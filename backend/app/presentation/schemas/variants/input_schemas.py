@@ -19,6 +19,7 @@ class CreateVariantRequest(BaseModel):
     bundle_components: Optional[List[Dict[str, Any]]] = None
     revenue_category: Optional[RevenueCategory] = None
     affects_inventory: Optional[bool] = None
+    is_serialized: Optional[bool] = None
     default_price: Optional[Decimal] = None
     # Legacy fields (for backward compatibility)
     status: Optional[ProductStatus] = None
@@ -42,6 +43,7 @@ class UpdateVariantRequest(BaseModel):
     bundle_components: Optional[List[Dict[str, Any]]] = None
     revenue_category: Optional[RevenueCategory] = None
     affects_inventory: Optional[bool] = None
+    is_serialized: Optional[bool] = None
     default_price: Optional[Decimal] = None
     # Legacy fields
     status: Optional[ProductStatus] = None

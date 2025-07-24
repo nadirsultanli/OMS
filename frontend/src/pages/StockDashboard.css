@@ -292,15 +292,22 @@
 
 .warehouse-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
 }
 
 .warehouse-card {
-  background-color: #f8f9fa;
-  border-radius: 6px;
-  padding: 1rem;
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.25rem;
   border: 1px solid #e9ecef;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
+}
+
+.warehouse-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
 .warehouse-header {
@@ -314,34 +321,73 @@
 }
 
 .warehouse-type {
-  color: #6c757d;
   font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.2);
+  display: inline-block;
+  margin-top: 0.25rem;
 }
 
 .warehouse-stats {
   display: flex;
   gap: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .stat {
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex: 1;
 }
 
 .stat-value {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #007bff;
   line-height: 1;
 }
 
 .stat-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #6c757d;
   margin-top: 0.25rem;
+  text-align: center;
+}
+
+.warehouse-preview {
+  border-top: 1px solid #e9ecef;
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.preview-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  font-size: 0.75rem;
+}
+
+.item-variant {
+  color: #495057;
+  font-family: monospace;
+}
+
+.item-quantity {
+  color: #007bff;
+  font-weight: 600;
 }
 
 .quick-actions {
@@ -421,6 +467,33 @@
   color: #721c24;
   background-color: #f8d7da;
   border-color: #f5c6cb;
+}
+
+.error-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.retry-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.retry-btn:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.retry-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .loading-container {

@@ -3,8 +3,9 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import date, datetime
 from app.services.trips.trip_service import TripService
-from app.services.dependencies.trips import get_trip_service
+from app.services.dependencies.trips import get_trip_service, get_trip_order_integration_service
 from app.services.dependencies.auth import get_current_user
+from app.services.trips.trip_order_integration_service import TripOrderIntegrationService
 from app.domain.entities.users import User
 from app.domain.entities.trips import TripStatus
 from app.presentation.schemas.trips.input_schemas import (
@@ -37,6 +38,7 @@ from app.domain.exceptions.trips.trip_exceptions import (
     TripStopValidationError
 )
 from app.infrastucture.logs.logger import default_logger
+from decimal import Decimal
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 
@@ -90,7 +92,8 @@ async def get_trips(
     limit: int = Query(100, ge=1, le=1000, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
     current_user: User = Depends(get_current_user),
-    trip_service: TripService = Depends(get_trip_service)
+    trip_service: TripService = Depends(get_trip_service),
+    integration_service: TripOrderIntegrationService = Depends(get_trip_order_integration_service)
 ):
     """Get trips for the current tenant with optional filtering"""
     try:
@@ -122,8 +125,24 @@ async def get_trips(
                 offset=offset
             )
         
+        # Enhance each trip with order count
+        enhanced_trips = []
+        for trip in trips:
+            trip_dict = trip.to_dict()
+            
+            # Get order count for this trip
+            try:
+                trip_summary = await integration_service.get_trip_orders_summary(trip.id)
+                trip_dict["order_count"] = trip_summary["order_count"]
+            except Exception as e:
+                # If we can't get order count, default to 0
+                default_logger.warning(f"Failed to get order count for trip {trip.id}: {str(e)}")
+                trip_dict["order_count"] = 0
+            
+            enhanced_trips.append(TripSummaryResponse(**trip_dict))
+        
         return TripListResponse(
-            trips=[TripSummaryResponse(**trip.to_dict()) for trip in trips],
+            trips=enhanced_trips,
             total=len(trips),
             limit=limit,
             offset=offset
