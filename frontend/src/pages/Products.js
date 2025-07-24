@@ -187,6 +187,10 @@ const Products = () => {
       newErrors.name = 'Product name is required';
     }
 
+    if (!formData.category) {
+      newErrors.category = 'Category is required';
+    }
+
     if (!formData.unit_of_measure) {
       newErrors.unit_of_measure = 'Unit of measure is required';
     }
@@ -645,18 +649,21 @@ const Products = () => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="category">Category</label>
+                  <label htmlFor="category">Category *</label>
                   <select
                     id="category"
                     name="category"
                     value={formData.category}
                     onChange={handleInputChange}
+                    className={errors.category ? 'error' : ''}
+                    required
                   >
-                    <option value="">Select Category</option>
+                    <option value="" disabled>Select Category</option>
                     {categories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
+                  {errors.category && <span className="error-text">{errors.category}</span>}
                 </div>
 
                 <div className="form-group">

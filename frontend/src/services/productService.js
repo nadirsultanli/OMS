@@ -70,7 +70,7 @@ const productService = {
   // Update product
   updateProduct: async (productId, productData) => {
     try {
-      const response = await api.put(`/products/${productId}`, productData);
+      const response = await api.put(`/products/${productId}/`, productData);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error updating product:', error);
@@ -81,7 +81,7 @@ const productService = {
   // Delete product
   deleteProduct: async (productId) => {
     try {
-      await api.delete(`/products/${productId}`);
+      await api.delete(`/products/${productId}/`);
       return { success: true };
     } catch (error) {
       console.error('Error deleting product:', error);
@@ -95,10 +95,8 @@ const productService = {
     return {
       success: true,
       data: [
-        'Cylinder',
-        'Accessory',
-        'Bulk Gas',
-        'Service',
+        'Cylinder Accessory',
+        'Bulk Gas Service',
         'Other'
       ]
     };
