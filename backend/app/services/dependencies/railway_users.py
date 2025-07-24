@@ -1,5 +1,5 @@
 from fastapi import Depends
-from app.services.users import UserService
+from app.services.users.user_service import UserService
 from app.infrastucture.database.repositories.supabase_user_repository import SupabaseUserRepository
 from decouple import config
 
