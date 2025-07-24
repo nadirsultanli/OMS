@@ -338,11 +338,17 @@
   background: #f1f5f9;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .action-btn:hover {
   background: #e2e8f0;
   transform: translateY(-1px);
+}
+
+.action-btn svg {
+  pointer-events: none;
+  display: block;
 }
 
 .action-btn.view {
@@ -354,6 +360,10 @@
   border-color: #3b82f6;
 }
 
+.action-btn.view svg {
+  color: #3b82f6;
+}
+
 .action-btn.edit {
   color: #8b5cf6;
 }
@@ -363,6 +373,10 @@
   border-color: #8b5cf6;
 }
 
+.action-btn.edit svg {
+  color: #8b5cf6;
+}
+
 .action-btn.delete {
   color: #ef4444;
 }
@@ -370,6 +384,10 @@
 .action-btn.delete:hover {
   background: #fee2e2;
   border-color: #ef4444;
+}
+
+.action-btn.delete svg {
+  color: #ef4444;
 }
 
 .loading-state,
