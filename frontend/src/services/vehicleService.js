@@ -49,7 +49,7 @@ const vehicleService = {
       // Add optional filters
       if (params.active !== undefined) queryParams.append('active', params.active);
 
-      const response = await api.get(`/vehicles/?${queryParams}`);
+      const response = await api.get(`/vehicles?${queryParams}`);
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
@@ -59,7 +59,7 @@ const vehicleService = {
   // Get single vehicle details
   getVehicleById: async (vehicleId) => {
     try {
-      const response = await api.get(`/vehicles/${vehicleId}/`);
+      const response = await api.get(`/vehicles/${vehicleId}`);
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
@@ -69,7 +69,7 @@ const vehicleService = {
   // Create new vehicle
   createVehicle: async (vehicleData) => {
     try {
-      const response = await api.post('/vehicles/', vehicleData);
+      const response = await api.post('/vehicles', vehicleData);
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
@@ -79,7 +79,7 @@ const vehicleService = {
   // Update vehicle
   updateVehicle: async (vehicleId, vehicleData) => {
     try {
-      const response = await api.put(`/vehicles/${vehicleId}/`, vehicleData);
+      const response = await api.put(`/vehicles/${vehicleId}`, vehicleData);
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
@@ -89,7 +89,7 @@ const vehicleService = {
   // Delete vehicle
   deleteVehicle: async (vehicleId) => {
     try {
-      await api.delete(`/vehicles/${vehicleId}/`);
+      await api.delete(`/vehicles/${vehicleId}`);
       return { success: true };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
