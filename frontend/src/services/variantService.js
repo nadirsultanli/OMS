@@ -19,7 +19,8 @@ const variantService = {
         offset: params.offset || 0,
         ...(params.product_id && { product_id: params.product_id }),
         ...(params.sku_type && { sku_type: params.sku_type }),
-        ...(params.is_stock_item !== undefined && { is_stock_item: params.is_stock_item })
+        ...(params.is_stock_item !== undefined && { is_stock_item: params.is_stock_item }),
+        ...(params.active_only !== undefined && { active_only: params.active_only })
       });
 
       const response = await api.get(`/variants/?${queryParams}`);
