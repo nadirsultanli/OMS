@@ -9,6 +9,8 @@ class CustomerResponse(BaseModel):
     customer_type: str
     status: str
     name: str
+    email: Optional[str]
+    phone_number: Optional[str]
     tax_pin: Optional[str]
     incorporation_doc: Optional[str]
     credit_days: Optional[int]

@@ -48,6 +48,8 @@ class CustomerRepository(CustomerRepositoryInterface):
             customer_type=customer.customer_type.value,
             status=customer.status.value,
             name=customer.name,
+            email=customer.email,
+            phone_number=customer.phone_number,
             tax_pin=customer.tax_pin,
             incorporation_doc=customer.incorporation_doc,
             credit_days=customer.credit_days,
@@ -71,7 +73,7 @@ class CustomerRepository(CustomerRepositoryInterface):
         if not obj:
             return None
         for field in [
-            "tenant_id", "customer_type", "status", "name", "tax_pin", "incorporation_doc", "credit_days", "credit_limit",
+            "tenant_id", "customer_type", "status", "name", "email", "phone_number", "tax_pin", "incorporation_doc", "credit_days", "credit_limit",
             "owner_sales_rep_id", "updated_at", "updated_by", "deleted_at", "deleted_by"
         ]:
             setattr(obj, field, getattr(customer, field))
@@ -167,6 +169,8 @@ class CustomerRepository(CustomerRepositoryInterface):
             customer_type=CustomerType(obj.customer_type),
             status=CustomerStatus(obj.status),
             name=obj.name,
+            email=obj.email,
+            phone_number=obj.phone_number,
             tax_pin=obj.tax_pin,
             incorporation_doc=obj.incorporation_doc,
             credit_days=obj.credit_days,

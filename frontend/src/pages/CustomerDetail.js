@@ -463,6 +463,20 @@ const CustomerDetail = () => {
                 </span>
               </div>
               
+              {customer.email && (
+                <div className="info-item">
+                  <label>Email</label>
+                  <span>{customer.email}</span>
+                </div>
+              )}
+              
+              {customer.phone_number && (
+                <div className="info-item">
+                  <label>Phone Number</label>
+                  <span>{customer.phone_number}</span>
+                </div>
+              )}
+              
               {customer.tax_pin && (
                 <div className="info-item">
                   <label>Tax PIN</label>

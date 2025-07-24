@@ -22,6 +22,8 @@ class Customer(Base):
     customer_type = Column(SAEnum(CustomerType, name="customer_type", values_callable=lambda x: [e.value for e in x]), nullable=False)
     status = Column(SAEnum(CustomerStatus, name="customer_status", values_callable=lambda x: [e.value for e in x]), nullable=False, server_default=text("'pending'"))
     name = Column(String, nullable=False)
+    email = Column(String, nullable=True)
+    phone_number = Column(String, nullable=True)
     tax_pin = Column(String, nullable=True)
     incorporation_doc = Column(String, nullable=True)
     credit_days = Column(Integer, nullable=True)
