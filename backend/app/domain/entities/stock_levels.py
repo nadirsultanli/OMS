@@ -53,10 +53,12 @@ class StockLevel:
         if unit_cost is not None and unit_cost > 0:
             total_qty = self.quantity + qty
             if total_qty > 0:
-                self.unit_cost = ((self.total_cost + (qty * unit_cost)) / total_qty)
+                # Round to 6 decimal places to match database precision
+                self.unit_cost = ((self.total_cost + (qty * unit_cost)) / total_qty).quantize(Decimal('0.000001'))
         
         self.quantity += qty
-        self.total_cost = self.quantity * self.unit_cost
+        # Round total_cost to 2 decimal places to match database precision
+        self.total_cost = (self.quantity * self.unit_cost).quantize(Decimal('0.01'))
         self.calculate_available_qty()
         self.last_transaction_date = datetime.utcnow()
         self.updated_at = datetime.utcnow()
@@ -66,11 +68,13 @@ class StockLevel:
         if qty <= 0:
             raise ValueError("Quantity must be positive for reductions")
         
-        if qty > self.quantity:
-            raise ValueError(f"Cannot reduce {qty} from stock level of {self.quantity}")
+        # Allow negative stock levels for adjustments (remove the constraint)
+        # if qty > self.quantity:
+        #     raise ValueError(f"Cannot reduce {qty} from stock level of {self.quantity}")
         
         self.quantity -= qty
-        self.total_cost = self.quantity * self.unit_cost
+        # Round total_cost to 2 decimal places to match database precision
+        self.total_cost = (self.quantity * self.unit_cost).quantize(Decimal('0.01'))
         self.calculate_available_qty()
         self.last_transaction_date = datetime.utcnow()
         self.updated_at = datetime.utcnow()

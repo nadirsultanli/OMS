@@ -3,13 +3,17 @@ import stockService from '../services/stockService';
 import warehouseService from '../services/warehouseService';
 import variantService from '../services/variantService';
 import StockAdjustModal from '../components/StockAdjustModal';
+import StockReserveModal from '../components/StockReserveModal';
+import StockTransferModal from '../components/StockTransferModal';
+import StockPhysicalCountModal from '../components/StockPhysicalCountModal';
+import StockReleaseModal from '../components/StockReleaseModal';
 import './StockLevels.css';
 
 const STOCK_STATUS_OPTIONS = [
-  { value: 'ON_HAND', label: 'On Hand' },
-  { value: 'IN_TRANSIT', label: 'In Transit' },
-  { value: 'TRUCK_STOCK', label: 'Truck Stock' },
-  { value: 'QUARANTINE', label: 'Quarantine' }
+  { value: 'on_hand', label: 'On Hand' },
+  { value: 'in_transit', label: 'In Transit' },
+  { value: 'truck_stock', label: 'Truck Stock' },
+  { value: 'quarantine', label: 'Quarantine' }
 ];
 
 const StockLevels = () => {
@@ -36,6 +40,7 @@ const StockLevels = () => {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showPhysicalCountModal, setShowPhysicalCountModal] = useState(false);
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
   const [selectedStockLevel, setSelectedStockLevel] = useState(null);
 
   // Load initial data
@@ -49,13 +54,15 @@ const StockLevels = () => {
           variantService.getVariants()
         ]);
         
-        setWarehouses(warehousesResponse.warehouses || []);
-        setVariants(variantsResponse.variants || []);
+        // Handle different response formats
+        const warehouses = warehousesResponse.warehouses || warehousesResponse || [];
+        const variants = variantsResponse.data?.variants || variantsResponse.variants || variantsResponse || [];
         
-        // Load stock levels if we have warehouse or variant filters
-        if (filters.warehouseId || filters.variantId) {
-          await loadStockLevels();
-        }
+        setWarehouses(warehouses);
+        setVariants(variants);
+        
+        // Load all stock levels immediately
+        await loadStockLevels();
       } catch (err) {
         setError('Failed to load initial data: ' + err.message);
       } finally {
@@ -67,11 +74,6 @@ const StockLevels = () => {
   }, []);
 
   const loadStockLevels = useCallback(async () => {
-    if (!filters.warehouseId && !filters.variantId) {
-      setStockLevels([]);
-      return;
-    }
-
     try {
       setLoading(true);
       const response = await stockService.getStockLevels(filters);
@@ -143,6 +145,36 @@ const StockLevels = () => {
     setTimeout(() => setSuccess(null), 5000); // Clear success message after 5 seconds
   };
 
+  const handleReservationSuccess = (response) => {
+    setSuccess(`Stock reservation completed successfully. Reserved: ${response.quantity_reserved}, Remaining available: ${response.remaining_available}`);
+    // Force immediate refresh
+    setTimeout(() => {
+      loadStockLevels();
+    }, 100);
+    setTimeout(() => setSuccess(null), 5000);
+  };
+
+  const handleTransferSuccess = (response) => {
+    setSuccess('Stock transfer completed successfully');
+    loadStockLevels(); // Refresh the data
+    setTimeout(() => setSuccess(null), 5000);
+  };
+
+  const handlePhysicalCountSuccess = (response) => {
+    setSuccess('Physical count reconciliation completed successfully');
+    loadStockLevels(); // Refresh the data
+    setTimeout(() => setSuccess(null), 5000);
+  };
+
+  const handleReleaseSuccess = (response) => {
+    setSuccess(`Stock reservation released successfully. Released: ${response.quantity_reserved}, Available: ${response.remaining_available}`);
+    // Force immediate refresh
+    setTimeout(() => {
+      loadStockLevels();
+    }, 100);
+    setTimeout(() => setSuccess(null), 5000);
+  };
+
   if (loading && stockLevels.length === 0) {
     return (
       <div className="stock-levels-page">
@@ -162,13 +194,43 @@ const StockLevels = () => {
       <div className="page-header">
         <h1>Stock Levels</h1>
         <div className="header-actions">
-          <button className="btn btn-secondary" onClick={() => setShowPhysicalCountModal(true)}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={() => {
+              if (stockLevels.length > 0) {
+                setSelectedStockLevel(stockLevels[0]);
+                setShowPhysicalCountModal(true);
+              } else {
+                setError('No stock levels available for physical count');
+              }
+            }}
+          >
             Physical Count
           </button>
-          <button className="btn btn-secondary" onClick={() => setShowTransferModal(true)}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={() => {
+              if (stockLevels.length > 0) {
+                setSelectedStockLevel(stockLevels[0]);
+                setShowTransferModal(true);
+              } else {
+                setError('No stock levels available for transfer');
+              }
+            }}
+          >
             Transfer Stock
           </button>
-          <button className="btn btn-primary" onClick={() => setShowAdjustModal(true)}>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => {
+              if (stockLevels.length > 0) {
+                setSelectedStockLevel(stockLevels[0]);
+                setShowAdjustModal(true);
+              } else {
+                setError('No stock levels available for adjustment');
+              }
+            }}
+          >
             Adjust Stock
           </button>
         </div>
@@ -273,9 +335,9 @@ const StockLevels = () => {
       </div>
 
       {/* Results */}
-      {!filters.warehouseId && !filters.variantId ? (
+      {stockLevels.length === 0 ? (
         <div className="empty-state">
-          <p>Please select a warehouse or variant to view stock levels.</p>
+          <p>No stock levels found matching your criteria.</p>
         </div>
       ) : (
         <div className="stock-levels-table">
@@ -319,7 +381,9 @@ const StockLevels = () => {
                       {formatQuantity(level.quantity)}
                     </td>
                     <td className="quantity-cell">
-                      {formatQuantity(level.reserved_qty)}
+                      <span className={level.reserved_qty > 0 ? 'reserved-qty' : ''}>
+                        {formatQuantity(level.reserved_qty)}
+                      </span>
                     </td>
                     <td className="quantity-cell">
                       <span className={getAvailabilityBadgeClass(level.available_qty, level.quantity)}>
@@ -354,6 +418,17 @@ const StockLevels = () => {
                         >
                           Reserve
                         </button>
+                        {level.reserved_qty > 0 && (
+                          <button 
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => {
+                              setSelectedStockLevel(level);
+                              setShowReleaseModal(true);
+                            }}
+                          >
+                            Release
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -372,6 +447,47 @@ const StockLevels = () => {
           setSelectedStockLevel(null);
         }}
         onSuccess={handleAdjustmentSuccess}
+        selectedStockLevel={selectedStockLevel}
+      />
+
+      <StockReserveModal
+        isOpen={showReserveModal}
+        onClose={() => {
+          setShowReserveModal(false);
+          setSelectedStockLevel(null);
+        }}
+        onSuccess={handleReservationSuccess}
+        selectedStockLevel={selectedStockLevel}
+      />
+
+      <StockTransferModal
+        isOpen={showTransferModal}
+        onClose={() => {
+          setShowTransferModal(false);
+          setSelectedStockLevel(null);
+        }}
+        onSuccess={handleTransferSuccess}
+        selectedStockLevel={selectedStockLevel}
+        warehouses={warehouses}
+      />
+
+      <StockPhysicalCountModal
+        isOpen={showPhysicalCountModal}
+        onClose={() => {
+          setShowPhysicalCountModal(false);
+          setSelectedStockLevel(null);
+        }}
+        onSuccess={handlePhysicalCountSuccess}
+        selectedStockLevel={selectedStockLevel}
+      />
+
+      <StockReleaseModal
+        isOpen={showReleaseModal}
+        onClose={() => {
+          setShowReleaseModal(false);
+          setSelectedStockLevel(null);
+        }}
+        onSuccess={handleReleaseSuccess}
         selectedStockLevel={selectedStockLevel}
       />
     </div>

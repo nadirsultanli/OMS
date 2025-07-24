@@ -40,8 +40,7 @@ class SQLAlchemyStockLevelRepository(StockLevelRepository):
 
     def _to_stock_level_model(self, entity: StockLevel) -> StockLevelModel:
         """Convert StockLevel entity to StockLevelModel"""
-        return StockLevelModel(
-            id=entity.id,
+        model = StockLevelModel(
             tenant_id=entity.tenant_id,
             warehouse_id=entity.warehouse_id,
             variant_id=entity.variant_id,
@@ -53,6 +52,12 @@ class SQLAlchemyStockLevelRepository(StockLevelRepository):
             total_cost=entity.total_cost,
             last_transaction_date=entity.last_transaction_date
         )
+        
+        # Only set ID if it exists (for updates)
+        if entity.id is not None:
+            model.id = entity.id
+            
+        return model
 
     async def get_stock_level(
         self, 
@@ -114,6 +119,21 @@ class SQLAlchemyStockLevelRepository(StockLevelRepository):
                 )
             )
             .order_by(StockLevelModel.warehouse_id, StockLevelModel.stock_status)
+        )
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        
+        return [self._to_stock_level_entity(model) for model in models]
+
+    async def get_all_stock_levels(
+        self, 
+        tenant_id: UUID
+    ) -> List[StockLevel]:
+        """Get all stock levels for a tenant"""
+        stmt = (
+            select(StockLevelModel)
+            .where(StockLevelModel.tenant_id == tenant_id)
+            .order_by(StockLevelModel.warehouse_id, StockLevelModel.variant_id, StockLevelModel.stock_status)
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
@@ -245,7 +265,9 @@ class SQLAlchemyStockLevelRepository(StockLevelRepository):
         
         if not existing:
             # Create new stock level if it doesn't exist
+            from uuid import uuid4
             existing = StockLevel(
+                id=uuid4(),  # Generate UUID for new entity
                 tenant_id=tenant_id,
                 warehouse_id=warehouse_id,
                 variant_id=variant_id,
