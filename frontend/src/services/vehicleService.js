@@ -3,6 +3,29 @@ import api from './api';
 const extractErrorMessage = (error) => {
   if (typeof error === 'string') return error;
   if (error?.message) return error.message;
+  
+  // Handle FastAPI validation errors (array of error objects)
+  if (Array.isArray(error?.detail)) {
+    const messages = error.detail.map(err => {
+      const field = err.loc ? err.loc.join(' -> ') : 'Field';
+      return `${field}: ${err.msg}`;
+    });
+    return messages.join(', ');
+  }
+  
+  // Handle array of errors directly
+  if (Array.isArray(error)) {
+    const messages = error.map(err => {
+      if (typeof err === 'string') return err;
+      if (err?.msg) {
+        const field = err.loc ? err.loc.join(' -> ') : 'Field';
+        return `${field}: ${err.msg}`;
+      }
+      return JSON.stringify(err);
+    });
+    return messages.join(', ');
+  }
+  
   if (error?.detail) return error.detail;
   if (error?.non_field_errors) return error.non_field_errors[0];
   if (error?.error) return error.error;
