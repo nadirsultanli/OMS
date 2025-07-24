@@ -16,10 +16,30 @@ class FileUploadService {
       const supabase = this.getSupabaseClient();
       
       // Check if user is authenticated
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('User not authenticated');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error(`Session error: ${sessionError.message}`);
       }
+      
+      if (!session) {
+        console.error('No session found. Attempting to refresh session...');
+        
+        // Try to refresh the session
+        const refreshResult = await supabaseAuthService.refreshSession();
+        if (refreshResult.success && refreshResult.session) {
+          console.log('Session refreshed successfully');
+          // Continue with the refreshed session
+        } else {
+          // Try to get user from localStorage as fallback
+          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          console.log('User from localStorage:', user);
+          throw new Error('User not authenticated. Please log in again.');
+        }
+      }
+      
+      console.log('Current session user:', session.user.email, 'Role:', session.user.user_metadata?.role);
 
       // Create a unique file name
       const fileExt = file.name.split('.').pop();

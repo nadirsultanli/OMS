@@ -917,14 +917,15 @@
 }
 
 .country-code-select {
-  width: 110px;
-  padding: 10px 12px;
+  width: 85px;
+  padding: 10px 8px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   background: white;
   cursor: pointer;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 
 .country-code-select:hover {

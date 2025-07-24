@@ -229,6 +229,18 @@ class SupabaseAuthService {
     });
   }
 
+  // Refresh the current session
+  async refreshSession() {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) throw error;
+      return { success: true, session: data.session };
+    } catch (error) {
+      console.error('Session refresh error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Get Supabase client for direct access if needed
   getClient() {
     return supabase;

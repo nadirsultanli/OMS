@@ -713,8 +713,8 @@ const Customers = () => {
                       className="country-code-select"
                     >
                       {countryCodes.map((country) => (
-                        <option key={country.code} value={country.code}>
-                          {country.flag} {country.code}
+                        <option key={country.code} value={country.code} title={country.name}>
+                          {country.code}
                         </option>
                       ))}
                     </select>
