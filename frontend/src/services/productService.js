@@ -95,8 +95,10 @@ const productService = {
     return {
       success: true,
       data: [
-        'Cylinder Accessory',
-        'Bulk Gas Service',
+        'Cylinder',
+        'Accessory',
+        'Bulk Gas',
+        'Service',
         'Other'
       ]
     };
