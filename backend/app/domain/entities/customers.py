@@ -22,6 +22,8 @@ class Customer:
     customer_type: CustomerType
     status: CustomerStatus
     name: str
+    email: Optional[str]
+    phone_number: Optional[str]
     tax_pin: Optional[str]
     incorporation_doc: Optional[str]
     credit_days: Optional[int]
@@ -44,6 +46,8 @@ class Customer:
             customer_type=customer_type,
             status=CustomerStatus.PENDING,
             name=name,
+            email=kwargs.get("email"),
+            phone_number=kwargs.get("phone_number"),
             tax_pin=kwargs.get("tax_pin"),
             incorporation_doc=kwargs.get("incorporation_doc"),
             credit_days=kwargs.get("credit_days"),
@@ -64,6 +68,8 @@ class Customer:
             "customer_type": self.customer_type.value,
             "status": self.status.value,
             "name": self.name,
+            "email": self.email,
+            "phone_number": self.phone_number,
             "tax_pin": self.tax_pin,
             "incorporation_doc": self.incorporation_doc,
             "credit_days": self.credit_days,
@@ -86,6 +92,8 @@ class Customer:
             customer_type=CustomerType(data["customer_type"]),
             status=CustomerStatus(data["status"]),
             name=data["name"],
+            email=data.get("email"),
+            phone_number=data.get("phone_number"),
             tax_pin=data.get("tax_pin"),
             incorporation_doc=data.get("incorporation_doc"),
             credit_days=data.get("credit_days"),

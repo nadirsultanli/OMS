@@ -7,7 +7,7 @@ class CreateCustomerRequest(BaseModel):
     customer_type: CustomerType
     name: str
     email: Optional[str] = None
-    phone: Optional[str] = None
+    phone_number: Optional[str] = None
     tax_pin: Optional[str] = None
     incorporation_doc: Optional[str] = None
     credit_days: Optional[int] = None
@@ -18,6 +18,8 @@ class CreateCustomerRequest(BaseModel):
 class UpdateCustomerRequest(BaseModel):
     customer_type: Optional[CustomerType] = None
     name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
     tax_pin: Optional[str] = None
     incorporation_doc: Optional[str] = None
     credit_days: Optional[int] = None

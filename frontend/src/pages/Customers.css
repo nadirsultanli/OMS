@@ -908,3 +908,51 @@
   color: #ef4444;
   font-weight: 600;
 }
+
+/* Phone input styles */
+.phone-input-group {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.country-code-select {
+  width: 110px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.country-code-select:hover {
+  border-color: #2563eb;
+}
+
+.country-code-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.phone-number-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.phone-number-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.phone-number-input.error {
+  border-color: #ef4444;
+  background: #fef2f2;
+}

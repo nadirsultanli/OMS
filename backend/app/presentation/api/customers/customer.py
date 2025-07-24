@@ -26,7 +26,7 @@ async def create_customer(
         user_role=context.role.value,
         customer_name=request.name,
         customer_type=request.customer_type,
-        phone=request.phone,
+        phone_number=request.phone_number,
         email=request.email
     )
     

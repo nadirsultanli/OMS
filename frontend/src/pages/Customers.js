@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import customerService from '../services/customerService';
 import fileUploadService from '../services/fileUploadService';
 import { Search, Plus, Mail, Phone, Building2, CreditCard, Wallet, Upload, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import countryCodes from '../data/countryCodes';
 import './Customers.css';
 
 const Customers = () => {
@@ -29,7 +30,10 @@ const Customers = () => {
     incorporation_doc: '',
     credit_days: '',
     credit_limit: '',
-    owner_sales_rep_id: ''
+    owner_sales_rep_id: '',
+    email: '',
+    country_code: '+1',
+    phone_number: ''
   });
 
   // File state for incorporation document
@@ -166,6 +170,16 @@ const Customers = () => {
       newErrors.customer_type = 'Customer type is required';
     }
 
+    // Validate email
+    if (formData.email && !formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Validate phone number
+    if (formData.phone_number && !formData.phone_number.match(/^[0-9\s\-\(\)]+$/)) {
+      newErrors.phone_number = 'Please enter a valid phone number';
+    }
+
     // Validate credit fields for credit customers
     if (formData.customer_type === 'credit') {
       if (!formData.credit_days || formData.credit_days < 0) {
@@ -241,7 +255,9 @@ const Customers = () => {
         credit_days: formData.customer_type === 'credit' ? parseInt(formData.credit_days) : null,
         credit_limit: formData.customer_type === 'credit' ? parseFloat(formData.credit_limit) : null,
         owner_sales_rep_id: formData.owner_sales_rep_id || currentUser.id,
-        created_by: currentUser.id
+        created_by: currentUser.id,
+        email: formData.email?.trim() || null,
+        phone_number: formData.phone_number ? `${formData.country_code} ${formData.phone_number.trim()}` : null
       };
       
       // Final validation - ensure no required fields are missing
@@ -267,7 +283,10 @@ const Customers = () => {
           incorporation_doc: '',
           credit_days: '',
           credit_limit: '',
-          owner_sales_rep_id: ''
+          owner_sales_rep_id: '',
+          email: '',
+          country_code: '+1',
+          phone_number: ''
         });
         setIncorporationFile(null);
         setFileError('');
@@ -496,8 +515,8 @@ const Customers = () => {
                       style={{ cursor: 'pointer' }}
                     >
                       <td className="name-cell">{customer.name}</td>
-                      <td className="email-cell">{defaultAddress?.email || '-'}</td>
-                      <td>{defaultAddress?.phone || '-'}</td>
+                      <td className="email-cell">{customer.email || defaultAddress?.email || '-'}</td>
+                      <td>{customer.phone_number || defaultAddress?.phone || '-'}</td>
                       <td>
                         <span className={getCustomerTypeBadgeClass(customer.customer_type)}>
                           {customer.customer_type.charAt(0).toUpperCase() + customer.customer_type.slice(1)}
@@ -668,6 +687,48 @@ const Customers = () => {
                     <option value="credit">Credit</option>
                   </select>
                   {errors.customer_type && <span className="error-text">{errors.customer_type}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="email">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="Enter email address"
+                    className={errors.email ? 'error' : ''}
+                  />
+                  {errors.email && <span className="error-text">{errors.email}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="phone_number">Phone Number</label>
+                  <div className="phone-input-group">
+                    <select
+                      name="country_code"
+                      value={formData.country_code}
+                      onChange={handleInputChange}
+                      className="country-code-select"
+                    >
+                      {countryCodes.map((country) => (
+                        <option key={country.code} value={country.code}>
+                          {country.flag} {country.code}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      id="phone_number"
+                      name="phone_number"
+                      value={formData.phone_number}
+                      onChange={handleInputChange}
+                      placeholder="Enter phone number"
+                      className={`phone-number-input ${errors.phone_number ? 'error' : ''}`}
+                    />
+                  </div>
+                  {errors.phone_number && <span className="error-text">{errors.phone_number}</span>}
                 </div>
 
                 <div className="form-group">
