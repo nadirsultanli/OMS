@@ -4,22 +4,29 @@ const extractErrorMessage = (error) => {
   if (typeof error === 'string') return error;
   if (error?.message) return error.message;
   
-  // Handle FastAPI validation errors
-  if (error?.detail) {
-    if (Array.isArray(error.detail)) {
-      // Multiple validation errors
-      const messages = error.detail.map(err => {
-        if (typeof err === 'object' && err.msg) {
-          const field = err.loc ? err.loc.join(' -> ') : 'Field';
-          return `${field}: ${err.msg}`;
-        }
-        return String(err);
-      });
-      return messages.join(', ');
-    }
-    return String(error.detail);
+  // Handle FastAPI validation errors (array of error objects)
+  if (Array.isArray(error?.detail)) {
+    const messages = error.detail.map(err => {
+      const field = err.loc ? err.loc.join(' -> ') : 'Field';
+      return `${field}: ${err.msg}`;
+    });
+    return messages.join(', ');
   }
   
+  // Handle array of errors directly
+  if (Array.isArray(error)) {
+    const messages = error.map(err => {
+      if (typeof err === 'string') return err;
+      if (err?.msg) {
+        const field = err.loc ? err.loc.join(' -> ') : 'Field';
+        return `${field}: ${err.msg}`;
+      }
+      return JSON.stringify(err);
+    });
+    return messages.join(', ');
+  }
+  
+  if (error?.detail) return error.detail;
   if (error?.non_field_errors) return error.non_field_errors[0];
   if (error?.error) return error.error;
   return 'An unexpected error occurred';
@@ -76,7 +83,7 @@ const vehicleService = {
   // Create new vehicle
   createVehicle: async (vehicleData) => {
     try {
-      const response = await api.post('/vehicles/', vehicleData);
+      const response = await api.post('/vehicles', vehicleData);
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };

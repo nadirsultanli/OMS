@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import './AddressMap.css';
@@ -19,6 +19,8 @@ const AddressMap = ({ coordinates, address }) => {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const [mapError, setMapError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     console.log('AddressMap coordinates received:', coordinates);
@@ -26,6 +28,7 @@ const AddressMap = ({ coordinates, address }) => {
     
     if (!mapContainerRef.current || !coordinates) {
       console.log('No map container or coordinates');
+      setIsLoading(false);
       return;
     }
 
@@ -41,6 +44,8 @@ const AddressMap = ({ coordinates, address }) => {
         console.log('Parsed coordinates:', { lng, lat });
       } else {
         console.log('Failed to parse coordinates format:', coordinates);
+        setMapError('Invalid coordinates format');
+        setIsLoading(false);
         return;
       }
     } else if (Array.isArray(coordinates)) {
@@ -52,12 +57,24 @@ const AddressMap = ({ coordinates, address }) => {
       console.log('Object coordinates:', { lng, lat });
     } else {
       console.log('Unrecognized coordinates format:', coordinates);
+      setMapError('Unrecognized coordinates format');
+      setIsLoading(false);
       return;
     }
 
     // Validate coordinates
     if (isNaN(lng) || isNaN(lat)) {
       console.log('Invalid coordinates - NaN values:', { lng, lat });
+      setMapError('Invalid coordinate values');
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate coordinate ranges
+    if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+      console.log('Coordinates out of range:', { lng, lat });
+      setMapError('Coordinates out of valid range');
+      setIsLoading(false);
       return;
     }
 
@@ -66,39 +83,62 @@ const AddressMap = ({ coordinates, address }) => {
       if (!mapRef.current && mapContainerRef.current) {
         try {
           console.log('Initializing map with center:', [lng, lat]);
+          
+          // Check if container has dimensions
+          const rect = mapContainerRef.current.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) {
+            console.log('Container has no dimensions, retrying...');
+            setTimeout(initMap, 100);
+            return;
+          }
+
           mapRef.current = new mapboxgl.Map({
             container: mapContainerRef.current,
             style: 'mapbox://styles/mapbox/streets-v12',
             center: [lng, lat],
             zoom: 15,
-            interactive: false, // Make map non-interactive for display only
-            failIfMajorPerformanceCaveat: false
+            interactive: true, // Allow interaction for better UX
+            failIfMajorPerformanceCaveat: false,
+            attributionControl: false // Hide attribution for cleaner look
           });
 
           // Wait for map to load
           mapRef.current.on('load', () => {
             console.log('AddressMap loaded successfully');
-            mapRef.current.resize();
+            setIsLoading(false);
+            setMapError(null);
+            
+            // Ensure map resizes to fit container
+            setTimeout(() => {
+              if (mapRef.current) {
+                mapRef.current.resize();
+              }
+            }, 100);
           });
 
           // Handle errors
           mapRef.current.on('error', (e) => {
             console.error('AddressMap error:', e);
+            setMapError('Failed to load map');
+            setIsLoading(false);
           });
 
           // Add navigation controls
           mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+          // Add marker immediately
+          addMarker();
+
         } catch (error) {
           console.error('Failed to initialize AddressMap:', error);
+          setMapError('Failed to initialize map');
+          setIsLoading(false);
           return;
         }
       }
     };
 
-    // Initialize map with small delay
-    setTimeout(initMap, 100);
-
-    // Add marker after map is ready
+    // Add marker function
     const addMarker = () => {
       if (mapRef.current) {
         // Remove existing marker
@@ -115,24 +155,19 @@ const AddressMap = ({ coordinates, address }) => {
 
         // Add popup with address info if provided
         if (address) {
-          const popup = new mapboxgl.Popup({ offset: 25 })
+          const popup = new mapboxgl.Popup({ 
+            offset: 25,
+            closeButton: false,
+            closeOnClick: false
+          })
             .setHTML(`<div class="address-popup">${address}</div>`);
           markerRef.current.setPopup(popup);
         }
-
-        // Center map on coordinates
-        mapRef.current.flyTo({
-          center: [lng, lat],
-          zoom: 15
-        });
-      } else {
-        // If map isn't ready yet, try again in a bit
-        setTimeout(addMarker, 200);
       }
     };
 
-    // Add marker with delay to ensure map is initialized
-    setTimeout(addMarker, 200);
+    // Initialize map with small delay
+    setTimeout(initMap, 100);
 
     // Cleanup
     return () => {
@@ -157,9 +192,29 @@ const AddressMap = ({ coordinates, address }) => {
     );
   }
 
+  if (mapError) {
+    return (
+      <div className="address-map-container">
+        <div className="no-coordinates-message">
+          <p>Unable to display map: {mapError}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="address-map-container">
-      <div ref={mapContainerRef} className="address-map" />
+      {isLoading && (
+        <div className="map-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading map...</p>
+        </div>
+      )}
+      <div 
+        ref={mapContainerRef} 
+        className="address-map"
+        style={{ opacity: isLoading ? 0 : 1 }}
+      />
     </div>
   );
 };
