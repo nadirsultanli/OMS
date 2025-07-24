@@ -16,6 +16,7 @@ from app.presentation.schemas.trips.input_schemas import (
 )
 from app.presentation.schemas.trips.output_schemas import (
     TripResponse,
+    TripSummaryResponse,
     TripWithStopsResponse,
     TripListResponse,
     TripStopResponse,
@@ -122,7 +123,7 @@ async def get_trips(
             )
         
         return TripListResponse(
-            trips=[TripResponse(**trip.to_dict()) for trip in trips],
+            trips=[TripSummaryResponse(**trip.to_dict()) for trip in trips],
             total=len(trips),
             limit=limit,
             offset=offset
@@ -328,7 +329,8 @@ async def get_trip_stops(
         
         return TripStopListResponse(
             stops=[TripStopResponse(**stop.to_dict()) for stop in stops],
-            total_count=len(stops)
+            total=len(stops),
+            trip_id=trip_id
         )
         
     except TripNotFoundError as e:

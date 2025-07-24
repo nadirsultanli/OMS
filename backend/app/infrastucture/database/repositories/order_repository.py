@@ -44,6 +44,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
             updated_at=getattr(model, 'updated_at', datetime.utcnow()),  # Use default if missing
             deleted_at=model.deleted_at,
             deleted_by=model.deleted_by,
+            executed=getattr(model, 'executed', False),  # Use default if missing
+            executed_at=getattr(model, 'executed_at', None),
+            executed_by=getattr(model, 'executed_by', None),
             order_lines=order_lines
         )
 
@@ -261,7 +264,10 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 total_amount=order.total_amount,
                 total_weight_kg=order.total_weight_kg,
                 updated_by=order.updated_by,
-                updated_at=datetime.utcnow()
+                updated_at=datetime.utcnow(),
+                executed=getattr(order, 'executed', False),
+                executed_at=getattr(order, 'executed_at', None),
+                executed_by=getattr(order, 'executed_by', None)
             )
         )
         await self.session.execute(stmt)

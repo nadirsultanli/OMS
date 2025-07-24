@@ -282,8 +282,13 @@ class OrderService:
         order.updated_by = user.id
         order.updated_at = datetime.utcnow()
         
+        # Set executed fields
+        order.executed = True
+        order.executed_at = datetime.utcnow()
+        order.executed_by = user.id
+        
         # Save the updated order
-        updated_order = await self.order_repository.update_order(order)
+        updated_order = await self.order_repository.update_order(str(order.id), order)
         
         return updated_order
 

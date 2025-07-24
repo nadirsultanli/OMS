@@ -235,7 +235,7 @@ async def execute_order(
             success=True,
             message="Order executed successfully",
             order_id=updated_order.id,
-            executed_at=request.created_at,
+            executed_at=updated_order.executed_at,
             created_at=request.created_at
         )
         

@@ -141,6 +141,9 @@ class Order:
     updated_at: datetime = field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = None
     deleted_by: Optional[UUID] = None
+    executed: bool = False
+    executed_at: Optional[datetime] = None
+    executed_by: Optional[UUID] = None
     order_lines: List[OrderLine] = field(default_factory=list)
 
     def __post_init__(self):

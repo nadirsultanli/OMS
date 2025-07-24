@@ -80,6 +80,9 @@ class OrderResponse(BaseModel):
     updated_at: datetime = Field(..., description="Last update timestamp")
     deleted_at: Optional[datetime] = Field(None, description="Soft deletion timestamp (if deleted)")
     deleted_by: Optional[UUID] = Field(None, description="User who deleted the order (UUID)")
+    executed: bool = Field(False, description="Whether order has been executed/fulfilled")
+    executed_at: Optional[datetime] = Field(None, description="Timestamp when order was executed")
+    executed_by: Optional[UUID] = Field(None, description="User who executed the order (UUID)")
     order_lines: List[OrderLineResponse] = Field(default_factory=list, description="Complete list of order lines")
 
     class Config:
@@ -142,6 +145,9 @@ class OrderSummaryResponse(BaseModel):
     created_at: datetime = Field(..., description="Order creation timestamp")
     updated_by: Optional[UUID] = Field(None, description="User who last updated the order (UUID)")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+    executed: bool = Field(False, description="Whether order has been executed/fulfilled")
+    executed_at: Optional[datetime] = Field(None, description="Timestamp when order was executed")
+    executed_by: Optional[UUID] = Field(None, description="User who executed the order (UUID)")
 
     class Config:
         from_attributes = True
