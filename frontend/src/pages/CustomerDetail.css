@@ -480,16 +480,22 @@
 }
 
 .checkbox-label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  font-size: 14px;
+  font-weight: 400;
   cursor: pointer;
+  user-select: none;
+  line-height: 1;
 }
 
 .checkbox-label input[type="checkbox"] {
   width: 18px;
   height: 18px;
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .form-actions {
