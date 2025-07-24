@@ -8,7 +8,9 @@ from app.domain.entities.users import User
 from app.services.trips.trip_order_integration_service import TripOrderIntegrationService
 from app.services.dependencies.trips import get_trip_order_integration_service
 
-router = APIRouter()
+router = APIRouter( 
+    tags=["trips_order_integration"]
+)
 
 
 class AssignOrderRequest(BaseModel):
