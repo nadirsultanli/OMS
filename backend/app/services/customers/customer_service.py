@@ -44,8 +44,8 @@ class CustomerService:
     async def create_customer(self, tenant_id: UUID, customer_type: CustomerType, name: str, created_by: Optional[UUID] = None, user_role: Optional[str] = None, **kwargs) -> Customer:
         # Set status based on customer_type and user role
         if customer_type == CustomerType.CASH:
-            # Cash customers are always ACTIVE when created by sales_rep or tenant_admin
-            if user_role in ["sales_rep", "tenant_admin"]:
+            # Cash customers are always ACTIVE when created by sales_rep, tenant_admin, or admin
+            if user_role in ["sales_rep", "tenant_admin", "admin"]:
                 status = CustomerStatus.ACTIVE
             else:
                 # For other roles, cash customers still need approval
