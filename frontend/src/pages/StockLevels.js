@@ -52,15 +52,38 @@ const StockLevels = () => {
         
         const [warehousesResponse, variantsResponse] = await Promise.all([
           warehouseService.getWarehouses(),
-          variantService.getVariants()
+          variantService.getVariants(null, { 
+            limit: 100,
+            active_only: true
+          })
         ]);
         
-        // Handle different response formats
-        const warehouses = warehousesResponse.warehouses || warehousesResponse || [];
-        const variants = variantsResponse.data?.variants || variantsResponse.variants || variantsResponse || [];
+        console.log('Warehouses response:', warehousesResponse);
+        console.log('Variants response:', variantsResponse);
         
-        setWarehouses(warehouses);
-        setVariants(variants);
+        // Handle different response formats and ensure arrays
+        let warehousesData = [];
+        if (warehousesResponse.success && warehousesResponse.data) {
+          warehousesData = warehousesResponse.data.warehouses || [];
+        } else if (warehousesResponse.warehouses) {
+          warehousesData = warehousesResponse.warehouses;
+        } else if (Array.isArray(warehousesResponse)) {
+          warehousesData = warehousesResponse;
+        }
+        
+        let variantsData = [];
+        if (variantsResponse.success && variantsResponse.data) {
+          variantsData = variantsResponse.data.variants || [];
+        } else if (variantsResponse.data?.variants) {
+          variantsData = variantsResponse.data.variants;
+        } else if (variantsResponse.variants) {
+          variantsData = variantsResponse.variants;
+        } else if (Array.isArray(variantsResponse)) {
+          variantsData = variantsResponse;
+        }
+        
+        setWarehouses(Array.isArray(warehousesData) ? warehousesData : []);
+        setVariants(Array.isArray(variantsData) ? variantsData : []);
         
         // Load all stock levels immediately
         await loadStockLevels();
@@ -99,11 +122,13 @@ const StockLevels = () => {
   };
 
   const getWarehouseName = (warehouseId) => {
+    if (!Array.isArray(warehouses)) return 'Unknown';
     const warehouse = warehouses.find(w => w.id === warehouseId);
     return warehouse ? `${warehouse.code} - ${warehouse.name}` : 'Unknown';
   };
 
   const getVariantName = (variantId) => {
+    if (!Array.isArray(variants)) return 'Unknown';
     const variant = variants.find(v => v.id === variantId);
     return variant ? variant.sku : 'Unknown';
   };
@@ -190,6 +215,17 @@ const StockLevels = () => {
     );
   }
 
+  if (loading && warehouses.length === 0 && variants.length === 0) {
+    return (
+      <div className="stock-levels-page">
+        <div className="loading-container">
+          <div className="spinner"></div>
+          <p>Loading stock levels...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="stock-levels-page">
       <div className="page-header">
@@ -251,7 +287,7 @@ const StockLevels = () => {
               className="form-control"
             >
               <option value="">Select Warehouse</option>
-              {warehouses.map(warehouse => (
+              {Array.isArray(warehouses) && warehouses.map(warehouse => (
                 <option key={warehouse.id} value={warehouse.id}>
                   {warehouse.code} - {warehouse.name}
                 </option>
@@ -267,7 +303,7 @@ const StockLevels = () => {
               className="form-control"
             >
               <option value="">Select Variant</option>
-              {variants.map(variant => (
+              {Array.isArray(variants) && variants.map(variant => (
                 <option key={variant.id} value={variant.id}>
                   {variant.sku}
                 </option>
