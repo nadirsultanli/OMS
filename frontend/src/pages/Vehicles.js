@@ -50,9 +50,7 @@ const Vehicles = () => {
 
   const vehicleTypes = [
     { value: 'CYLINDER_TRUCK', label: 'Cylinder Truck' },
-    { value: 'BULK_TANKER', label: 'Bulk Tanker' },
-    { value: 'DELIVERY_VAN', label: 'Delivery Van' },
-    { value: 'PICKUP_TRUCK', label: 'Pickup Truck' }
+    { value: 'BULK_TANKER', label: 'Bulk Tanker' }
   ];
 
   const vehicleStatuses = [
@@ -78,11 +76,11 @@ const Vehicles = () => {
       });
 
       if (result.success) {
-        setVehicles(result.data.results || []);
+        setVehicles(result.data.vehicles || []);
         setPagination(prev => ({
           ...prev,
-          total: result.data.count || 0,
-          totalPages: Math.ceil((result.data.count || 0) / prev.limit)
+          total: result.data.total || 0,
+          totalPages: Math.ceil((result.data.total || 0) / prev.limit)
         }));
       } else {
         setMessage({ type: 'error', text: result.error });
@@ -115,7 +113,7 @@ const Vehicles = () => {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(vehicle => 
-        vehicle.plate_number?.toLowerCase().includes(searchLower) ||
+        (vehicle.plate_number || vehicle.plate)?.toLowerCase().includes(searchLower) ||
         vehicle.make?.toLowerCase().includes(searchLower) ||
         vehicle.model?.toLowerCase().includes(searchLower)
       );
@@ -142,9 +140,32 @@ const Vehicles = () => {
       setLoading(true);
       setErrors({});
       
+      // Validate required fields before sending
+      if (!formData.plate_number) {
+        setErrors({ submit: 'Plate number is required' });
+        return;
+      }
+      if (!formData.capacity_kg || parseFloat(formData.capacity_kg) <= 0) {
+        setErrors({ submit: 'Valid capacity (kg) is required' });
+        return;
+      }
+      if (!formData.capacity_m3 || parseFloat(formData.capacity_m3) <= 0) {
+        setErrors({ submit: 'Valid capacity (m³) is required' });
+        return;
+      }
+      if (!formData.depot_id) {
+        setErrors({ submit: 'Depot selection is required' });
+        return;
+      }
+
       const result = await vehicleService.createVehicle({
-        ...formData,
         tenant_id: tenantId,
+        plate: formData.plate_number.trim(), // Convert to API field name
+        vehicle_type: formData.vehicle_type,
+        capacity_kg: parseFloat(formData.capacity_kg),
+        capacity_m3: parseFloat(formData.capacity_m3),
+        volume_unit: 'M3', // Required field
+        depot_id: formData.depot_id,
         active: true
       });
 
@@ -153,9 +174,28 @@ const Vehicles = () => {
         setShowCreateForm(false);
         await fetchVehicles();
       } else {
-        const errorMessage = result?.error || 'Failed to create vehicle';
+        let errorMessage = 'Failed to create vehicle';
+        
+        if (result?.error) {
+          if (typeof result.error === 'string') {
+            errorMessage = result.error;
+          } else if (Array.isArray(result.error)) {
+            // Handle validation error arrays
+            errorMessage = result.error.map(err => {
+              if (typeof err === 'string') return err;
+              if (err?.msg) {
+                const field = err.loc ? err.loc.join(' -> ') : 'Field';
+                return `${field}: ${err.msg}`;
+              }
+              return 'Validation error';
+            }).join(', ');
+          } else {
+            errorMessage = JSON.stringify(result.error);
+          }
+        }
+        
         setErrors({ submit: errorMessage });
-        console.error('Vehicle creation failed:', errorMessage);
+        console.error('Vehicle creation failed:', result?.error);
       }
     } catch (error) {
       console.error('Vehicle creation error:', error);
@@ -354,7 +394,7 @@ const Vehicles = () => {
                       <div className="vehicle-details">
                         <div className="vehicle-main">
                           <Truck size={16} />
-                          <span className="plate-number">{vehicle.plate_number}</span>
+                          <span className="plate-number">{vehicle.plate_number || vehicle.plate}</span>
                         </div>
                         <div className="vehicle-sub">
                           {vehicle.make} {vehicle.model} ({vehicle.year})
@@ -518,10 +558,16 @@ const CreateVehicleModal = ({ warehouses, onClose, onSubmit, errors }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Basic validation
+    if (!formData.plate_number || !formData.capacity_kg || !formData.capacity_m3 || !formData.depot_id) {
+      return; // Let HTML5 validation handle it
+    }
+    
     onSubmit({
       ...formData,
       capacity_kg: parseFloat(formData.capacity_kg) || 0,
-      capacity_m3: parseFloat(formData.capacity_m3) || null
+      capacity_m3: parseFloat(formData.capacity_m3) || 0.1
     });
   };
 
@@ -558,8 +604,6 @@ const CreateVehicleModal = ({ warehouses, onClose, onSubmit, errors }) => {
               >
                 <option value="CYLINDER_TRUCK">Cylinder Truck</option>
                 <option value="BULK_TANKER">Bulk Tanker</option>
-                <option value="DELIVERY_VAN">Delivery Van</option>
-                <option value="PICKUP_TRUCK">Pickup Truck</option>
               </select>
               {errors.vehicle_type && <span className="error-text">{errors.vehicle_type}</span>}
             </div>
@@ -620,12 +664,13 @@ const CreateVehicleModal = ({ warehouses, onClose, onSubmit, errors }) => {
             </div>
 
             <div className="form-group">
-              <label>Capacity (m³)</label>
+              <label>Capacity (m³) *</label>
               <input
                 type="number"
                 value={formData.capacity_m3}
                 onChange={(e) => setFormData({ ...formData, capacity_m3: e.target.value })}
-                min="0"
+                required
+                min="0.1"
                 step="0.1"
                 className={errors.capacity_m3 ? 'error' : ''}
                 placeholder="e.g., 25.5"
@@ -685,7 +730,7 @@ const CreateVehicleModal = ({ warehouses, onClose, onSubmit, errors }) => {
 
 const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) => {
   const [formData, setFormData] = useState({
-    plate_number: vehicle.plate_number || '',
+    plate_number: vehicle.plate_number || vehicle.plate || '',
     make: vehicle.make || '',
     model: vehicle.model || '',
     year: vehicle.year || new Date().getFullYear(),
@@ -739,8 +784,6 @@ const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) =>
               >
                 <option value="CYLINDER_TRUCK">Cylinder Truck</option>
                 <option value="BULK_TANKER">Bulk Tanker</option>
-                <option value="DELIVERY_VAN">Delivery Van</option>
-                <option value="PICKUP_TRUCK">Pickup Truck</option>
               </select>
               {errors.vehicle_type && <span className="error-text">{errors.vehicle_type}</span>}
             </div>
@@ -801,12 +844,13 @@ const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) =>
             </div>
 
             <div className="form-group">
-              <label>Capacity (m³)</label>
+              <label>Capacity (m³) *</label>
               <input
                 type="number"
                 value={formData.capacity_m3}
                 onChange={(e) => setFormData({ ...formData, capacity_m3: e.target.value })}
-                min="0"
+                required
+                min="0.1"
                 step="0.1"
                 className={errors.capacity_m3 ? 'error' : ''}
                 placeholder="e.g., 25.5"
@@ -882,7 +926,7 @@ const VehicleInventoryModal = ({ vehicle, onClose }) => {
         <div className="modal-header">
           <div>
             <h2>Vehicle Inventory</h2>
-            <p className="modal-subtitle">{vehicle.plate_number}</p>
+            <p className="modal-subtitle">{vehicle.plate_number || vehicle.plate}</p>
           </div>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>

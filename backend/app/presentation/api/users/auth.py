@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from app.services.users import UserService
+from app.services.users.user_service import UserService
 from app.domain.exceptions.users import (
     UserNotFoundError,
     UserAuthenticationError,

@@ -47,6 +47,34 @@ class UserRepository(UserRepositoryInterface):
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
 
+    async def get_users_by_tenant(self, tenant_id: str) -> List[User]:
+        """Get all users for a specific tenant"""
+        result = await self._session.execute(select(UserORM).where(UserORM.tenant_id == UUID(tenant_id)))
+        objs = result.scalars().all()
+        return [self._to_entity(obj) for obj in objs]
+
+    async def get_active_users_by_tenant(self, tenant_id: str) -> List[User]:
+        """Get active users for a specific tenant"""
+        result = await self._session.execute(
+            select(UserORM).where(
+                UserORM.tenant_id == UUID(tenant_id),
+                UserORM.status == UserStatus.ACTIVE.value
+            )
+        )
+        objs = result.scalars().all()
+        return [self._to_entity(obj) for obj in objs]
+
+    async def get_users_by_role_and_tenant(self, role: UserRoleType, tenant_id: str) -> List[User]:
+        """Get users by role for a specific tenant"""
+        result = await self._session.execute(
+            select(UserORM).where(
+                UserORM.tenant_id == UUID(tenant_id),
+                UserORM.role == role.value
+            )
+        )
+        objs = result.scalars().all()
+        return [self._to_entity(obj) for obj in objs]
+
     async def create_user(self, user: User) -> User:
         obj = UserORM(
             id=user.id,

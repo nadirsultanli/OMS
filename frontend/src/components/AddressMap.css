@@ -6,12 +6,14 @@
   overflow: hidden;
   border: 1px solid #e5e7eb;
   position: relative;
+  background-color: #f9fafb;
 }
 
 .address-map {
   width: 100%;
   height: 100%;
   min-height: 200px;
+  transition: opacity 0.3s ease-in-out;
 }
 
 .address-popup {
@@ -34,4 +36,52 @@
 .no-coordinates-message p {
   margin: 0;
   font-size: 14px;
+}
+
+.map-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f9fafb;
+  z-index: 10;
+}
+
+.map-loading p {
+  margin: 8px 0 0 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Ensure Mapbox controls are properly styled */
+.mapboxgl-control-container {
+  font-family: inherit;
+}
+
+.mapboxgl-popup-content {
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: white;
 }

@@ -137,6 +137,47 @@ class SupabaseUserRepository(UserRepositoryInterface):
             default_logger.error(f"Supabase get_users_without_auth failed: {str(e)}")
             return []
 
+    async def get_users_by_tenant(self, tenant_id: str) -> List[User]:
+        """Get all users for a specific tenant"""
+        try:
+            client = self._get_client()
+            result = client.table(self.table_name).select("*").eq("tenant_id", tenant_id).execute()
+            
+            return [self._to_entity(data) for data in result.data]
+        except Exception as e:
+            default_logger.error(f"Supabase get_users_by_tenant failed: {str(e)}")
+            return []
+
+    async def get_active_users_by_tenant(self, tenant_id: str) -> List[User]:
+        """Get active users for a specific tenant"""
+        try:
+            client = self._get_client()
+            result = (client.table(self.table_name)
+                     .select("*")
+                     .eq("tenant_id", tenant_id)
+                     .eq("status", "active")
+                     .execute())
+            
+            return [self._to_entity(data) for data in result.data]
+        except Exception as e:
+            default_logger.error(f"Supabase get_active_users_by_tenant failed: {str(e)}")
+            return []
+
+    async def get_users_by_role_and_tenant(self, role: UserRoleType, tenant_id: str) -> List[User]:
+        """Get users by role for a specific tenant"""
+        try:
+            client = self._get_client()
+            result = (client.table(self.table_name)
+                     .select("*")
+                     .eq("tenant_id", tenant_id)
+                     .eq("role", role.value)
+                     .execute())
+            
+            return [self._to_entity(data) for data in result.data]
+        except Exception as e:
+            default_logger.error(f"Supabase get_users_by_role_and_tenant failed: {str(e)}")
+            return []
+
     async def create_user(self, user: User) -> User:
         try:
             client = self._get_client()
