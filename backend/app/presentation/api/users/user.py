@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import Optional
-from app.services.users import UserService
+from app.services.users.user_service import UserService
 from app.domain.entities.users import UserRoleType, UserStatus, User
 from app.domain.exceptions.users import (
     UserNotFoundError,
@@ -117,20 +117,46 @@ async def get_user(
 
 @user_router.get("/", response_model=UserListResponse)
 async def get_users(
+    tenant_id: Optional[str] = Query(None, description="Filter by tenant ID"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     role: Optional[UserRoleType] = Query(None),
+    search: Optional[str] = Query(None, description="Search by email or name"),
     active_only: bool = Query(False),
     user_service: UserService = Depends(get_smart_user_service)
 ):
     """Get users with filtering and pagination"""
     try:
-        if role:
-            users = await user_service.get_users_by_role(role)
-        elif active_only:
-            users = await user_service.get_active_users()
+        # Get users based on filters with tenant awareness
+        if tenant_id:
+            if role:
+                users = await user_service.get_users_by_role_and_tenant(role, tenant_id)
+            elif active_only:
+                users = await user_service.get_active_users_by_tenant(tenant_id)
+            else:
+                users = await user_service.get_users_by_tenant(tenant_id, limit, offset)
         else:
-            users = await user_service.get_all_users(limit, offset)
+            # Fallback to original methods if no tenant_id specified
+            if role:
+                users = await user_service.get_users_by_role(role)
+            elif active_only:
+                users = await user_service.get_active_users()
+            else:
+                users = await user_service.get_all_users(limit, offset)
+        
+        # Apply search filter if specified
+        if search:
+            search_lower = search.lower()
+            users = [
+                user for user in users 
+                if (user.email and search_lower in user.email.lower()) or 
+                   (user.full_name and search_lower in user.full_name.lower())
+            ]
+        
+        # Apply pagination after filtering if we did search filtering
+        total_users = len(users)
+        if search:
+            users = users[offset:offset + limit]
         
         user_responses = [
             UserResponse(
@@ -153,7 +179,7 @@ async def get_users(
         
         return UserListResponse(
             users=user_responses,
-            total=len(user_responses),
+            total=total_users,
             limit=limit,
             offset=offset
         )
@@ -175,9 +201,13 @@ async def update_user(
 ):
     """Update user"""
     try:
+        # Get current user from context
+        current_user = context.get_current_user() if context else None
+        updated_by = str(current_user.id) if current_user else None
+        
         user = await user_service.update_user_with_audit(
             user_id=user_id,
-            updated_by=current_user.id,
+            updated_by=updated_by,
             full_name=request.full_name,
             role=request.role,
             email=request.email

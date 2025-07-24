@@ -76,11 +76,11 @@ const Vehicles = () => {
       });
 
       if (result.success) {
-        setVehicles(result.data.results || []);
+        setVehicles(result.data.vehicles || []);
         setPagination(prev => ({
           ...prev,
-          total: result.data.count || 0,
-          totalPages: Math.ceil((result.data.count || 0) / prev.limit)
+          total: result.data.total || 0,
+          totalPages: Math.ceil((result.data.total || 0) / prev.limit)
         }));
       } else {
         setMessage({ type: 'error', text: result.error });
@@ -113,7 +113,7 @@ const Vehicles = () => {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(vehicle => 
-        vehicle.plate_number?.toLowerCase().includes(searchLower) ||
+        (vehicle.plate_number || vehicle.plate)?.toLowerCase().includes(searchLower) ||
         vehicle.make?.toLowerCase().includes(searchLower) ||
         vehicle.model?.toLowerCase().includes(searchLower)
       );
@@ -394,7 +394,7 @@ const Vehicles = () => {
                       <div className="vehicle-details">
                         <div className="vehicle-main">
                           <Truck size={16} />
-                          <span className="plate-number">{vehicle.plate_number}</span>
+                          <span className="plate-number">{vehicle.plate_number || vehicle.plate}</span>
                         </div>
                         <div className="vehicle-sub">
                           {vehicle.make} {vehicle.model} ({vehicle.year})
@@ -730,7 +730,7 @@ const CreateVehicleModal = ({ warehouses, onClose, onSubmit, errors }) => {
 
 const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) => {
   const [formData, setFormData] = useState({
-    plate_number: vehicle.plate_number || '',
+    plate_number: vehicle.plate_number || vehicle.plate || '',
     make: vehicle.make || '',
     model: vehicle.model || '',
     year: vehicle.year || new Date().getFullYear(),
@@ -926,7 +926,7 @@ const VehicleInventoryModal = ({ vehicle, onClose }) => {
         <div className="modal-header">
           <div>
             <h2>Vehicle Inventory</h2>
-            <p className="modal-subtitle">{vehicle.plate_number}</p>
+            <p className="modal-subtitle">{vehicle.plate_number || vehicle.plate}</p>
           </div>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>

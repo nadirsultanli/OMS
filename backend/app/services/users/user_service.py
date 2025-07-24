@@ -53,6 +53,22 @@ class UserService:
         """Get users by role"""
         return await self.user_repository.get_by_role(role)
     
+    async def get_users_by_tenant(self, tenant_id: str, limit: int = 100, offset: int = 0) -> List[User]:
+        """Get all users for a specific tenant with pagination"""
+        all_users = await self.user_repository.get_all(limit * 10, 0)  # Get more users to filter
+        tenant_users = [user for user in all_users if str(user.tenant_id) == tenant_id]
+        return tenant_users[offset:offset + limit]
+    
+    async def get_active_users_by_tenant(self, tenant_id: str) -> List[User]:
+        """Get active users for a specific tenant"""
+        active_users = await self.user_repository.get_active_users()
+        return [user for user in active_users if str(user.tenant_id) == tenant_id]
+    
+    async def get_users_by_role_and_tenant(self, role: UserRoleType, tenant_id: str) -> List[User]:
+        """Get users by role for a specific tenant"""
+        role_users = await self.user_repository.get_by_role(role)
+        return [user for user in role_users if str(user.tenant_id) == tenant_id]
+    
     async def create_user(self, email: str, name: str, role: UserRoleType, tenant_id: str, created_by: Optional[str] = None) -> User:
         """Create a new user with mandatory Supabase Auth integration"""
         try:
