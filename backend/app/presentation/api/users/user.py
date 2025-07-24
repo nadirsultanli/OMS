@@ -484,4 +484,24 @@ async def create_user_simple(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create user simple"
-        ) 
+        )
+
+
+@user_router.get("/debug/env", status_code=status.HTTP_200_OK)
+async def debug_environment():
+    """Debug endpoint to check environment variables"""
+    from decouple import config
+    
+    supabase_url = config("SUPABASE_URL", default=None)
+    supabase_key = config("SUPABASE_KEY", default=None)
+    supabase_anon_key = config("SUPABASE_ANON_KEY", default=None)
+    service_role_key = config("SUPABASE_SERVICE_ROLE_KEY", default=None)
+    
+    return {
+        "supabase_url": "✓ Configured" if supabase_url else "✗ Missing",
+        "supabase_key": "✓ Configured" if supabase_key else "✗ Missing", 
+        "supabase_anon_key": "✓ Configured" if supabase_anon_key else "✗ Missing",
+        "service_role_key": "✓ Configured" if service_role_key else "✗ Missing",
+        "effective_anon_key": "✓ Available" if (supabase_key or supabase_anon_key) else "✗ Missing",
+        "railway_mode": should_use_railway_mode()
+    } 
