@@ -51,6 +51,7 @@ class UpdateTripRequest(BaseModel):
     trip_no: Optional[str] = Field(None, description="Human-readable trip number")
     vehicle_id: Optional[str] = Field(None, description="Vehicle ID")
     driver_id: Optional[str] = Field(None, description="Driver ID")
+    trip_status: Optional[TripStatus] = Field(None, description="Trip status")
     planned_date: Optional[date] = Field(None, description="Planned delivery date")
     start_time: Optional[datetime] = Field(None, description="Planned start time")
     end_time: Optional[datetime] = Field(None, description="Planned end time")

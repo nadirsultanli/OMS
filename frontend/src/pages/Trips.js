@@ -625,6 +625,7 @@ const Trips = () => {
 
 const CreateTripModal = ({ vehicles, drivers, onClose, onSubmit, errors }) => {
   const [formData, setFormData] = useState({
+    trip_number: '',
     vehicle_id: '',
     driver_id: '',
     planned_date: '',
@@ -646,6 +647,19 @@ const CreateTripModal = ({ vehicles, drivers, onClose, onSubmit, errors }) => {
         
         <form onSubmit={handleSubmit} className="trip-form">
           <div className="form-grid">
+            <div className="form-group">
+              <label>Trip Number *</label>
+              <input
+                type="text"
+                value={formData.trip_number}
+                onChange={(e) => setFormData({ ...formData, trip_number: e.target.value })}
+                required
+                className={errors.trip_number ? 'error' : ''}
+                placeholder="e.g., TRIP-001"
+              />
+              {errors.trip_number && <span className="error-text">{errors.trip_number}</span>}
+            </div>
+
             <div className="form-group">
               <label>Vehicle *</label>
               <select
@@ -685,7 +699,7 @@ const CreateTripModal = ({ vehicles, drivers, onClose, onSubmit, errors }) => {
             <div className="form-group">
               <label>Planned Date *</label>
               <input
-                type="datetime-local"
+                type="date"
                 value={formData.planned_date}
                 onChange={(e) => setFormData({ ...formData, planned_date: e.target.value })}
                 required
