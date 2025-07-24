@@ -576,7 +576,240 @@
   box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
 }
 
-/* Responsive Design */
+/* Trip Details Modal */
+.trip-details-modal {
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.trip-details-content {
+  padding: 20px;
+}
+
+.trip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.trip-number {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trip-number h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.trip-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.info-section {
+  background: #f9fafb;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.info-section.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row .label {
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.info-row .value {
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notes-content {
+  background: white;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.trip-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn.edit {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.action-btn.edit:hover {
+  background-color: #2563eb;
+}
+
+.action-btn.start {
+  background-color: #10b981;
+  color: white;
+}
+
+.action-btn.start:hover {
+  background-color: #059669;
+}
+
+.action-btn.complete {
+  background-color: #8b5cf6;
+  color: white;
+}
+
+.action-btn.complete:hover {
+  background-color: #7c3aed;
+}
+
+.action-btn.secondary {
+  background-color: #6b7280;
+  color: white;
+}
+
+.action-btn.secondary:hover {
+  background-color: #4b5563;
+}
+
+/* Enhanced table actions */
+.trips-table td.actions,
+.trips-table .actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px;
+  align-items: center;
+  min-width: 80px;
+}
+
+.trips-table td.actions .action-btn,
+.trips-table .actions .action-btn {
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: 1px 0;
+}
+
+.trips-table .action-btn.view {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.trips-table .action-btn.view:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.trips-table .action-btn.edit {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.trips-table .action-btn.edit:hover {
+  background-color: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.trips-table .action-btn.start {
+  background-color: #10b981;
+  color: white;
+}
+
+.trips-table .action-btn.start:hover {
+  background-color: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.trips-table .action-btn.complete {
+  background-color: #8b5cf6;
+  color: white;
+}
+
+.trips-table .action-btn.complete:hover {
+  background-color: #7c3aed;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+}
+
+.trips-table .action-btn.delete {
+  background-color: #ef4444;
+  color: white;
+}
+
+.trips-table .action-btn.delete:hover {
+  background-color: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}
+
+/* Responsive design */
 @media (max-width: 768px) {
   .trips-container {
     padding: 16px;
@@ -613,8 +846,16 @@
     padding: 12px 8px;
   }
 
-  .actions {
-    flex-direction: column;
+  .trips-table td.actions,
+  .trips-table .actions {
+    flex-direction: column !important;
+    min-width: 60px;
+  }
+  
+  .trips-table td.actions .action-btn,
+  .trips-table .actions .action-btn {
+    width: 28px;
+    height: 28px;
   }
 
   .pagination-container {
@@ -628,5 +869,18 @@
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .trip-info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .trip-actions {
+    flex-direction: column;
+  }
+  
+  .action-btn {
+    width: 100%;
+    justify-content: center;
   }
 }

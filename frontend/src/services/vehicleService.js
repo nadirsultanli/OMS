@@ -3,7 +3,23 @@ import api from './api';
 const extractErrorMessage = (error) => {
   if (typeof error === 'string') return error;
   if (error?.message) return error.message;
-  if (error?.detail) return error.detail;
+  
+  // Handle FastAPI validation errors
+  if (error?.detail) {
+    if (Array.isArray(error.detail)) {
+      // Multiple validation errors
+      const messages = error.detail.map(err => {
+        if (typeof err === 'object' && err.msg) {
+          const field = err.loc ? err.loc.join(' -> ') : 'Field';
+          return `${field}: ${err.msg}`;
+        }
+        return String(err);
+      });
+      return messages.join(', ');
+    }
+    return String(error.detail);
+  }
+  
   if (error?.non_field_errors) return error.non_field_errors[0];
   if (error?.error) return error.error;
   return 'An unexpected error occurred';
@@ -27,7 +43,21 @@ const vehicleService = {
       if (params.active !== undefined) queryParams.append('active', params.active);
 
       const response = await api.get(`/vehicles/?${queryParams}`);
-      return { success: true, data: response.data };
+      
+      // Transform the response to match frontend expectations
+      const vehicles = response.data.vehicles || [];
+      const transformedData = {
+        results: vehicles.map(vehicle => ({
+          ...vehicle,
+          plate_number: vehicle.plate, // Map plate to plate_number for frontend
+          vehicle_type: vehicle.vehicle_type || 'UNKNOWN'
+        })),
+        count: response.data.total || 0,
+        limit: params.limit || 100,
+        offset: params.offset || 0
+      };
+      
+      return { success: true, data: transformedData };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
     }
@@ -36,7 +66,7 @@ const vehicleService = {
   // Get single vehicle details
   getVehicleById: async (vehicleId) => {
     try {
-      const response = await api.get(`/vehicles/${vehicleId}/`);
+      const response = await api.get(`/vehicles/${vehicleId}`);
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
@@ -56,7 +86,7 @@ const vehicleService = {
   // Update vehicle
   updateVehicle: async (vehicleId, vehicleData) => {
     try {
-      const response = await api.put(`/vehicles/${vehicleId}/`, vehicleData);
+      const response = await api.put(`/vehicles/${vehicleId}`, vehicleData);
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
@@ -66,7 +96,7 @@ const vehicleService = {
   // Delete vehicle
   deleteVehicle: async (vehicleId) => {
     try {
-      await api.delete(`/vehicles/${vehicleId}/`);
+      await api.delete(`/vehicles/${vehicleId}`);
       return { success: true };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };

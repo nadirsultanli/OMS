@@ -59,9 +59,23 @@ class UserService {
       
       const response = await api.get(`/users/?${queryParams.toString()}`);
       
+      // Transform the response to match frontend expectations
+      const users = response.data.users || response.data.results || [];
+      const transformedData = {
+        results: users.map(user => ({
+          ...user,
+          name: user.full_name, // Map full_name to name for frontend
+          role: user.role || 'user',
+          status: user.status || 'active'
+        })),
+        count: response.data.total || response.data.count || 0,
+        limit: params.limit || 100,
+        offset: params.offset || 0
+      };
+      
       return {
         success: true,
-        data: response.data
+        data: transformedData
       };
     } catch (error) {
       console.error('Get users error:', error);
