@@ -259,8 +259,9 @@ async def delete_trip(
         deleted = await trip_service.delete_trip(trip_id, current_user.id)
         
         return TripDeleteResponse(
-            trip_id=str(trip_id),
+            trip_id=trip_id,
             deleted=deleted,
+            message="Trip deleted successfully",
             deleted_at=datetime.now()
         )
         
@@ -405,8 +406,11 @@ async def delete_trip_stop(
         deleted = await trip_service.delete_trip_stop(stop_id)
         
         return TripStopDeleteResponse(
-            stop_id=str(stop_id),
-            deleted=deleted
+            stop_id=stop_id,
+            trip_id=existing_stop.trip_id,
+            deleted=deleted,
+            message="Trip stop deleted successfully",
+            deleted_at=datetime.now()
         )
         
     except TripStopNotFoundError as e:

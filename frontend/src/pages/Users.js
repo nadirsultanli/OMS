@@ -55,10 +55,10 @@ const Users = () => {
       const result = await userService.getUsers(params);
 
       if (result.success) {
-        setUsers(result.data.users || []);
+        setUsers(result.data.results || []);
         setPagination(prev => ({
           ...prev,
-          total: result.data.total || 0
+          total: result.data.count || 0
         }));
       } else {
         setErrors({ general: result.error });
