@@ -9,6 +9,9 @@ import './MapboxAddressInput.css';
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibmFkaXJzdWx0YW5saSIsImEiOiJjbWJ6OGxkM3IxcWZ1MmtzMXUxYzN6cXU2In0.ZYAbvebNShkCtbm-a1A8ug';
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
+// Disable telemetry to prevent ad blocker issues
+mapboxgl.disable = () => {};
+
 // Check for WebGL support
 if (!mapboxgl.supported()) {
   console.warn('Your browser does not support Mapbox GL');
