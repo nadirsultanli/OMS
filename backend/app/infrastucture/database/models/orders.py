@@ -46,6 +46,11 @@ class OrderModel(Base):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     deleted_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
+    # Execution fields
+    executed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    executed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    executed_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    
     # Relationships
     order_lines: Mapped[List["OrderLineModel"]] = relationship(
         "OrderLineModel", 
