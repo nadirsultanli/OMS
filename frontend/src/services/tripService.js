@@ -3,11 +3,37 @@ import api from './api';
 const extractErrorMessage = (error) => {
   if (typeof error === 'string') return error;
   if (error?.message) return error.message;
-  if (error?.detail) return error.detail;
+  
+  // Handle FastAPI validation errors
+  if (error?.detail) {
+    if (Array.isArray(error.detail)) {
+      // Multiple validation errors
+      const messages = error.detail.map(err => {
+        if (typeof err === 'object' && err.msg) {
+          const field = err.loc ? err.loc.join(' -> ') : 'Field';
+          return `${field}: ${err.msg}`;
+        }
+        return String(err);
+      });
+      return messages.join(', ');
+    }
+    return String(error.detail);
+  }
+  
   if (error?.non_field_errors) return error.non_field_errors[0];
   if (error?.error) return error.error;
   return 'An unexpected error occurred';
 };
+
+// Helper function to transform trip data for frontend compatibility
+const transformTripData = (trip) => ({
+  ...trip,
+  trip_number: trip.trip_no, // Map trip_no to trip_number for frontend
+  status: trip.trip_status?.toUpperCase(), // Convert status to uppercase
+  vehicle: trip.vehicle || null,
+  driver: trip.driver || null,
+  order_count: trip.order_count || 0
+});
 
 const tripService = {
   // Get all trips with optional filters
@@ -19,13 +45,22 @@ const tripService = {
       });
 
       // Add optional filters
-      if (params.status) queryParams.append('status', params.status);
+      if (params.status) queryParams.append('status', params.status.toLowerCase()); // Convert to lowercase for API
       if (params.vehicle_id) queryParams.append('vehicle_id', params.vehicle_id);
       if (params.driver_id) queryParams.append('driver_id', params.driver_id);
       if (params.planned_date) queryParams.append('planned_date', params.planned_date);
 
       const response = await api.get(`/trips/?${queryParams}`);
-      return { success: true, data: response.data };
+      
+      // Transform the response to match frontend expectations
+      const transformedData = {
+        results: response.data.trips?.map(transformTripData) || [],
+        count: response.data.total || 0,
+        limit: response.data.limit || 100,
+        offset: response.data.offset || 0
+      };
+      
+      return { success: true, data: transformedData };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
     }
@@ -34,8 +69,8 @@ const tripService = {
   // Get single trip details
   getTripById: async (tripId) => {
     try {
-      const response = await api.get(`/trips/${tripId}/`);
-      return { success: true, data: response.data };
+      const response = await api.get(`/trips/${tripId}`);
+      return { success: true, data: transformTripData(response.data) };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
     }
@@ -45,7 +80,7 @@ const tripService = {
   getTripWithStops: async (tripId) => {
     try {
       const response = await api.get(`/trips/${tripId}/with-stops`);
-      return { success: true, data: response.data };
+      return { success: true, data: transformTripData(response.data) };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
     }
@@ -54,8 +89,20 @@ const tripService = {
   // Create new trip
   createTrip: async (tripData) => {
     try {
-      const response = await api.post('/trips/', tripData);
-      return { success: true, data: response.data };
+      // Transform frontend data to API format
+      const apiData = {
+        ...tripData,
+        trip_no: tripData.trip_number || tripData.trip_no, // Use trip_number if provided
+        trip_status: tripData.status?.toLowerCase() || 'draft' // Convert status to lowercase
+      };
+      
+      // Convert datetime to date for planned_date
+      if (apiData.planned_date) {
+        apiData.planned_date = apiData.planned_date.split('T')[0]; // Extract date part only
+      }
+      
+      const response = await api.post('/trips/', apiData);
+      return { success: true, data: transformTripData(response.data) };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
     }
@@ -64,8 +111,20 @@ const tripService = {
   // Update trip
   updateTrip: async (tripId, tripData) => {
     try {
-      const response = await api.put(`/trips/${tripId}/`, tripData);
-      return { success: true, data: response.data };
+      // Transform frontend data to API format
+      const apiData = {
+        ...tripData,
+        trip_no: tripData.trip_number || tripData.trip_no,
+        trip_status: tripData.status?.toLowerCase()
+      };
+      
+      // Convert datetime to date for planned_date
+      if (apiData.planned_date) {
+        apiData.planned_date = apiData.planned_date.split('T')[0]; // Extract date part only
+      }
+      
+      const response = await api.put(`/trips/${tripId}`, apiData);
+      return { success: true, data: transformTripData(response.data) };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
     }
@@ -74,7 +133,7 @@ const tripService = {
   // Delete trip
   deleteTrip: async (tripId) => {
     try {
-      await api.delete(`/trips/${tripId}/`);
+      await api.delete(`/trips/${tripId}`);
       return { success: true };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };

@@ -21,6 +21,14 @@ import userService from '../services/userService';
 import authService from '../services/authService';
 import './Trips.css';
 
+const tripStatuses = [
+  { value: 'draft', label: 'Draft', color: '#6b7280' },
+  { value: 'planned', label: 'Planned', color: '#3b82f6' },
+  { value: 'loaded', label: 'Loaded', color: '#8b5cf6' },
+  { value: 'in_progress', label: 'In Progress', color: '#f59e0b' },
+  { value: 'completed', label: 'Completed', color: '#10b981' }
+];
+
 const Trips = () => {
   const [trips, setTrips] = useState([]);
   const [filteredTrips, setFilteredTrips] = useState([]);
@@ -29,9 +37,22 @@ const Trips = () => {
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showTripDetails, setShowTripDetails] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
+
+  // Helper function to ensure error messages are strings
+  const ensureStringError = (error) => {
+    if (typeof error === 'string') return error;
+    if (error && typeof error === 'object') {
+      if (error.msg) return error.msg;
+      if (error.message) return error.message;
+      if (error.detail) return String(error.detail);
+      return JSON.stringify(error);
+    }
+    return String(error || 'An error occurred');
+  };
   
   const [filters, setFilters] = useState({
     search: '',
@@ -51,14 +72,6 @@ const Trips = () => {
   });
 
   const tenantId = authService.getCurrentTenantId();
-
-  const tripStatuses = [
-    { value: 'DRAFT', label: 'Draft', color: '#6b7280' },
-    { value: 'PLANNED', label: 'Planned', color: '#3b82f6' },
-    { value: 'LOADED', label: 'Loaded', color: '#8b5cf6' },
-    { value: 'IN_PROGRESS', label: 'In Progress', color: '#f59e0b' },
-    { value: 'COMPLETED', label: 'Completed', color: '#10b981' }
-  ];
 
   useEffect(() => {
     fetchTrips();
@@ -114,7 +127,7 @@ const Trips = () => {
       const result = await userService.getUsers();
       if (result.success) {
         const driverUsers = result.data.results?.filter(user => 
-          user.role === 'driver' && user.status === 'active'
+          user.role?.toLowerCase() === 'driver' && user.status?.toLowerCase() === 'active'
         ) || [];
         setDrivers(driverUsers);
       }
@@ -136,7 +149,7 @@ const Trips = () => {
     }
 
     if (filters.status) {
-      filtered = filtered.filter(trip => trip.status === filters.status);
+      filtered = filtered.filter(trip => trip.status?.toLowerCase() === filters.status.toLowerCase());
     }
 
     if (filters.vehicleId) {
@@ -167,7 +180,7 @@ const Trips = () => {
       const result = await tripService.createTrip({
         ...formData,
         tenant_id: tenantId,
-        status: 'DRAFT'
+        status: 'draft'
       });
 
       if (result.success) {
@@ -175,7 +188,7 @@ const Trips = () => {
         setShowCreateForm(false);
         fetchTrips();
       } else {
-        setErrors({ submit: result.error });
+        setErrors({ submit: ensureStringError(result.error) });
       }
     } catch (error) {
       setErrors({ submit: 'Failed to create trip' });
@@ -192,7 +205,7 @@ const Trips = () => {
         setSelectedTrip(null);
         fetchTrips();
       } else {
-        setErrors({ submit: result.error });
+        setErrors({ submit: ensureStringError(result.error) });
       }
     } catch (error) {
       setErrors({ submit: 'Failed to update trip' });
@@ -209,7 +222,7 @@ const Trips = () => {
         setMessage({ type: 'success', text: 'Trip deleted successfully' });
         fetchTrips();
       } else {
-        setMessage({ type: 'error', text: result.error });
+        setMessage({ type: 'error', text: ensureStringError(result.error) });
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to delete trip' });
@@ -222,6 +235,11 @@ const Trips = () => {
     console.log('Plan trip:', trip);
   };
 
+  const handleViewTrip = (trip) => {
+    setSelectedTrip(trip);
+    setShowTripDetails(true);
+  };
+
   const handleStartTrip = async (tripId) => {
     try {
       const result = await tripService.startTrip(tripId, {
@@ -232,10 +250,27 @@ const Trips = () => {
         setMessage({ type: 'success', text: 'Trip started successfully' });
         fetchTrips();
       } else {
-        setMessage({ type: 'error', text: result.error });
+        setMessage({ type: 'error', text: ensureStringError(result.error) });
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to start trip' });
+    }
+  };
+
+  const handleCompleteTrip = async (tripId) => {
+    try {
+      const result = await tripService.completeTrip(tripId, {
+        end_time: new Date().toISOString()
+      });
+
+      if (result.success) {
+        setMessage({ type: 'success', text: 'Trip completed successfully' });
+        fetchTrips();
+      } else {
+        setMessage({ type: 'error', text: ensureStringError(result.error) });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to complete trip' });
     }
   };
 
@@ -257,16 +292,16 @@ const Trips = () => {
   };
 
   const getStatusIcon = (status) => {
-    switch (status) {
-      case 'DRAFT':
+    switch (status?.toLowerCase()) {
+      case 'draft':
         return <Edit2 size={14} />;
-      case 'PLANNED':
+      case 'planned':
         return <Calendar size={14} />;
-      case 'LOADED':
+      case 'loaded':
         return <Package size={14} />;
-      case 'IN_PROGRESS':
+      case 'in_progress':
         return <Navigation size={14} />;
-      case 'COMPLETED':
+      case 'completed':
         return <CheckCircle size={14} />;
       default:
         return <AlertCircle size={14} />;
@@ -290,6 +325,16 @@ const Trips = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const getVehicleName = (vehicleId) => {
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    return vehicle ? vehicle.plate_number : 'Not assigned';
+  };
+
+  const getDriverName = (driverId) => {
+    const driver = drivers.find(d => d.id === driverId);
+    return driver ? (driver.name || driver.full_name) : 'Not assigned';
   };
 
   return (
@@ -429,13 +474,13 @@ const Trips = () => {
                   <td>
                     <div className="vehicle-info">
                       <Truck size={16} />
-                      <span>{trip.vehicle?.plate_number || '-'}</span>
+                      <span>{getVehicleName(trip.vehicle_id)}</span>
                     </div>
                   </td>
                   <td>
                     <div className="driver-info">
                       <User size={16} />
-                      <span>{trip.driver?.name || '-'}</span>
+                      <span>{getDriverName(trip.driver_id)}</span>
                     </div>
                   </td>
                   <td>{getStatusBadge(trip.status)}</td>
@@ -450,12 +495,12 @@ const Trips = () => {
                   <td className="actions">
                     <button 
                       className="action-btn view"
-                      onClick={() => handlePlanTrip(trip)}
-                      title="View/Plan Trip"
+                      onClick={() => handleViewTrip(trip)}
+                      title="View Trip Details"
                     >
                       <Eye size={16} />
                     </button>
-                    {trip.status === 'DRAFT' && (
+                    {(trip.status?.toLowerCase() === 'draft' || trip.status?.toLowerCase() === 'planned') && (
                       <button 
                         className="action-btn edit"
                         onClick={() => {
@@ -467,7 +512,7 @@ const Trips = () => {
                         <Edit2 size={16} />
                       </button>
                     )}
-                    {trip.status === 'LOADED' && (
+                    {trip.status?.toLowerCase() === 'loaded' && (
                       <button 
                         className="action-btn start"
                         onClick={() => handleStartTrip(trip.id)}
@@ -476,7 +521,16 @@ const Trips = () => {
                         <Play size={16} />
                       </button>
                     )}
-                    {trip.status === 'DRAFT' && (
+                    {trip.status?.toLowerCase() === 'in_progress' && (
+                      <button 
+                        className="action-btn complete"
+                        onClick={() => handleCompleteTrip(trip.id)}
+                        title="Complete Trip"
+                      >
+                        <CheckCircle size={16} />
+                      </button>
+                    )}
+                    {trip.status?.toLowerCase() === 'draft' && (
                       <button 
                         className="action-btn delete"
                         onClick={() => handleDeleteTrip(trip.id)}
@@ -544,6 +598,25 @@ const Trips = () => {
           }}
           onSubmit={handleUpdateTrip}
           errors={errors}
+        />
+      )}
+
+      {showTripDetails && selectedTrip && (
+        <TripDetailsModal
+          trip={selectedTrip}
+          vehicles={vehicles}
+          drivers={drivers}
+          onClose={() => {
+            setShowTripDetails(false);
+            setSelectedTrip(null);
+          }}
+          onEdit={() => {
+            setShowTripDetails(false);
+            setShowEditForm(true);
+          }}
+          onStart={handleStartTrip}
+          onComplete={handleCompleteTrip}
+          onDelete={handleDeleteTrip}
         />
       )}
     </div>
@@ -653,11 +726,222 @@ const CreateTripModal = ({ vehicles, drivers, onClose, onSubmit, errors }) => {
   );
 };
 
+const TripDetailsModal = ({ trip, vehicles, drivers, onClose, onEdit, onStart, onComplete, onDelete }) => {
+  const getVehicleName = (vehicleId) => {
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    return vehicle ? `${vehicle.plate_number} (${vehicle.vehicle_type})` : 'Not assigned';
+  };
+
+  const getDriverName = (driverId) => {
+    const driver = drivers.find(d => d.id === driverId);
+    return driver ? driver.name || driver.full_name : 'Not assigned';
+  };
+
+  const getStatusBadge = (status) => {
+    const statusConfig = tripStatuses.find(s => s.value === status?.toLowerCase());
+    return (
+      <span 
+        className="status-badge" 
+        style={{ 
+          backgroundColor: `${statusConfig?.color}20`,
+          color: statusConfig?.color,
+          border: `1px solid ${statusConfig?.color}40`
+        }}
+      >
+        {getStatusIcon(status)}
+        {statusConfig?.label || status}
+      </span>
+    );
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'draft':
+        return <Edit2 size={14} />;
+      case 'planned':
+        return <Calendar size={14} />;
+      case 'loaded':
+        return <Package size={14} />;
+      case 'in_progress':
+        return <Navigation size={14} />;
+      case 'completed':
+        return <CheckCircle size={14} />;
+      default:
+        return <AlertCircle size={14} />;
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const canStart = trip.status?.toLowerCase() === 'loaded';
+  const canComplete = trip.status?.toLowerCase() === 'in_progress';
+  const canEdit = trip.status?.toLowerCase() === 'draft' || trip.status?.toLowerCase() === 'planned';
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content trip-details-modal">
+        <div className="modal-header">
+          <h2>Trip Details</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="trip-details-content">
+          <div className="trip-header">
+            <div className="trip-number">
+              <MapPin size={20} />
+              <h3>{trip.trip_number || trip.trip_no}</h3>
+            </div>
+            <div className="trip-status">
+              {getStatusBadge(trip.status)}
+            </div>
+          </div>
+
+          <div className="trip-info-grid">
+            <div className="info-section">
+              <h4>Basic Information</h4>
+              <div className="info-row">
+                <span className="label">Trip Number:</span>
+                <span className="value">{trip.trip_number || trip.trip_no}</span>
+              </div>
+              <div className="info-row">
+                <span className="label">Status:</span>
+                <span className="value">{getStatusBadge(trip.status)}</span>
+              </div>
+              <div className="info-row">
+                <span className="label">Planned Date:</span>
+                <span className="value">{formatDate(trip.planned_date)}</span>
+              </div>
+              <div className="info-row">
+                <span className="label">Load Capacity:</span>
+                <span className="value">{trip.gross_loaded_kg || 0} kg</span>
+              </div>
+              <div className="info-row">
+                <span className="label">Orders Count:</span>
+                <span className="value">{trip.order_count || 0}</span>
+              </div>
+            </div>
+
+            <div className="info-section">
+              <h4>Assignment</h4>
+              <div className="info-row">
+                <span className="label">Vehicle:</span>
+                <span className="value">
+                  <Truck size={16} />
+                  {getVehicleName(trip.vehicle_id)}
+                </span>
+              </div>
+              <div className="info-row">
+                <span className="label">Driver:</span>
+                <span className="value">
+                  <User size={16} />
+                  {getDriverName(trip.driver_id)}
+                </span>
+              </div>
+              <div className="info-row">
+                <span className="label">Start Warehouse:</span>
+                <span className="value">{trip.start_warehouse?.name || 'Not specified'}</span>
+              </div>
+              <div className="info-row">
+                <span className="label">End Warehouse:</span>
+                <span className="value">{trip.end_warehouse?.name || 'Not specified'}</span>
+              </div>
+            </div>
+
+            <div className="info-section">
+              <h4>Timeline</h4>
+              <div className="info-row">
+                <span className="label">Start Time:</span>
+                <span className="value">{trip.start_time ? formatTime(trip.start_time) : 'Not started'}</span>
+              </div>
+              <div className="info-row">
+                <span className="label">End Time:</span>
+                <span className="value">{trip.end_time ? formatTime(trip.end_time) : 'Not completed'}</span>
+              </div>
+              <div className="info-row">
+                <span className="label">Created:</span>
+                <span className="value">{trip.created_at ? formatTime(trip.created_at) : '-'}</span>
+              </div>
+              <div className="info-row">
+                <span className="label">Last Updated:</span>
+                <span className="value">{trip.updated_at ? formatTime(trip.updated_at) : '-'}</span>
+              </div>
+            </div>
+
+            {trip.notes && (
+              <div className="info-section full-width">
+                <h4>Notes</h4>
+                <div className="notes-content">
+                  {trip.notes}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="trip-actions">
+            {canEdit && (
+              <button className="action-btn edit" onClick={onEdit}>
+                <Edit2 size={16} />
+                Edit Trip
+              </button>
+            )}
+            {canStart && (
+              <button className="action-btn start" onClick={() => onStart(trip.id)}>
+                <Play size={16} />
+                Start Trip
+              </button>
+            )}
+            {canComplete && (
+              <button className="action-btn complete" onClick={() => onComplete(trip.id)}>
+                <CheckCircle size={16} />
+                Complete Trip
+              </button>
+            )}
+            {trip.status?.toLowerCase() === 'draft' && (
+              <button 
+                className="action-btn delete" 
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to delete this trip?')) {
+                    onDelete(trip.id);
+                    onClose();
+                  }
+                }}
+              >
+                <Trash2 size={16} />
+                Delete Trip
+              </button>
+            )}
+            <button className="action-btn secondary" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const EditTripModal = ({ trip, vehicles, drivers, onClose, onSubmit, errors }) => {
   const [formData, setFormData] = useState({
     vehicle_id: trip.vehicle_id || '',
     driver_id: trip.driver_id || '',
-    planned_date: trip.planned_date ? trip.planned_date.slice(0, 16) : '',
+    planned_date: trip.planned_date ? trip.planned_date.split('T')[0] : '',
     notes: trip.notes || ''
   });
 
@@ -715,7 +999,7 @@ const EditTripModal = ({ trip, vehicles, drivers, onClose, onSubmit, errors }) =
             <div className="form-group">
               <label>Planned Date *</label>
               <input
-                type="datetime-local"
+                type="date"
                 value={formData.planned_date}
                 onChange={(e) => setFormData({ ...formData, planned_date: e.target.value })}
                 required
