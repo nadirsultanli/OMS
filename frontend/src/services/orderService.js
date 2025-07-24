@@ -49,7 +49,7 @@ const orderService = {
   // Get order by ID
   getOrderById: async (orderId) => {
     try {
-      const response = await api.get(`/orders/${orderId}/`);
+      const response = await api.get(`/orders/${orderId}`);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching order:', error);
@@ -60,7 +60,7 @@ const orderService = {
   // Get order by number
   getOrderByNumber: async (orderNo) => {
     try {
-      const response = await api.get(`/orders/number/${orderNo}/`);
+      const response = await api.get(`/orders/number/${orderNo}`);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching order by number:', error);
@@ -93,7 +93,7 @@ const orderService = {
   // Update order
   updateOrder: async (orderId, orderData) => {
     try {
-      const response = await api.put(`/orders/${orderId}/`, orderData);
+      const response = await api.put(`/orders/${orderId}`, orderData);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error updating order:', error);
@@ -104,7 +104,7 @@ const orderService = {
   // Update order status
   updateOrderStatus: async (orderId, status) => {
     try {
-      const response = await api.patch(`/orders/${orderId}/status/`, { status });
+      const response = await api.patch(`/orders/${orderId}/status`, { status });
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -115,7 +115,7 @@ const orderService = {
   // Submit order for approval
   submitOrder: async (orderId) => {
     try {
-      const response = await api.post(`/orders/${orderId}/submit/`);
+      const response = await api.post(`/orders/${orderId}/submit`);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error submitting order:', error);
@@ -126,7 +126,7 @@ const orderService = {
   // Approve order
   approveOrder: async (orderId) => {
     try {
-      const response = await api.post(`/orders/${orderId}/approve/`);
+      const response = await api.post(`/orders/${orderId}/approve`);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error approving order:', error);
@@ -137,7 +137,7 @@ const orderService = {
   // Cancel order (delete)
   deleteOrder: async (orderId) => {
     try {
-      await api.delete(`/orders/${orderId}/`);
+      await api.delete(`/orders/${orderId}`);
       return { success: true };
     } catch (error) {
       console.error('Error cancelling order:', error);
@@ -148,7 +148,7 @@ const orderService = {
   // Get orders by customer
   getOrdersByCustomer: async (customerId) => {
     try {
-      const response = await api.get(`/orders/customer/${customerId}/`);
+      const response = await api.get(`/orders/customer/${customerId}`);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching orders by customer:', error);
@@ -159,7 +159,7 @@ const orderService = {
   // Get orders by status
   getOrdersByStatus: async (status) => {
     try {
-      const response = await api.get(`/orders/status/${status}/`);
+      const response = await api.get(`/orders/status/${status}`);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching orders by status:', error);
@@ -170,7 +170,7 @@ const orderService = {
   // Get order statistics/counts
   getOrderStats: async () => {
     try {
-      const response = await api.get('/orders/stats/count/');
+      const response = await api.get('/orders/stats/count');
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching order stats:', error);
@@ -182,7 +182,7 @@ const orderService = {
   // Add order line
   addOrderLine: async (orderId, lineData) => {
     try {
-      const response = await api.post(`/orders/${orderId}/lines/`, lineData);
+      const response = await api.post(`/orders/${orderId}/lines`, lineData);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error adding order line:', error);
@@ -193,7 +193,7 @@ const orderService = {
   // Update order line
   updateOrderLine: async (orderId, lineId, lineData) => {
     try {
-      const response = await api.put(`/orders/${orderId}/lines/${lineId}/`, lineData);
+      const response = await api.put(`/orders/${orderId}/lines/${lineId}`, lineData);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error updating order line:', error);
@@ -204,7 +204,7 @@ const orderService = {
   // Update order line quantities
   updateOrderLineQuantities: async (orderId, lineId, quantities) => {
     try {
-      const response = await api.patch(`/orders/${orderId}/lines/${lineId}/quantities/`, quantities);
+      const response = await api.patch(`/orders/${orderId}/lines/${lineId}/quantities`, quantities);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error updating order line quantities:', error);
@@ -215,11 +215,26 @@ const orderService = {
   // Delete order line
   deleteOrderLine: async (orderId, lineId) => {
     try {
-      await api.delete(`/orders/${orderId}/lines/${lineId}/`);
+      await api.delete(`/orders/${orderId}/lines/${lineId}`);
       return { success: true };
     } catch (error) {
       console.error('Error deleting order line:', error);
       return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to delete order line' };
+    }
+  },
+
+  // Execute order (fulfillment process)
+  executeOrder: async (orderId, executeData) => {
+    try {
+      const response = await api.post('/orders/execute', {
+        order_id: orderId,
+        variants: executeData.variants || [],
+        created_at: executeData.created_at || new Date().toISOString()
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error executing order:', error);
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to execute order' };
     }
   },
 

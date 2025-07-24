@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 from uuid import UUID
 
 from app.domain.entities.price_lists import PriceListLineEntity
@@ -21,12 +21,19 @@ class PricingService:
         manual_unit_price: Optional[Decimal] = None,
         is_credit_order: bool = False,
         target_date: date = None
-    ) -> Tuple[Decimal, Decimal, Decimal]:
+    ) -> Dict[str, Any]:
         """
         Calculate pricing for an order line according to business rules
         
         Returns:
-            Tuple of (list_price, manual_unit_price, final_price)
+            Dictionary containing:
+            - list_price: Base price from price list
+            - manual_unit_price: Manual override (credit orders only)
+            - final_price: Final net price (before tax)
+            - tax_code: Tax code (TX_STD, TX_DEP, etc.)
+            - tax_rate: Tax rate percentage
+            - tax_amount: Calculated tax amount
+            - final_price_incl_tax: Final price including tax
         """
         if target_date is None:
             target_date = date.today()
@@ -46,25 +53,48 @@ class PricingService:
             raise ValueError(f"No minimum price found for {'variant ' + variant_id if variant_id else 'gas type ' + gas_type}")
         
         list_price = min_price_line.min_unit_price
+        tax_code = min_price_line.tax_code
+        tax_rate = min_price_line.tax_rate
         
         # BUSINESS RULE: Cash orders use minimum price, not editable
         if not is_credit_order:
-            return list_price, None, list_price
+            final_price = list_price
+            manual_unit_price = None
+        else:
+            # BUSINESS RULE: Credit orders allow manual pricing above minimum
+            if manual_unit_price is None:
+                # Default to minimum price for credit orders if no manual price provided
+                manual_unit_price = list_price
+            
+            # BUSINESS RULE: Validate manual price is not below minimum (except for negative prices like empty returns)
+            if list_price >= 0 and manual_unit_price < list_price:
+                raise ValueError(
+                    f"Manual unit price ({manual_unit_price}) cannot be below minimum price ({list_price})"
+                )
+            
+            final_price = manual_unit_price
         
-        # BUSINESS RULE: Credit orders allow manual pricing above minimum
-        if manual_unit_price is None:
-            # Default to minimum price for credit orders if no manual price provided
-            manual_unit_price = list_price
+        # Calculate tax amount
+        if min_price_line.is_tax_inclusive:
+            # Price includes tax - extract the tax amount
+            final_price_incl_tax = final_price
+            tax_amount = final_price * (tax_rate / (Decimal('100') + tax_rate))
+            final_price = final_price - tax_amount
+        else:
+            # Price excludes tax - add tax amount
+            tax_amount = final_price * (tax_rate / Decimal('100'))
+            final_price_incl_tax = final_price + tax_amount
         
-        # BUSINESS RULE: Validate manual price is not below minimum
-        if manual_unit_price < list_price:
-            raise ValueError(
-                f"Manual unit price ({manual_unit_price}) cannot be below minimum price ({list_price})"
-            )
-        
-        final_price = manual_unit_price
-        
-        return list_price, manual_unit_price, final_price
+        return {
+            'list_price': list_price,
+            'manual_unit_price': manual_unit_price,
+            'final_price': final_price,
+            'tax_code': tax_code,
+            'tax_rate': tax_rate,
+            'tax_amount': tax_amount,
+            'final_price_incl_tax': final_price_incl_tax,
+            'is_tax_inclusive': min_price_line.is_tax_inclusive
+        }
     
     async def get_deposit_price(
         self,

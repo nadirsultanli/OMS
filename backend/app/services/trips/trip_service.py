@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from uuid import UUID
 from datetime import datetime, date
 from decimal import Decimal
@@ -21,11 +21,20 @@ from app.domain.exceptions.trips.trip_exceptions import (
 )
 from app.infrastucture.logs.logger import default_logger
 
+if TYPE_CHECKING:
+    from app.domain.entities.users import User
+    from app.services.trips.trip_status_automation_service import TripStatusAutomationService
+
 class TripService:
     """Trip service with business logic"""
     
-    def __init__(self, trip_repository: TripRepository):
+    def __init__(
+        self, 
+        trip_repository: TripRepository,
+        automation_service: Optional['TripStatusAutomationService'] = None
+    ):
         self.trip_repository = trip_repository
+        self.automation_service = automation_service
     
     async def create_trip(self, tenant_id: UUID, trip_no: str, created_by: Optional[UUID] = None, **kwargs) -> Trip:
         """Create a new trip with validation"""
@@ -171,6 +180,79 @@ class TripService:
         except Exception as e:
             default_logger.error(f"Failed to update trip: {str(e)}", trip_id=str(trip_id))
             raise TripUpdateError(f"Failed to update trip: {str(e)}", trip_id=str(trip_id))
+    
+    async def update_trip_status(
+        self,
+        user: 'User',
+        trip_id: UUID,
+        new_status: TripStatus,
+        updated_by: Optional[UUID] = None
+    ) -> Dict[str, Any]:
+        """Update trip status and trigger automation workflows"""
+        try:
+            # Get current trip
+            trip = await self.get_trip_by_id(trip_id)
+            previous_status = trip.trip_status
+            
+            # Validate status transition
+            if not self._is_valid_status_transition(previous_status, new_status):
+                raise TripStatusTransitionError(
+                    current_status=previous_status.value,
+                    target_status=new_status.value
+                )
+            
+            # Update trip status
+            trip.trip_status = new_status
+            trip.updated_by = updated_by or user.id
+            trip.updated_at = datetime.utcnow()
+            
+            # Add timestamps for specific statuses
+            if new_status == TripStatus.IN_PROGRESS and not trip.start_time:
+                trip.start_time = datetime.utcnow()
+            elif new_status == TripStatus.COMPLETED and not trip.end_time:
+                trip.end_time = datetime.utcnow()
+            
+            # Save trip changes
+            updated_trip = await self.trip_repository.update_trip(trip_id, trip)
+            
+            result = {
+                "trip_id": str(trip_id),
+                "previous_status": previous_status.value,
+                "new_status": new_status.value,
+                "updated_at": updated_trip.updated_at.isoformat(),
+                "success": True
+            }
+            
+            # Trigger automation if available
+            if self.automation_service:
+                try:
+                    automation_result = await self.automation_service.handle_trip_status_change(
+                        user=user,
+                        trip=updated_trip,
+                        new_status=new_status,
+                        previous_status=previous_status
+                    )
+                    result["automation"] = automation_result
+                except Exception as e:
+                    default_logger.warning(f"Trip automation failed: {str(e)}")
+                    result["automation"] = {"success": False, "error": str(e)}
+            
+            default_logger.info(
+                f"Trip status updated successfully",
+                trip_id=str(trip_id),
+                previous_status=previous_status.value,
+                new_status=new_status.value
+            )
+            
+            return result
+            
+        except Exception as e:
+            default_logger.error(f"Failed to update trip status: {str(e)}")
+            return {
+                "trip_id": str(trip_id),
+                "success": False,
+                "error": str(e)
+            }
     
     async def delete_trip(self, trip_id: UUID, deleted_by: UUID) -> bool:
         """Soft delete a trip"""

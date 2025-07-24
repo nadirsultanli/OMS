@@ -86,4 +86,9 @@ class TripRepository(ABC):
     @abstractmethod
     async def get_next_stop_no(self, trip_id: UUID) -> int:
         """Get the next available stop number for a trip"""
+        pass
+    
+    @abstractmethod
+    async def get_trip_stops_by_order(self, order_id: UUID) -> List[TripStop]:
+        """Get trip stops that contain the specified order"""
         pass 

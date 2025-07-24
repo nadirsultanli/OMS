@@ -394,6 +394,22 @@ class SQLAlchemyTripRepository(TripRepository):
             default_logger.error(f"Failed to get next stop number: {str(e)}", trip_id=str(trip_id))
             raise
     
+    async def get_trip_stops_by_order(self, order_id: UUID) -> List[TripStop]:
+        """Get trip stops that contain the specified order"""
+        try:
+            stmt = select(TripStopModel).where(
+                TripStopModel.order_id == order_id
+            ).order_by(asc(TripStopModel.created_at))
+            
+            result = await self.session.execute(stmt)
+            stop_models = result.scalars().all()
+            
+            return [self._stop_model_to_entity(stop_model) for stop_model in stop_models]
+            
+        except Exception as e:
+            default_logger.error(f"Failed to get trip stops by order: {str(e)}", order_id=str(order_id))
+            raise
+    
     def _model_to_entity(self, trip_model: TripModel) -> Trip:
         """Convert TripModel to Trip entity"""
         if not trip_model:

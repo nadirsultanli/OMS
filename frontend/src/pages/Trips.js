@@ -19,6 +19,7 @@ import tripService from '../services/tripService';
 import vehicleService from '../services/vehicleService';
 import userService from '../services/userService';
 import authService from '../services/authService';
+import TripDetailView from './TripDetailView';
 import './Trips.css';
 
 const tripStatuses = [
@@ -38,6 +39,7 @@ const Trips = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showTripDetails, setShowTripDetails] = useState(false);
+  const [showTripDetailView, setShowTripDetailView] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
@@ -237,7 +239,7 @@ const Trips = () => {
 
   const handleViewTrip = (trip) => {
     setSelectedTrip(trip);
-    setShowTripDetails(true);
+    setShowTripDetailView(true);
   };
 
   const handleStartTrip = async (tripId) => {
@@ -496,9 +498,9 @@ const Trips = () => {
                     <button 
                       className="action-btn view"
                       onClick={() => handleViewTrip(trip)}
-                      title="View Trip Details"
+                      title="Manage Trip Orders"
                     >
-                      <Eye size={16} />
+                      <Package size={16} />
                     </button>
                     {(trip.status?.toLowerCase() === 'draft' || trip.status?.toLowerCase() === 'planned') && (
                       <button 
@@ -617,6 +619,17 @@ const Trips = () => {
           onStart={handleStartTrip}
           onComplete={handleCompleteTrip}
           onDelete={handleDeleteTrip}
+        />
+      )}
+
+      {showTripDetailView && selectedTrip && (
+        <TripDetailView
+          tripId={selectedTrip.id}
+          onClose={() => {
+            setShowTripDetailView(false);
+            setSelectedTrip(null);
+            fetchTrips(); // Refresh trips after any changes
+          }}
         />
       )}
     </div>

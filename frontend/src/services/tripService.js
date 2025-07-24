@@ -238,6 +238,81 @@ const tripService = {
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
     }
+  },
+
+  // =====================================================================
+  // TRIP-ORDER INTEGRATION METHODS
+  // =====================================================================
+
+  // Assign order to trip with automatic stock reservation
+  assignOrderToTrip: async (tripId, orderId, warehouseId = null) => {
+    try {
+      const response = await api.post(`/trips/${tripId}/assign-order`, {
+        order_id: orderId,
+        warehouse_id: warehouseId
+      });
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        error: extractErrorMessage(error.response?.data)
+      };
+    }
+  },
+
+  // Remove order from trip and release stock reservations
+  unassignOrderFromTrip: async (tripId, orderId) => {
+    try {
+      const response = await api.post(`/trips/${tripId}/unassign-order`, {
+        order_id: orderId
+      });
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        error: extractErrorMessage(error.response?.data)
+      };
+    }
+  },
+
+  // Get orders that can be assigned to this trip
+  getAvailableOrders: async (tripId, warehouseId = null) => {
+    try {
+      const params = warehouseId ? { warehouse_id: warehouseId } : {};
+      const response = await api.get(`/trips/${tripId}/available-orders`, { params });
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        error: extractErrorMessage(error.response?.data)
+      };
+    }
+  },
+
+  // Get summary of orders assigned to this trip
+  getTripOrdersSummary: async (tripId) => {
+    try {
+      const response = await api.get(`/trips/${tripId}/orders-summary`);
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        error: extractErrorMessage(error.response?.data)
+      };
+    }
+  },
+
+  // Get detailed orders information for trip planning
+  getTripOrdersDetail: async (tripId) => {
+    try {
+      const response = await api.get(`/trips/${tripId}/orders-detail`);
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        error: extractErrorMessage(error.response?.data)
+      };
+    }
   }
 };
 

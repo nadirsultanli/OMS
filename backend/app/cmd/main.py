@@ -22,6 +22,7 @@ from app.presentation.api.orders.order import router as order_router
 from app.presentation.api.stock_docs.stock_doc import router as stock_doc_router
 from app.presentation.api.stock_levels.stock_level import router as stock_level_router
 from app.presentation.api.trips.trip import router as trip_router
+from app.presentation.api.trips.trip_order_integration import router as trip_order_integration_router
 from app.presentation.api.trips.monitoring import router as monitoring_router
 from app.presentation.api.vehicles.vehicle import router as vehicle_router
 from app.presentation.api.vehicles.vehicle_warehouse import router as vehicle_warehouse_router
@@ -172,6 +173,7 @@ app.include_router(order_router, prefix="/api/v1")
 app.include_router(stock_doc_router, prefix="/api/v1")
 app.include_router(stock_level_router, prefix="/api/v1")
 app.include_router(trip_router, prefix="/api/v1")
+app.include_router(trip_order_integration_router, prefix="/api/v1")
 app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(vehicle_router, prefix="/api/v1")
 app.include_router(vehicle_warehouse_router, prefix="/api/v1")

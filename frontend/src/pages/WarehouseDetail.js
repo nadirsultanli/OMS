@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import MapboxAddressInput from '../components/MapboxAddressInput';
 import warehouseService from '../services/warehouseService';
+import stockService from '../services/stockService';
+import variantService from '../services/variantService';
 import { extractErrorMessage } from '../utils/errorUtils';
 import authService from '../services/authService';
 import './WarehouseDetail.css';
@@ -35,9 +37,17 @@ const WarehouseDetail = () => {
     unlimited_stock: false
   });
   const [updateLoading, setUpdateLoading] = useState(false);
+  const [stockData, setStockData] = useState({
+    summary: null,
+    stockLevels: [],
+    loadingStock: true,
+    variants: {}
+  });
+  const [stockFilter, setStockFilter] = useState('');
 
   useEffect(() => {
     fetchWarehouse();
+    fetchWarehouseStock();
   }, [warehouseId]);
 
   const fetchWarehouse = async () => {
@@ -58,6 +68,58 @@ const WarehouseDetail = () => {
       setError('Failed to load warehouse details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWarehouseStock = async () => {
+    try {
+      setStockData(prev => ({ ...prev, loadingStock: true }));
+      
+      // Fetch stock levels for this warehouse (get more data)
+      const stockLevelsResponse = await stockService.getStockLevels({
+        warehouseId: warehouseId,
+        includeZeroStock: true,
+        limit: 500  // Increased limit to show more data
+      });
+
+      console.log('Stock levels response:', stockLevelsResponse);
+
+      // Fetch warehouse stock summary
+      const summaryResponse = await stockService.getWarehouseStockSummaries(warehouseId, 100);
+
+      // Get all unique variant IDs from stock levels
+      const stockLevels = stockLevelsResponse.stock_levels || [];
+      const variantIds = [...new Set(stockLevels.map(level => level.variant_id))];
+
+      // Fetch variant details for all variants in this warehouse
+      const variantsMap = {};
+      if (variantIds.length > 0) {
+        try {
+          const variantsResponse = await variantService.getVariants(null, { limit: 200 });
+          if (variantsResponse.success && variantsResponse.data.variants) {
+            variantsResponse.data.variants.forEach(variant => {
+              variantsMap[variant.id] = variant;
+            });
+          }
+        } catch (variantError) {
+          console.warn('Could not fetch variant details:', variantError);
+        }
+      }
+
+      setStockData({
+        summary: summaryResponse,
+        stockLevels: stockLevels,
+        loadingStock: false,
+        variants: variantsMap
+      });
+
+    } catch (error) {
+      console.error('Error fetching warehouse stock:', error);
+      setStockData(prev => ({ 
+        ...prev, 
+        loadingStock: false,
+        error: 'Failed to load stock data'
+      }));
     }
   };
 
@@ -145,6 +207,62 @@ const WarehouseDetail = () => {
     }
 
     return capabilities;
+  };
+
+  const getVariantDisplayName = (variantId) => {
+    const variant = stockData.variants[variantId];
+    return variant ? variant.sku : `Variant ${variantId?.slice(0, 8)}`;
+  };
+
+  const getStockStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'ON_HAND':
+        return 'status-badge status-on-hand';
+      case 'TRUCK_STOCK':
+        return 'status-badge status-truck-stock';
+      case 'IN_TRANSIT':
+        return 'status-badge status-in-transit';
+      case 'QUARANTINE':
+        return 'status-badge status-quarantine';
+      default:
+        return 'status-badge status-default';
+    }
+  };
+
+  const formatQuantity = (quantity) => {
+    return Number(quantity || 0).toLocaleString();
+  };
+
+  const formatCurrency = (amount) => {
+    return `$${Number(amount || 0).toFixed(2)}`;
+  };
+
+  const calculateStockSummary = () => {
+    if (!stockData.stockLevels.length) {
+      return {
+        totalVariants: 0,
+        totalQuantity: 0,
+        totalValue: 0,
+        availableQuantity: 0,
+        reservedQuantity: 0
+      };
+    }
+
+    const summary = stockData.stockLevels.reduce((acc, level) => {
+      acc.totalQuantity += Number(level.quantity || 0);
+      acc.totalValue += Number(level.total_cost || 0);
+      acc.availableQuantity += Number(level.available_qty || 0);
+      acc.reservedQuantity += Number(level.reserved_qty || 0);
+      return acc;
+    }, {
+      totalVariants: new Set(stockData.stockLevels.map(l => l.variant_id)).size,
+      totalQuantity: 0,
+      totalValue: 0,
+      availableQuantity: 0,
+      reservedQuantity: 0
+    });
+
+    return summary;
   };
 
   if (loading) {
@@ -426,19 +544,179 @@ const WarehouseDetail = () => {
               </div>
             </div>
 
-            {/* Operations Card */}
+            {/* Stock Summary Card */}
             <div className="info-card">
               <div className="info-card-header">
                 <h3>
-                  <Users size={20} />
-                  Operations Summary
+                  <Package size={20} />
+                  Stock Summary
+                </h3>
+                <button 
+                  onClick={fetchWarehouseStock}
+                  className="refresh-stock-btn"
+                  disabled={stockData.loadingStock}
+                >
+                  {stockData.loadingStock ? <Loader size={16} className="spinning" /> : 'Refresh'}
+                </button>
+              </div>
+              <div className="info-card-content">
+                {stockData.loadingStock ? (
+                  <div className="stock-loading">
+                    <Loader size={24} className="spinning" />
+                    <p>Loading stock data...</p>
+                  </div>
+                ) : stockData.error ? (
+                  <div className="stock-error">
+                    <AlertCircle size={24} />
+                    <p>{stockData.error}</p>
+                  </div>
+                ) : (() => {
+                  const summary = calculateStockSummary();
+                  return (
+                    <div className="stock-summary-content">
+                      <div className="summary-stats">
+                        <div className="stat-item">
+                          <span className="stat-label">Total Variants</span>
+                          <span className="stat-value">{summary.totalVariants}</span>
+                        </div>
+                        <div className="stat-item">
+                          <span className="stat-label">Total Quantity</span>
+                          <span className="stat-value">{formatQuantity(summary.totalQuantity)}</span>
+                        </div>
+                        <div className="stat-item">
+                          <span className="stat-label">Available</span>
+                          <span className="stat-value available">{formatQuantity(summary.availableQuantity)}</span>
+                        </div>
+                        <div className="stat-item">
+                          <span className="stat-label">Reserved</span>
+                          <span className="stat-value reserved">{formatQuantity(summary.reservedQuantity)}</span>
+                        </div>
+                        <div className="stat-item">
+                          <span className="stat-label">Total Value</span>
+                          <span className="stat-value">{formatCurrency(summary.totalValue)}</span>
+                        </div>
+                      </div>
+                      
+                      {warehouse.unlimited_stock && (
+                        <div className="unlimited-stock-notice">
+                          <CheckCircle size={16} />
+                          <span>This warehouse has unlimited stock enabled</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Stock Levels Card - Full Width */}
+            <div className="info-card stock-levels-card">
+              <div className="info-card-header">
+                <h3>
+                  <BarChart3 size={20} />
+                  Current Stock Levels ({stockData.stockLevels.length} items)
                 </h3>
               </div>
               <div className="info-card-content">
-                <div className="operations-placeholder">
-                  <p>Inventory levels, recent transactions, and operational metrics will be displayed here.</p>
-                  <small>This section will be implemented with inventory integration.</small>
+                {stockData.loadingStock ? (
+                  <div className="stock-loading">
+                    <Loader size={24} className="spinning" />
+                    <p>Loading stock levels...</p>
+                  </div>
+                ) : stockData.stockLevels.length === 0 ? (
+                  <div className="empty-stock">
+                    <Package size={32} />
+                    <p>No stock items in this warehouse</p>
+                    <small>Stock will appear here once items are added to this warehouse</small>
+                  </div>
+                ) : (
+                  <div className="stock-levels-container">
+                    <div className="stock-levels-info">
+                      <span className="stock-count">
+                        Showing {stockData.stockLevels.filter(level => 
+                          getVariantDisplayName(level.variant_id).toLowerCase().includes(stockFilter.toLowerCase()) ||
+                          level.stock_status.toLowerCase().includes(stockFilter.toLowerCase())
+                        ).length} of {stockData.stockLevels.length} stock entries
+                      </span>
+                      <div className="stock-controls">
+                        <input
+                          type="text"
+                          placeholder="Search products..."
+                          value={stockFilter}
+                          onChange={(e) => setStockFilter(e.target.value)}
+                          className="stock-search"
+                        />
+                        <button 
+                          className="export-btn"
+                          onClick={() => console.log('Export stock data:', stockData.stockLevels)}
+                        >
+                          Export Data
+                        </button>
+                      </div>
+                    </div>
+                    <div className="stock-levels-table">
+                      <div className="table-container">
+                        <table>
+                        <thead>
+                          <tr>
+                            <th>Product</th>
+                            <th>Status</th>
+                            <th>Quantity</th>
+                            <th>Available</th>
+                            <th>Reserved</th>
+                            <th>Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stockData.stockLevels
+                            .filter(level => 
+                              getVariantDisplayName(level.variant_id).toLowerCase().includes(stockFilter.toLowerCase()) ||
+                              level.stock_status.toLowerCase().includes(stockFilter.toLowerCase())
+                            )
+                            .sort((a, b) => getVariantDisplayName(a.variant_id).localeCompare(getVariantDisplayName(b.variant_id)))
+                            .map((level, index) => (
+                            <tr key={`${level.variant_id}-${level.stock_status}-${index}`}>
+                              <td>
+                                <div className="variant-info">
+                                  <span className="sku">{getVariantDisplayName(level.variant_id)}</span>
+                                  {stockData.variants[level.variant_id] && (
+                                    <small className="sku-type">
+                                      {stockData.variants[level.variant_id].sku_type}
+                                    </small>
+                                  )}
+                                </div>
+                              </td>
+                              <td>
+                                <span className={getStockStatusBadgeClass(level.stock_status)}>
+                                  {level.stock_status?.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="quantity-cell">
+                                <span className={Number(level.quantity) < 0 ? 'negative-qty' : ''}>
+                                  {formatQuantity(level.quantity)}
+                                </span>
+                              </td>
+                              <td className="quantity-cell">
+                                <span className={Number(level.available_qty) <= 0 ? 'zero-qty' : 'available-qty'}>
+                                  {formatQuantity(level.available_qty)}
+                                </span>
+                              </td>
+                              <td className="quantity-cell">
+                                <span className={Number(level.reserved_qty) > 0 ? 'reserved-qty' : ''}>
+                                  {formatQuantity(level.reserved_qty)}
+                                </span>
+                              </td>
+                              <td className="value-cell">
+                                {formatCurrency(level.total_cost)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
+                )}
               </div>
             </div>
           </div>

@@ -14,6 +14,7 @@ const Orders = () => {
   const [variants, setVariants] = useState([]);
   const [priceLists, setPriceLists] = useState([]);
   const [selectedPriceList, setSelectedPriceList] = useState('');
+  const [availableVariants, setAvailableVariants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -118,7 +119,9 @@ const Orders = () => {
       const result = await variantService.getVariants('332072c1-5405-4f09-a56f-a631defa911b');
       if (result.success) {
         console.log('Variants fetched:', result.data);
-        setVariants(result.data.variants || []);
+        const allVariants = result.data.variants || [];
+        setVariants(allVariants);
+        setAvailableVariants(allVariants); // Initially show all variants
       } else {
         console.error('Failed to fetch variants:', result.error);
       }
@@ -178,12 +181,45 @@ const Orders = () => {
     return null;
   };
 
-  const handlePriceListChange = (priceListId) => {
+  const handlePriceListChange = async (priceListId) => {
     setSelectedPriceList(priceListId);
     
-    // Update all order lines with new prices
-    if (priceListId && formData.order_lines.length > 0) {
-      updateAllOrderLinePrices();
+    if (priceListId) {
+      // Load price list lines and filter available variants
+      await loadPriceListAndFilterVariants(priceListId);
+      
+      // Update all order lines with new prices
+      if (formData.order_lines.length > 0) {
+        updateAllOrderLinePrices();
+      }
+    } else {
+      // No price list selected - show all variants
+      setAvailableVariants(variants);
+    }
+  };
+
+  const loadPriceListAndFilterVariants = async (priceListId) => {
+    try {
+      const result = await priceListService.getPriceListLines(priceListId);
+      if (result.success) {
+        const lines = result.data || [];
+        
+        // Filter variants to only show those with prices in this price list
+        const variantsWithPrices = variants.filter(variant => {
+          return lines.some(line => line.variant_id === variant.id);
+        });
+        
+        setAvailableVariants(variantsWithPrices);
+        
+        console.log(`Price list loaded: ${lines.length} price lines`);
+        console.log(`Filtered variants: ${variantsWithPrices.length} out of ${variants.length} total variants`);
+      } else {
+        console.error('Failed to load price list lines:', result.error);
+        setAvailableVariants(variants);
+      }
+    } catch (error) {
+      console.error('Error loading price list lines:', error);
+      setAvailableVariants(variants);
     }
   };
 
@@ -965,8 +1001,13 @@ const Orders = () => {
                           onChange={async (e) => await updateOrderLine(index, 'variant_id', e.target.value)}
                           className={errors[`line_${index}_product`] ? 'error' : ''}
                         >
-                          <option value="">Select Product</option>
-                          {variants.map(variant => (
+                          <option value="">
+                            {selectedPriceList ? 
+                              `Select Product (${availableVariants.length} with prices)` :
+                              'Select Product'
+                            }
+                          </option>
+                          {availableVariants.map(variant => (
                             <option key={variant.id} value={variant.id}>{getVariantDisplayName(variant)}</option>
                           ))}
                         </select>

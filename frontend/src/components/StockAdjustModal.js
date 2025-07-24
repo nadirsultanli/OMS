@@ -52,14 +52,17 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
         variantService.getVariants()
       ]);
       
-      // Handle different response formats
+      // Handle different response formats and ensure arrays
       const warehouses = warehousesResponse.warehouses || warehousesResponse || [];
       const variants = variantsResponse.data?.variants || variantsResponse.variants || variantsResponse || [];
       
-      setWarehouses(warehouses);
-      setVariants(variants);
+      setWarehouses(Array.isArray(warehouses) ? warehouses : []);
+      setVariants(Array.isArray(variants) ? variants : []);
     } catch (err) {
       setError('Failed to load data: ' + err.message);
+      // Set empty arrays on error to prevent map errors
+      setWarehouses([]);
+      setVariants([]);
     }
   };
 
@@ -125,11 +128,13 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
   };
 
   const getWarehouseName = (warehouseId) => {
+    if (!Array.isArray(warehouses)) return '';
     const warehouse = warehouses.find(w => w.id === warehouseId);
     return warehouse ? `${warehouse.code} - ${warehouse.name}` : '';
   };
 
   const getVariantName = (variantId) => {
+    if (!Array.isArray(variants)) return '';
     const variant = variants.find(v => v.id === variantId);
     return variant ? variant.sku : '';
   };
@@ -160,7 +165,7 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
                   disabled={selectedStockLevel}
                 >
                   <option value="">Select Warehouse</option>
-                  {warehouses.map(warehouse => (
+                  {Array.isArray(warehouses) && warehouses.map(warehouse => (
                     <option key={warehouse.id} value={warehouse.id}>
                       {warehouse.code} - {warehouse.name}
                     </option>
@@ -179,7 +184,7 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
                   disabled={selectedStockLevel}
                 >
                   <option value="">Select Variant</option>
-                  {variants.map(variant => (
+                  {Array.isArray(variants) && variants.map(variant => (
                     <option key={variant.id} value={variant.id}>
                       {variant.sku}
                     </option>

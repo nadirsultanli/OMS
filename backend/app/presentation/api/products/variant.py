@@ -37,11 +37,18 @@ router = APIRouter(prefix="/variants", tags=["Variants"])
 @router.post("/", response_model=VariantResponse, status_code=status.HTTP_201_CREATED)
 async def create_variant(
     request: CreateVariantRequest, 
-    variant_service: VariantService = Depends(get_variant_service)
+    variant_service: VariantService = Depends(get_variant_service),
+    user: User = current_user
 ):
     """Create a new variant"""
     try:
-        variant = await variant_service.create_variant(**request.dict())
+        created_by = UUID(str(user.id)) if user else None
+        # Exclude created_by from request body since it comes from authenticated user
+        request_data = request.dict(exclude_unset=True, exclude={'created_by'})
+        variant = await variant_service.create_variant(
+            **request_data,
+            created_by=created_by
+        )
         return VariantResponse(**variant.to_dict())
     except VariantAlreadyExistsError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
