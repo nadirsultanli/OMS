@@ -19,7 +19,7 @@ const priceListService = {
         offset: params.offset || 0
       });
 
-      const response = await api.get(`/price-lists?${queryParams}`);
+      const response = await api.get(`/price-lists/?${queryParams}`);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching price lists:', error);
@@ -75,7 +75,9 @@ const priceListService = {
   getPriceListLines: async (priceListId) => {
     try {
       const response = await api.get(`/price-lists/${priceListId}/lines`);
-      return { success: true, data: response.data };
+      // Handle both list and object responses
+      const lines = Array.isArray(response.data) ? response.data : (response.data?.price_list_lines || []);
+      return { success: true, data: lines };
     } catch (error) {
       console.error('Error fetching price list lines:', error);
       return { success: false, error: error.response?.data?.detail || 'Failed to fetch price list lines' };

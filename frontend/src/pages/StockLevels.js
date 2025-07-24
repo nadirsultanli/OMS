@@ -7,6 +7,7 @@ import StockReserveModal from '../components/StockReserveModal';
 import StockTransferModal from '../components/StockTransferModal';
 import StockPhysicalCountModal from '../components/StockPhysicalCountModal';
 import StockReleaseModal from '../components/StockReleaseModal';
+import { extractErrorMessage } from '../utils/errorUtils';
 import './StockLevels.css';
 
 const STOCK_STATUS_OPTIONS = [
@@ -236,7 +237,7 @@ const StockLevels = () => {
         </div>
       </div>
 
-      {error && <div className="alert alert-danger">{error}</div>}
+      {error && <div className="alert alert-danger">{typeof error === 'string' ? error : 'An error occurred'}</div>}
       {success && <div className="alert alert-success">{success}</div>}
 
       {/* Filters */}

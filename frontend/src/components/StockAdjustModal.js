@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import stockService from '../services/stockService';
 import warehouseService from '../services/warehouseService';
 import variantService from '../services/variantService';
+import { extractErrorMessage } from '../utils/errorUtils';
 import './StockAdjustModal.css';
 
 const STOCK_STATUS_OPTIONS = [
@@ -145,7 +146,7 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {error && <div className="alert alert-danger">{error}</div>}
+            {error && <div className="alert alert-danger">{typeof error === 'string' ? error : 'An error occurred'}</div>}
 
             <div className="form-grid">
               <div className="form-group">

@@ -35,6 +35,7 @@ from app.presentation.schemas.stock_docs.input_schemas import (
     UpdateStockDocRequest,
     UpdateStockDocStatusRequest,
     StockDocSearchRequest,
+    StockDocGetRequest,
     StockMovementsSummaryRequest,
     ConversionCreateRequest,
     TransferCreateRequest,
@@ -458,7 +459,7 @@ async def post_stock_doc(
             error=str(e)
         )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except (StockDocPostingError, StockDocInsufficientStockError) as e:
+    except (StockDocPostingError, StockDocInsufficientStockError, StockDocStatusTransitionError) as e:
         logger.error(
             "Failed to post stock document - business rule violation",
             user_id=str(current_user.id),
@@ -685,6 +686,7 @@ async def search_stock_docs(
     search_term: Optional[str] = Query(None, description="Search term for document number or notes"),
     doc_type: Optional[StockDocType] = Query(None, description="Filter by document type"),
     status: Optional[StockDocStatus] = Query(None, description="Filter by document status"),
+    doc_status: Optional[StockDocStatus] = Query(None, description="Filter by document status (alias for status)"),
     warehouse_id: Optional[UUID] = Query(None, description="Filter by warehouse"),
     ref_doc_id: Optional[UUID] = Query(None, description="Filter by reference document"),
     start_date: Optional[datetime] = Query(None, description="Start date for date range"),
@@ -694,14 +696,34 @@ async def search_stock_docs(
     stock_doc_service: StockDocService = Depends(get_stock_doc_service),
     current_user: User = Depends(get_current_user)
 ):
+    # Use doc_status if provided, otherwise use status
+    final_status = doc_status if doc_status is not None else status
+    
+    # Map frontend enum values to backend values
+    mapped_doc_type = None
+    if doc_type:
+        if doc_type == StockDocType.CONV_FIL:
+            mapped_doc_type = StockDocType.ADJ_VARIANCE
+        elif doc_type == StockDocType.LOAD_MOB:
+            mapped_doc_type = StockDocType.ISS_LOAD
+        else:
+            mapped_doc_type = doc_type
+    
+    mapped_status = None
+    if final_status:
+        if final_status == StockDocStatus.DRAFT:
+            mapped_status = StockDocStatus.OPEN
+        else:
+            mapped_status = final_status
+    
     """Search stock documents with filters"""
     logger.info(
         "Searching stock documents",
         user_id=str(current_user.id),
         tenant_id=str(current_user.tenant_id),
         search_term=search_term,
-        doc_type=doc_type.value if doc_type else None,
-        status=status.value if status else None,
+        doc_type=mapped_doc_type.value if mapped_doc_type else None,
+        status=mapped_status.value if mapped_status else None,
         warehouse_id=str(warehouse_id) if warehouse_id else None,
         ref_doc_id=str(ref_doc_id) if ref_doc_id else None,
         start_date=start_date.isoformat() if start_date else None,
@@ -714,8 +736,8 @@ async def search_stock_docs(
         stock_docs = await stock_doc_service.search_stock_docs(
             tenant_id=current_user.tenant_id,
             search_term=search_term,
-            doc_type=doc_type,
-            status=status,
+            doc_type=mapped_doc_type,
+            status=mapped_status,
             warehouse_id=warehouse_id,
             ref_doc_id=ref_doc_id,
             start_date=start_date,
@@ -727,8 +749,8 @@ async def search_stock_docs(
         # Get total count for pagination
         total = await stock_doc_service.get_document_count(
             tenant_id=current_user.tenant_id,
-            doc_type=doc_type,
-            status=status
+            doc_type=mapped_doc_type,
+            status=mapped_status
         )
 
         logger.info(
@@ -764,6 +786,60 @@ async def search_stock_docs(
                 "limit": limit,
                 "offset": offset
             }
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+    
+@router.post("/get", response_model=List[StockDocSummaryResponse])
+async def get_stock_docs_by_ref_and_status(
+    request: StockDocGetRequest,
+    stock_doc_service: StockDocService = Depends(get_stock_doc_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Get stock documents filtered by reference document ID and status"""
+    logger.info(
+        "Getting stock documents by ref_doc_id and status",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        ref_doc_id=str(request.ref_doc_id) if request.ref_doc_id else None,
+        status=request.status.value if request.status else None
+    )
+    
+    try:
+        # Use the existing search functionality with the provided filters
+        stock_docs = await stock_doc_service.search_stock_docs(
+            tenant_id=current_user.tenant_id,
+            search_term=None,
+            doc_type=None,
+            status=request.status,
+            warehouse_id=None,
+            ref_doc_id=request.ref_doc_id,
+            start_date=None,
+            end_date=None,
+            limit=1000,  # Get all matching documents
+            offset=0
+        )
+
+        logger.info(
+            "Stock documents retrieved successfully",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            results_found=len(stock_docs),
+            ref_doc_id=str(request.ref_doc_id) if request.ref_doc_id else None,
+            status=request.status.value if request.status else None
+        )
+
+        return [StockDocSummaryResponse.from_entity(doc) for doc in stock_docs]
+
+    except Exception as e:
+        logger.error(
+            "Failed to get stock documents by ref_doc_id and status",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            error=str(e),
+            error_type=type(e).__name__,
+            ref_doc_id=str(request.ref_doc_id) if request.ref_doc_id else None,
+            status=request.status.value if request.status else None
         )
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 

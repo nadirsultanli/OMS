@@ -17,6 +17,9 @@ class StockDocType(str, Enum):
     REC_FILL = "REC_FILL"      # External Receipt - Filling Warehouse
     TRF_WH = "TRF_WH"          # Internal Transfer between warehouses
     TRF_TRUCK = "TRF_TRUCK"    # Transfer to/from truck
+    # Frontend compatibility aliases
+    CONV_FIL = "CONV_FIL"      # Conversion Fill (maps to ADJ_VARIANCE)
+    LOAD_MOB = "LOAD_MOB"      # Load Mobile (maps to ISS_LOAD)
 
 
 class StockDocStatus(str, Enum):
@@ -24,6 +27,8 @@ class StockDocStatus(str, Enum):
     OPEN = "open"           # Initial state, can be modified
     POSTED = "posted"       # Finalized, stock movements applied
     CANCELLED = "cancelled" # Cancelled before posting
+    # Frontend compatibility aliases
+    DRAFT = "DRAFT"         # Draft (maps to open)
 
 
 class StockStatus(str, Enum):

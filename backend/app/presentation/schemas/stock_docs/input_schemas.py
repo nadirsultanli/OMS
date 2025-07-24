@@ -117,6 +117,12 @@ class StockDocSearchRequest(BaseModel):
     offset: int = Field(0, ge=0, description="Number of results to skip")
 
 
+class StockDocGetRequest(BaseModel):
+    """Schema for getting stock documents by ref_doc_id and status (POST endpoint)"""
+    ref_doc_id: Optional[UUID] = Field(None, description="Filter by reference document ID")
+    status: Optional[StockDocStatus] = Field(None, description="Filter by document status")
+
+
 class StockMovementsSummaryRequest(BaseModel):
     """Schema for stock movements summary request"""
     warehouse_id: Optional[UUID] = Field(None, description="Filter by warehouse")
