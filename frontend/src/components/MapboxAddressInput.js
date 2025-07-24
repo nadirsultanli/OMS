@@ -9,6 +9,11 @@ import './MapboxAddressInput.css';
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibmFkaXJzdWx0YW5saSIsImEiOiJjbWJ6OGxkM3IxcWZ1MmtzMXUxYzN6cXU2In0.ZYAbvebNShkCtbm-a1A8ug';
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
+// Check for WebGL support
+if (!mapboxgl.supported()) {
+  console.warn('Your browser does not support Mapbox GL');
+}
+
 const MapboxAddressInput = ({ 
   onAddressSelect, 
   onCoordinatesChange, 
@@ -328,49 +333,66 @@ const MapboxAddressInput = ({
     // Remove existing map
     if (mapRef.current) {
       mapRef.current.remove();
+      mapRef.current = null;
     }
 
-    // Create new map
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: coordinates,
-      zoom: 15,
-      attributionControl: false
-    });
+    try {
+      // Create new map
+      const map = new mapboxgl.Map({
+        container: mapContainerRef.current,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: coordinates,
+        zoom: 15,
+        attributionControl: false,
+        failIfMajorPerformanceCaveat: false // Allow map to work even with performance issues
+      });
 
-    mapRef.current = map;
+      mapRef.current = map;
 
-    // Add marker
-    const marker = new mapboxgl.Marker({
-      draggable: true,
-      color: '#667eea'
-    })
-      .setLngLat(coordinates)
-      .addTo(map);
+      // Wait for map to load
+      map.on('load', () => {
+        console.log('Map loaded successfully');
+        map.resize(); // Ensure proper sizing
+      });
 
-    markerRef.current = marker;
+      // Handle errors
+      map.on('error', (e) => {
+        console.error('Map error:', e);
+      });
 
-    // Handle marker drag
-    marker.on('dragend', () => {
-      const lngLat = marker.getLngLat();
-      const newCoordinates = [lngLat.lng, lngLat.lat];
-      onCoordinatesChange(newCoordinates);
-      
-      // Optionally, reverse geocode to get the address
-      reverseGeocode(newCoordinates);
-    });
+      // Add marker
+      const marker = new mapboxgl.Marker({
+        draggable: true,
+        color: '#667eea'
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
 
-    // Add map controls
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      markerRef.current = marker;
 
-    // Handle map click to move marker
-    map.on('click', (e) => {
-      const coordinates = [e.lngLat.lng, e.lngLat.lat];
-      marker.setLngLat(coordinates);
-      onCoordinatesChange(coordinates);
-      reverseGeocode(coordinates);
-    });
+      // Handle marker drag
+      marker.on('dragend', () => {
+        const lngLat = marker.getLngLat();
+        const newCoordinates = [lngLat.lng, lngLat.lat];
+        onCoordinatesChange(newCoordinates);
+        
+        // Optionally, reverse geocode to get the address
+        reverseGeocode(newCoordinates);
+      });
+
+      // Add map controls
+      map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+      // Handle map click to move marker
+      map.on('click', (e) => {
+        const coordinates = [e.lngLat.lng, e.lngLat.lat];
+        marker.setLngLat(coordinates);
+        onCoordinatesChange(coordinates);
+        reverseGeocode(coordinates);
+      });
+    } catch (error) {
+      console.error('Failed to initialize map:', error);
+    }
   };
 
   const reverseGeocode = async (coordinates) => {

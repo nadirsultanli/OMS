@@ -7,6 +7,11 @@ import './AddressMap.css';
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibmFkaXJzdWx0YW5saSIsImEiOiJjbWJ6OGxkM3IxcWZ1MmtzMXUxYzN6cXU2In0.ZYAbvebNShkCtbm-a1A8ug';
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
+// Check for WebGL support
+if (!mapboxgl.supported()) {
+  console.warn('Your browser does not support Mapbox GL');
+}
+
 const AddressMap = ({ coordinates, address }) => {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -37,16 +42,33 @@ const AddressMap = ({ coordinates, address }) => {
 
     // Initialize map
     if (!mapRef.current) {
-      mapRef.current = new mapboxgl.Map({
-        container: mapContainerRef.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
-        center: [lng, lat],
-        zoom: 15,
-        interactive: false // Make map non-interactive for display only
-      });
+      try {
+        mapRef.current = new mapboxgl.Map({
+          container: mapContainerRef.current,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: [lng, lat],
+          zoom: 15,
+          interactive: false, // Make map non-interactive for display only
+          failIfMajorPerformanceCaveat: false
+        });
 
-      // Add navigation controls
-      mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        // Wait for map to load
+        mapRef.current.on('load', () => {
+          console.log('AddressMap loaded successfully');
+          mapRef.current.resize();
+        });
+
+        // Handle errors
+        mapRef.current.on('error', (e) => {
+          console.error('AddressMap error:', e);
+        });
+
+        // Add navigation controls
+        mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      } catch (error) {
+        console.error('Failed to initialize AddressMap:', error);
+        return;
+      }
     }
 
     // Add or update marker
@@ -77,6 +99,11 @@ const AddressMap = ({ coordinates, address }) => {
     return () => {
       if (markerRef.current) {
         markerRef.current.remove();
+        markerRef.current = null;
+      }
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
       }
     };
   }, [coordinates, address]);
