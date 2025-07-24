@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import customerService from '../services/customerService';
 import fileUploadService from '../services/fileUploadService';
 import MapboxAddressInput from '../components/MapboxAddressInput';
+import AddressMap from '../components/AddressMap';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -616,6 +617,13 @@ const CustomerDetail = () => {
                         <div className="access-instructions">
                           <strong>Access Instructions:</strong> {address.access_instructions}
                         </div>
+                      )}
+                      
+                      {address.coordinates && (
+                        <AddressMap 
+                          coordinates={address.coordinates}
+                          address={`${address.street}, ${address.city}`}
+                        />
                       )}
                     </div>
                   </div>
