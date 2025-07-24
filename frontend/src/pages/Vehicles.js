@@ -98,7 +98,7 @@ const Vehicles = () => {
     try {
       const result = await warehouseService.getWarehouses();
       if (result.success) {
-        setWarehouses(result.data.results || []);
+        setWarehouses(result.data.warehouses || []);
       }
     } catch (error) {
       console.error('Failed to fetch warehouses:', error);
