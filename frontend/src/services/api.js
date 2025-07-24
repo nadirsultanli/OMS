@@ -39,8 +39,30 @@ const api = axios.create({
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken');
+  async (config) => {
+    // First try to get token from localStorage (for custom auth)
+    let token = localStorage.getItem('accessToken');
+    
+    // If no custom token, try to get Supabase token
+    if (!token) {
+      try {
+        // Import Supabase client dynamically to avoid circular dependencies
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+        const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+        
+        if (supabaseUrl && supabaseAnonKey) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            token = session.access_token;
+          }
+        }
+      } catch (error) {
+        console.error('Error getting Supabase token:', error);
+      }
+    }
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -60,6 +82,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       
+      // First try custom auth refresh
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
         try {
@@ -74,14 +97,54 @@ api.interceptors.response.use(
           original.headers.Authorization = `Bearer ${access_token}`;
           return api(original);
         } catch (refreshError) {
-          // Refresh failed, redirect to login
+          // Custom auth refresh failed, try Supabase refresh
+          try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+            const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+            
+            if (supabaseUrl && supabaseAnonKey) {
+              const supabase = createClient(supabaseUrl, supabaseAnonKey);
+              const { data, error: refreshError } = await supabase.auth.refreshSession();
+              
+              if (!refreshError && data.session?.access_token) {
+                // Retry original request with new token
+                original.headers.Authorization = `Bearer ${data.session.access_token}`;
+                return api(original);
+              }
+            }
+          } catch (supabaseError) {
+            console.error('Supabase refresh error:', supabaseError);
+          }
+          
+          // Both refresh methods failed, redirect to login
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
           window.location.href = '/login';
         }
       } else {
-        // No refresh token, redirect to login
+        // Try Supabase refresh directly
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+          const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+          
+          if (supabaseUrl && supabaseAnonKey) {
+            const supabase = createClient(supabaseUrl, supabaseAnonKey);
+            const { data, error: refreshError } = await supabase.auth.refreshSession();
+            
+            if (!refreshError && data.session?.access_token) {
+              // Retry original request with new token
+              original.headers.Authorization = `Bearer ${data.session.access_token}`;
+              return api(original);
+            }
+          }
+        } catch (supabaseError) {
+          console.error('Supabase refresh error:', supabaseError);
+        }
+        
+        // No refresh token available, redirect to login
         window.location.href = '/login';
       }
     }

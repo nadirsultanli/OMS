@@ -97,11 +97,15 @@ const Vehicles = () => {
   const fetchWarehouses = async () => {
     try {
       const result = await warehouseService.getWarehouses();
-      if (result.success) {
+      if (result && result.success && result.data) {
         setWarehouses(result.data.warehouses || []);
+      } else {
+        console.error('Failed to fetch warehouses:', result?.error || 'Unknown error');
+        setWarehouses([]);
       }
     } catch (error) {
       console.error('Failed to fetch warehouses:', error);
+      setWarehouses([]);
     }
   };
 
@@ -135,21 +139,29 @@ const Vehicles = () => {
 
   const handleCreateVehicle = async (formData) => {
     try {
+      setLoading(true);
+      setErrors({});
+      
       const result = await vehicleService.createVehicle({
         ...formData,
         tenant_id: tenantId,
         active: true
       });
 
-      if (result.success) {
+      if (result && result.success) {
         setMessage({ type: 'success', text: 'Vehicle created successfully' });
         setShowCreateForm(false);
-        fetchVehicles();
+        await fetchVehicles();
       } else {
-        setErrors({ submit: result.error });
+        const errorMessage = result?.error || 'Failed to create vehicle';
+        setErrors({ submit: errorMessage });
+        console.error('Vehicle creation failed:', errorMessage);
       }
     } catch (error) {
-      setErrors({ submit: 'Failed to create vehicle' });
+      console.error('Vehicle creation error:', error);
+      setErrors({ submit: 'Failed to create vehicle. Please try again.' });
+    } finally {
+      setLoading(false);
     }
   };
 
