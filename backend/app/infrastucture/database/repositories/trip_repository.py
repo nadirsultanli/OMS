@@ -11,6 +11,7 @@ from app.domain.repositories.trip_repository import TripRepository
 from app.infrastucture.database.models.trips import TripModel
 from app.infrastucture.database.models.trip_stops import TripStopModel
 from app.infrastucture.logs.logger import default_logger
+import logging
 
 class SQLAlchemyTripRepository(TripRepository):
     """SQLAlchemy implementation of TripRepository"""
@@ -21,11 +22,12 @@ class SQLAlchemyTripRepository(TripRepository):
     async def create_trip(self, trip: Trip) -> Trip:
         """Create a new trip"""
         try:
+            logging.warning(f"DEBUG: trip_status value before DB: {trip.trip_status} (type: {type(trip.trip_status)})")
             trip_model = TripModel(
                 id=trip.id,
                 tenant_id=trip.tenant_id,
                 trip_no=trip.trip_no,
-                trip_status=trip.trip_status,
+                trip_status=trip.trip_status.value,
                 vehicle_id=trip.vehicle_id,
                 driver_id=trip.driver_id,
                 planned_date=trip.planned_date,
@@ -191,7 +193,7 @@ class SQLAlchemyTripRepository(TripRepository):
             
             # Update fields
             trip_model.trip_no = trip.trip_no
-            trip_model.trip_status = trip.trip_status
+            trip_model.trip_status = trip.trip_status.value
             trip_model.vehicle_id = trip.vehicle_id
             trip_model.driver_id = trip.driver_id
             trip_model.planned_date = trip.planned_date
@@ -401,7 +403,7 @@ class SQLAlchemyTripRepository(TripRepository):
             id=trip_model.id,
             tenant_id=trip_model.tenant_id,
             trip_no=trip_model.trip_no,
-            trip_status=trip_model.trip_status,
+            trip_status=TripStatus(trip_model.trip_status),
             vehicle_id=trip_model.vehicle_id,
             driver_id=trip_model.driver_id,
             planned_date=trip_model.planned_date,

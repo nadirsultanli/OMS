@@ -123,7 +123,7 @@ async def get_trips(
         
         return TripListResponse(
             trips=[TripResponse(**trip.to_dict()) for trip in trips],
-            total_count=len(trips),
+            total=len(trips),
             limit=limit,
             offset=offset
         )

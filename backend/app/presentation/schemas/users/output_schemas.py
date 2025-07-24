@@ -12,7 +12,7 @@ class UserResponse(BaseModel):
     id: str
     tenant_id: str
     email: str
-    full_name: str
+    full_name: Optional[str]
     role: UserRoleType
     status: UserStatus
     last_login: Optional[str]
