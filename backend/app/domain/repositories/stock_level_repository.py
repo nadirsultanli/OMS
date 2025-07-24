@@ -40,6 +40,14 @@ class StockLevelRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_all_stock_levels(
+        self, 
+        tenant_id: UUID
+    ) -> List[StockLevel]:
+        """Get all stock levels for a tenant"""
+        pass
+
+    @abstractmethod
     async def get_stock_levels_by_warehouse_and_variant(
         self, 
         tenant_id: UUID, 

@@ -52,6 +52,13 @@ class StockLevelService:
             tenant_id, variant_id
         )
 
+    async def get_all_stock_levels(
+        self,
+        tenant_id: UUID
+    ) -> List[StockLevel]:
+        """Get all stock levels for a tenant"""
+        return await self.stock_level_repository.get_all_stock_levels(tenant_id)
+
     async def get_available_quantity(
         self,
         tenant_id: UUID,
@@ -284,6 +291,21 @@ class StockLevelService:
         """Perform manual stock adjustment with audit trail"""
         if adjustment_quantity == 0:
             raise StockDocValidationError("Adjustment quantity cannot be zero")
+
+        # Get current stock level to validate adjustment
+        current_level = await self.get_current_stock_level(
+            user.tenant_id, warehouse_id, variant_id, stock_status
+        )
+        
+        if current_level:
+            # Check if reduction would violate reserved quantity constraint
+            if adjustment_quantity < 0:
+                new_quantity = current_level.quantity + adjustment_quantity
+                if new_quantity < current_level.reserved_qty:
+                    raise StockDocValidationError(
+                        f"Cannot reduce stock to {new_quantity} when {current_level.reserved_qty} units are reserved. "
+                        f"Available for reduction: {current_level.quantity - current_level.reserved_qty}"
+                    )
 
         # Apply adjustment
         updated_level = await self.stock_level_repository.update_stock_quantity(

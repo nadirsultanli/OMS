@@ -5,10 +5,10 @@ import variantService from '../services/variantService';
 import './StockAdjustModal.css';
 
 const STOCK_STATUS_OPTIONS = [
-  { value: 'ON_HAND', label: 'On Hand' },
-  { value: 'IN_TRANSIT', label: 'In Transit' },
-  { value: 'TRUCK_STOCK', label: 'Truck Stock' },
-  { value: 'QUARANTINE', label: 'Quarantine' }
+  { value: 'on_hand', label: 'On Hand' },
+  { value: 'in_transit', label: 'In Transit' },
+  { value: 'truck_stock', label: 'Truck Stock' },
+  { value: 'quarantine', label: 'Quarantine' }
 ];
 
 const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = null }) => {
@@ -18,7 +18,7 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
     quantityChange: '',
     reason: '',
     unitCost: '',
-    stockStatus: 'ON_HAND'
+    stockStatus: 'on_hand'
   });
   
   const [warehouses, setWarehouses] = useState([]);
@@ -51,8 +51,12 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
         variantService.getVariants()
       ]);
       
-      setWarehouses(warehousesResponse.warehouses || []);
-      setVariants(variantsResponse.variants || []);
+      // Handle different response formats
+      const warehouses = warehousesResponse.warehouses || warehousesResponse || [];
+      const variants = variantsResponse.data?.variants || variantsResponse.variants || variantsResponse || [];
+      
+      setWarehouses(warehouses);
+      setVariants(variants);
     } catch (err) {
       setError('Failed to load data: ' + err.message);
     }
@@ -113,7 +117,7 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
       quantityChange: '',
       reason: '',
       unitCost: '',
-      stockStatus: 'ON_HAND'
+      stockStatus: 'on_hand'
     });
     setError(null);
     onClose();

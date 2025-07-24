@@ -40,7 +40,7 @@ from app.presentation.schemas.stock_levels.output_schemas import (
 )
 from app.services.stock_levels.stock_level_service import StockLevelService
 from app.services.dependencies.stock_levels import get_stock_level_service
-from app.services.dependencies.auth import get_current_user
+from app.core.auth_utils import current_user
 from app.infrastucture.logs.logger import get_logger
 
 logger = get_logger("stock_levels_api")
@@ -57,7 +57,7 @@ async def get_stock_levels(
     limit: int = Query(100, ge=1, le=1000, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Results offset"),
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Get stock levels with optional filters"""
     try:
@@ -80,11 +80,9 @@ async def get_stock_levels(
                 current_user.tenant_id, variant_id
             )
         else:
-            # This would need a repository method to get all stock levels for tenant
-            # For now, require at least warehouse_id or variant_id
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Either warehouse_id or variant_id must be provided"
+            # Get all stock levels for tenant
+            stock_levels = await stock_level_service.get_all_stock_levels(
+                current_user.tenant_id
             )
 
         # Apply filters
@@ -127,7 +125,7 @@ async def get_available_stock(
     stock_status: StockStatus = Query(StockStatus.ON_HAND, description="Stock status bucket"),
     requested_quantity: Optional[Decimal] = Query(None, description="Check if this quantity is available"),
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Get available stock for a specific warehouse-variant combination"""
     try:
@@ -161,7 +159,7 @@ async def check_stock_availability(
     requested_quantity: Decimal = Query(..., description="Requested quantity"),
     stock_status: StockStatus = Query(StockStatus.ON_HAND, description="Stock status bucket"),
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Check stock availability for a specific quantity"""
     try:
@@ -193,7 +191,7 @@ async def get_stock_summary(
     warehouse_id: UUID,
     variant_id: UUID,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Get comprehensive stock summary for a warehouse-variant combination"""
     try:
@@ -216,7 +214,7 @@ async def get_warehouse_stock_summaries(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Get stock summaries for all variants in a warehouse"""
     try:
@@ -249,7 +247,7 @@ async def get_warehouse_stock_summaries(
 async def adjust_stock_level(
     request: StockLevelUpdateRequest,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Perform manual stock adjustment"""
     logger.info(
@@ -326,7 +324,7 @@ async def adjust_stock_level(
 async def reserve_stock(
     request: StockReservationRequest,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Reserve stock for allocation"""
     logger.info(
@@ -427,7 +425,7 @@ async def reserve_stock(
 async def release_stock_reservation(
     request: StockReservationRequest,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Release previously reserved stock"""
     try:
@@ -468,7 +466,7 @@ async def release_stock_reservation(
 async def transfer_stock_between_warehouses(
     request: StockTransferRequest,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Transfer stock between warehouses"""
     try:
@@ -507,7 +505,7 @@ async def transfer_stock_between_warehouses(
 async def transfer_stock_between_statuses(
     request: StockStatusTransferRequest,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Transfer stock between status buckets within same warehouse"""
     try:
@@ -546,7 +544,7 @@ async def transfer_stock_between_statuses(
 async def reconcile_physical_count(
     request: PhysicalCountRequest,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Reconcile system stock with physical count"""
     try:
@@ -591,7 +589,7 @@ async def reconcile_physical_count(
 async def get_low_stock_alerts(
     minimum_threshold: Decimal = Query(Decimal('10'), description="Minimum stock threshold"),
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Get low stock alerts"""
     try:
@@ -631,7 +629,7 @@ async def get_low_stock_alerts(
 @router.get("/alerts/negative-stock", response_model=NegativeStockReportResponse)
 async def get_negative_stock_report(
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
-    current_user: User = Depends(get_current_user)
+    current_user: User = current_user
 ):
     """Get negative stock report"""
     try:

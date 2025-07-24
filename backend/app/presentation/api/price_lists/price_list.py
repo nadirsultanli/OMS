@@ -27,7 +27,7 @@ from app.services.dependencies.price_lists import get_price_list_service, get_pr
 router = APIRouter(prefix="/price-lists", tags=["Price Lists"])
 
 
-@router.get("", response_model=PriceListListResponse)
+@router.get("/", response_model=PriceListListResponse)
 async def get_price_lists(
     tenant_id: str = Query(..., description="Tenant ID"),
     limit: int = Query(100, ge=1, le=1000),

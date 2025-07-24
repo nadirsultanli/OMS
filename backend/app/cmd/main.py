@@ -20,6 +20,7 @@ from app.presentation.api.price_lists.price_list import router as price_list_rou
 from app.presentation.api.warehouses.warehouse import router as warehouse_router
 from app.presentation.api.orders.order import router as order_router
 from app.presentation.api.stock_docs.stock_doc import router as stock_doc_router
+from app.presentation.api.stock_levels.stock_level import router as stock_level_router
 from app.presentation.api.trips.trip import router as trip_router
 from app.presentation.api.trips.monitoring import router as monitoring_router
 from app.presentation.api.vehicles.vehicle import router as vehicle_router
@@ -169,6 +170,7 @@ app.include_router(price_list_router, prefix="/api/v1")
 app.include_router(warehouse_router, prefix="/api/v1")
 app.include_router(order_router, prefix="/api/v1")
 app.include_router(stock_doc_router, prefix="/api/v1")
+app.include_router(stock_level_router, prefix="/api/v1")
 app.include_router(trip_router, prefix="/api/v1")
 app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(vehicle_router, prefix="/api/v1")

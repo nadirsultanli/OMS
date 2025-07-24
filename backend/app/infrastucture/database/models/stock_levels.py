@@ -29,7 +29,7 @@ class StockLevelModel(Base):
     
     # Stock status (ON_HAND, IN_TRANSIT, TRUCK_STOCK, QUARANTINE)
     stock_status: Mapped[StockStatus] = mapped_column(
-        SQLAlchemyEnum(StockStatus, name="stock_status", create_constraint=True, native_enum=True), 
+        SQLAlchemyEnum(StockStatus, name="stock_status_type", create_constraint=False, native_enum=True), 
         nullable=False, 
         default=StockStatus.ON_HAND
     )
@@ -59,10 +59,10 @@ class StockLevelModel(Base):
         # Unique constraint: one record per tenant-warehouse-variant-status combination
         UniqueConstraint("tenant_id", "warehouse_id", "variant_id", "stock_status", 
                         name="stock_levels_unique_combination"),
-        # Quantity constraints
-        CheckConstraint("quantity >= 0", name="stock_levels_quantity_non_negative"),
+        # Quantity constraints (allow negative stock for adjustments)
+        # CheckConstraint("quantity >= 0", name="stock_levels_quantity_non_negative"),
         CheckConstraint("reserved_qty >= 0", name="stock_levels_reserved_qty_non_negative"),
-        CheckConstraint("available_qty >= 0", name="stock_levels_available_qty_non_negative"),
+        # CheckConstraint("available_qty >= 0", name="stock_levels_available_qty_non_negative"),
         CheckConstraint("reserved_qty <= quantity", name="stock_levels_reserved_qty_within_total"),
         CheckConstraint("unit_cost >= 0", name="stock_levels_unit_cost_non_negative"),
         CheckConstraint("total_cost >= 0", name="stock_levels_total_cost_non_negative"),
