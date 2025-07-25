@@ -23,6 +23,15 @@ const Variants = () => {
     isStockItem: ''
   });
   
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    total: 0,
+    limit: 20,
+    offset: 0,
+    currentPage: 1,
+    totalPages: 1
+  });
+  
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState(''); // 'generic', 'cylinder', 'complete', 'edit'
@@ -45,30 +54,48 @@ const Variants = () => {
   useEffect(() => {
     fetchVariants();
     fetchProducts();
-  }, []);
+  }, [pagination.currentPage]);
+  
+  useEffect(() => {
+    if (pagination.currentPage !== 1) {
+      setPagination(prev => ({ ...prev, currentPage: 1 }));
+    } else {
+      fetchVariants();
+    }
+  }, [filters]);
   
   const fetchVariants = async () => {
     setLoading(true);
     try {
-      
       const params = {
         productId: filters.productId,
         skuType: filters.skuType,
-        isStockItem: filters.isStockItem === '' ? undefined : filters.isStockItem === 'true'
+        isStockItem: filters.isStockItem === '' ? undefined : filters.isStockItem === 'true',
+        limit: pagination.limit,
+        offset: (pagination.currentPage - 1) * pagination.limit
       };
       
       const result = await variantService.getVariants(null, params);
       if (result.success) {
         // Filter by search term
         let filteredVariants = result.data.variants || [];
+        let totalCount = result.data.count || filteredVariants.length;
+        
         if (filters.search) {
           const search = filters.search.toLowerCase();
           filteredVariants = filteredVariants.filter(v => 
             v.sku.toLowerCase().includes(search) ||
             (v.state_attr && v.state_attr.toLowerCase().includes(search))
           );
+          totalCount = filteredVariants.length;
         }
+        
         setVariants(filteredVariants);
+        setPagination(prev => ({
+          ...prev,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / prev.limit)
+        }));
       } else {
         setError(extractErrorMessage(result.error));
       }
@@ -474,6 +501,36 @@ const Variants = () => {
           </table>
         )}
       </div>
+      
+      {/* Pagination */}
+      {variants.length > 0 && (
+        <div className="pagination-container">
+          <div className="pagination-info">
+            Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
+            {Math.min(pagination.currentPage * pagination.limit, pagination.total)} of{' '}
+            {pagination.total} variants
+          </div>
+          <div className="pagination-controls">
+            <button
+              className="pagination-btn"
+              onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
+              disabled={pagination.currentPage === 1}
+            >
+              Previous
+            </button>
+            <span className="page-numbers">
+              Page {pagination.currentPage} of {pagination.totalPages}
+            </span>
+            <button
+              className="pagination-btn"
+              onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
+              disabled={pagination.currentPage === pagination.totalPages}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Create Variant Modal */}
       {showModal && (

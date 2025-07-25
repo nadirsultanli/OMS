@@ -87,7 +87,7 @@ const StockLevels = () => {
         setVariants(Array.isArray(variantsData) ? variantsData : []);
         
         // Load all stock levels immediately
-        await loadStockLevels();
+        await loadStockLevels(filters);
       } catch (err) {
         setError('Failed to load initial data: ' + err.message);
       } finally {
@@ -98,10 +98,10 @@ const StockLevels = () => {
     loadInitialData();
   }, []);
 
-  const loadStockLevels = useCallback(async () => {
+  const loadStockLevels = useCallback(async (searchFilters = filters) => {
     try {
       setLoading(true);
-      const response = await stockService.getStockLevels(filters);
+      const response = await stockService.getStockLevels(searchFilters);
       setStockLevels(response.stock_levels || []);
       setTotalCount(response.total_count || response.stock_levels?.length || 0);
     } catch (err) {
@@ -109,11 +109,12 @@ const StockLevels = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
-  useEffect(() => {
-    loadStockLevels();
-  }, [loadStockLevels]);
+  // Only load initially, no auto-refresh on filter changes
+  const handleSearch = () => {
+    loadStockLevels(filters);
+  };
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({
@@ -169,7 +170,7 @@ const StockLevels = () => {
 
   const handleAdjustmentSuccess = (response) => {
     setSuccess('Stock adjustment completed successfully');
-    loadStockLevels(); // Refresh the data
+    loadStockLevels(filters); // Refresh the data
     setTimeout(() => setSuccess(null), 5000); // Clear success message after 5 seconds
   };
 
@@ -177,20 +178,20 @@ const StockLevels = () => {
     setSuccess(`Stock reservation completed successfully. Reserved: ${response.quantity_reserved}, Remaining available: ${response.remaining_available}`);
     // Force immediate refresh
     setTimeout(() => {
-      loadStockLevels();
+      loadStockLevels(filters);
     }, 100);
     setTimeout(() => setSuccess(null), 5000);
   };
 
   const handleTransferSuccess = (response) => {
     setSuccess('Stock transfer completed successfully');
-    loadStockLevels(); // Refresh the data
+    loadStockLevels(filters); // Refresh the data
     setTimeout(() => setSuccess(null), 5000);
   };
 
   const handlePhysicalCountSuccess = (response) => {
     setSuccess('Physical count reconciliation completed successfully');
-    loadStockLevels(); // Refresh the data
+    loadStockLevels(filters); // Refresh the data
     setTimeout(() => setSuccess(null), 5000);
   };
 
@@ -198,7 +199,7 @@ const StockLevels = () => {
     setSuccess(`Stock reservation released successfully. Released: ${response.quantity_reserved}, Available: ${response.remaining_available}`);
     // Force immediate refresh
     setTimeout(() => {
-      loadStockLevels();
+      loadStockLevels(filters);
     }, 100);
     setTimeout(() => setSuccess(null), 5000);
   };
@@ -231,8 +232,8 @@ const StockLevels = () => {
             <p className="page-subtitle">Manage inventory across all warehouses</p>
           </div>
         </div>
-        <div className="loading-container">
-          <div className="spinner"></div>
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
           <p>Loading stock levels...</p>
         </div>
       </div>
@@ -242,8 +243,8 @@ const StockLevels = () => {
   if (loading && warehouses.length === 0 && variants.length === 0) {
     return (
       <div className="stock-levels-page">
-        <div className="loading-container">
-          <div className="spinner"></div>
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
           <p>Loading stock levels...</p>
         </div>
       </div>
@@ -365,7 +366,10 @@ const StockLevels = () => {
             />
           </div>
 
-          <div className="filter-group checkbox-group">
+        </div>
+
+        <div className="filter-actions">
+          <div className="checkbox-group">
             <label className="checkbox-label">
               <input
                 type="checkbox"
@@ -375,26 +379,25 @@ const StockLevels = () => {
               Include Zero Stock
             </label>
           </div>
-        </div>
-
-        <div className="filter-actions">
-          <button className="btn btn-primary" onClick={loadStockLevels}>
-            Search
-          </button>
-          <button 
-            className="btn btn-secondary" 
-            onClick={() => setFilters({
-              warehouseId: '',
-              variantId: '',
-              stockStatus: '',
-              minQuantity: '',
-              includeZeroStock: true,
-              limit: 20,
-              offset: 0
-            })}
-          >
-            Clear Filters
-          </button>
+          <div className="action-buttons">
+            <button className="btn btn-primary" onClick={handleSearch}>
+              Search
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setFilters({
+                warehouseId: '',
+                variantId: '',
+                stockStatus: '',
+                minQuantity: '',
+                includeZeroStock: true,
+                limit: 20,
+                offset: 0
+              })}
+            >
+              Clear Filters
+            </button>
+          </div>
         </div>
       </div>
 
@@ -405,7 +408,8 @@ const StockLevels = () => {
         </div>
       ) : (
         <div className="stock-levels-table">
-          <table className="table">
+          <div className="table-scroll-wrapper">
+            <table className="table">
             <thead>
               <tr>
                 <th>Warehouse</th>
@@ -445,8 +449,8 @@ const StockLevels = () => {
                       {formatQuantity(level.quantity)}
                     </td>
                     <td className="quantity-cell">
-                      <span className={level.reserved_qty > 0 ? 'reserved-qty' : ''}>
-                        {formatQuantity(level.reserved_qty)}
+                      <span className={level.reserved_qty > 0 ? 'reserved-qty' : 'text-muted'}>
+                        {level.reserved_qty > 0 ? formatQuantity(level.reserved_qty) : '-'}
                       </span>
                     </td>
                     <td className="quantity-cell">
@@ -500,6 +504,7 @@ const StockLevels = () => {
               )}
             </tbody>
           </table>
+          </div>
           
           {/* Pagination Controls */}
           {totalCount > 0 && (

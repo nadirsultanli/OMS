@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Eye, Edit2, Check, X } from 'lucide-react';
 import stockService from '../services/stockService';
 import warehouseService from '../services/warehouseService';
 import CreateStockDocModal from '../components/CreateStockDocModal';
@@ -80,10 +81,10 @@ const StockDocuments = () => {
     loadInitialData();
   }, []);
 
-  const loadStockDocuments = useCallback(async () => {
+  const loadStockDocuments = useCallback(async (searchFilters = filters) => {
     try {
       setLoading(true);
-      const response = await stockService.getStockDocuments(filters);
+      const response = await stockService.getStockDocuments(searchFilters);
       setStockDocs(response.stock_docs || []);
       setTotalCount(response.total_count || response.stock_docs?.length || 0);
     } catch (err) {
@@ -91,11 +92,12 @@ const StockDocuments = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
-  useEffect(() => {
-    loadStockDocuments();
-  }, [loadStockDocuments]);
+  // Only load initially, no auto-refresh on filter changes
+  const handleSearch = () => {
+    loadStockDocuments(filters);
+  };
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({
@@ -159,7 +161,7 @@ const StockDocuments = () => {
       setSuccess(null);
       await stockService.postStockDocument(docId);
       setSuccess('Document posted successfully');
-      await loadStockDocuments();
+      await loadStockDocuments(filters);
     } catch (err) {
       setError('Failed to post document: ' + (extractErrorMessage(err.response?.data) || err.message));
     }
@@ -174,7 +176,7 @@ const StockDocuments = () => {
       setSuccess(null);
       await stockService.cancelStockDocument(docId, reason);
       setSuccess('Document cancelled successfully');
-      await loadStockDocuments();
+      await loadStockDocuments(filters);
     } catch (err) {
       setError('Failed to cancel document: ' + err.message);
     }
@@ -200,7 +202,7 @@ const StockDocuments = () => {
   };
 
   const handleEditSuccess = () => {
-    loadStockDocuments();
+    loadStockDocuments(filters);
   };
 
   // Pagination handlers
@@ -231,8 +233,8 @@ const StockDocuments = () => {
             <p className="page-subtitle">Manage inventory transactions and transfers</p>
           </div>
         </div>
-        <div className="loading-container">
-          <div className="spinner"></div>
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
           <p>Loading stock documents...</p>
         </div>
       </div>
@@ -320,7 +322,7 @@ const StockDocuments = () => {
         </div>
 
         <div className="filter-actions">
-          <button className="btn btn-primary" onClick={loadStockDocuments}>
+          <button className="btn btn-primary" onClick={handleSearch}>
             Search
           </button>
           <button 
@@ -417,39 +419,43 @@ const StockDocuments = () => {
                   <td>
                     <div className="action-buttons">
                       <button 
-                        className="btn btn-sm btn-outline-primary"
+                        className="action-btn view"
                         onClick={() => {
                           setSelectedDoc(doc);
                           setShowDetailsModal(true);
                         }}
+                        title="View Document"
                       >
-                        View
+                        <Eye size={16} />
                       </button>
                       
                       {canEdit(doc) && (
                         <button 
-                          className="btn btn-sm btn-outline-secondary"
+                          className="action-btn edit"
                           onClick={() => handleEditDocument(doc)}
+                          title="Edit Document"
                         >
-                          Edit
+                          <Edit2 size={16} />
                         </button>
                       )}
                       
                       {canPost(doc) && (
                         <button 
-                          className="btn btn-sm btn-success"
+                          className="action-btn post"
                           onClick={() => handlePostDocument(doc.id)}
+                          title="Post Document"
                         >
-                          Post
+                          <Check size={16} />
                         </button>
                       )}
                       
                       {canCancel(doc) && (
                         <button 
-                          className="btn btn-sm btn-outline-danger"
+                          className="action-btn cancel"
                           onClick={() => handleCancelDocument(doc.id)}
+                          title="Cancel Document"
                         >
-                          Cancel
+                          <X size={16} />
                         </button>
                       )}
                     </div>
@@ -552,7 +558,7 @@ const StockDocuments = () => {
         }}
         onSuccess={(response) => {
           setSuccess('Stock document created successfully');
-          loadStockDocuments();
+          loadStockDocuments(filters);
           setTimeout(() => setSuccess(null), 5000);
         }}
       />

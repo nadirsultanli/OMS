@@ -515,6 +515,8 @@
   justify-content: center;
   min-width: 140px;
   flex-wrap: wrap;
+  vertical-align: middle;
+  height: 100%;
 }
 
 .action-btn {

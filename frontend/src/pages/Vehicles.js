@@ -397,7 +397,7 @@ const Vehicles = () => {
                           <span className="plate-number">{vehicle.plate_number || vehicle.plate}</span>
                         </div>
                         <div className="vehicle-sub">
-                          {vehicle.make} {vehicle.model} ({vehicle.year})
+                          {vehicle.make} {vehicle.model} {vehicle.year}
                         </div>
                       </div>
                     </td>

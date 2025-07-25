@@ -511,30 +511,90 @@ select.form-control option {
 /* Action Buttons */
 .action-buttons {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+  justify-content: center;
+  min-width: 140px;
   flex-wrap: wrap;
-  justify-content: flex-end;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-btn.view {
+  background: #3b82f6;
+  color: white;
+}
+
+.action-btn.view:hover:not(:disabled) {
+  background: #2563eb;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.action-btn.edit {
+  background: #f59e0b;
+  color: white;
+}
+
+.action-btn.edit:hover:not(:disabled) {
+  background: #d97706;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.action-btn.post {
+  background: #10b981;
+  color: white;
+}
+
+.action-btn.post:hover:not(:disabled) {
+  background: #059669;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.action-btn.cancel {
+  background: #ef4444;
+  color: white;
+}
+
+.action-btn.cancel:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
 }
 
 /* Loading States */
-.loading-container {
+.loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  margin: 24px auto;
-  max-width: 600px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #6b7280;
 }
 
-.spinner {
-  width: 48px;
-  height: 48px;
+.loading-spinner {
+  width: 40px;
+  height: 40px;
   border: 4px solid #e5e7eb;
   border-top: 4px solid #2563eb;
   border-radius: 50%;
@@ -735,11 +795,13 @@ select.form-control option {
   
   .action-buttons {
     flex-direction: column;
-    width: 100%;
+    gap: 4px;
+    min-width: 60px;
   }
   
-  .action-buttons .btn {
-    width: 100%;
+  .action-btn {
+    width: 28px;
+    height: 28px;
   }
   
   .pagination-container {
