@@ -243,8 +243,10 @@
   max-height: none;
 }
 
+/* Fix table layout */
 .trips-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
@@ -274,38 +276,46 @@
 
 /* Column-specific alignments and widths */
 .trips-table th:nth-child(1) { /* Trip Number */
-  min-width: 140px;
+  min-width: 160px;
+  width: 160px;
   padding-left: 24px;
 }
 
 .trips-table th:nth-child(2) { /* Date */
-  min-width: 120px;
+  min-width: 140px;
+  width: 140px;
 }
 
 .trips-table th:nth-child(3) { /* Vehicle */
-  min-width: 180px;
+  min-width: 200px;
+  width: 200px;
 }
 
 .trips-table th:nth-child(4) { /* Driver */
-  min-width: 140px;
+  min-width: 160px;
+  width: 160px;
 }
 
 .trips-table th:nth-child(5) { /* Status */
   min-width: 120px;
+  width: 120px;
 }
 
 .trips-table th:nth-child(6) { /* Orders */
   min-width: 80px;
+  width: 80px;
   text-align: center;
 }
 
 .trips-table th:nth-child(7) { /* Load */
   min-width: 100px;
+  width: 100px;
   text-align: right;
 }
 
 .trips-table th:nth-child(8) { /* Actions */
   min-width: 150px;
+  width: 150px;
   text-align: center;
   padding-right: 24px;
 }
@@ -317,23 +327,53 @@
   vertical-align: middle;
   position: relative;
   background: white;
+  white-space: nowrap;
 }
 
 .trips-table td:nth-child(1) { /* Trip Number */
   padding-left: 24px;
+  width: 160px;
+}
+
+.trips-table td:nth-child(2) { /* Date */
+  width: 140px;
+}
+
+.trips-table td:nth-child(3) { /* Vehicle */
+  width: 200px;
+}
+
+.trips-table td:nth-child(4) { /* Driver */
+  width: 160px;
+}
+
+.trips-table td:nth-child(5) { /* Status */
+  width: 120px;
 }
 
 .trips-table td:nth-child(6) { /* Orders */
   text-align: center;
+  width: 80px;
 }
 
 .trips-table td:nth-child(7) { /* Load */
   text-align: right;
   font-weight: 500;
+  width: 100px;
 }
 
 .trips-table td:nth-child(8) { /* Actions */
   padding-right: 24px;
+  width: 150px;
+  text-align: center;
+}
+
+/* Actions Column Specific */
+.trips-table .actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
 }
 
 .trips-table tbody tr {

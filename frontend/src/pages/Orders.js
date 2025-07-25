@@ -6,7 +6,6 @@ import priceListService from '../services/priceListService';
 import productService from '../services/productService';
 import { extractErrorMessage } from '../utils/errorUtils';
 import { Search, Plus, Edit2, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Truck, X } from 'lucide-react';
-import SearchableDropdown from '../components/SearchableDropdown';
 import './Orders.css';
 
 const Orders = () => {
@@ -40,6 +39,10 @@ const Orders = () => {
     status: '',
     customer: ''
   });
+
+  // Custom dropdown state
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const [customerFilterSearch, setCustomerFilterSearch] = useState('');
 
   // Form data for creating/editing order
   const [formData, setFormData] = useState({
@@ -77,6 +80,22 @@ const Orders = () => {
     fetchPriceLists();
     fetchProducts();
   }, []);
+
+  // Handle clicking outside of custom dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.custom-filter-dropdown')) {
+        setIsCustomerDropdownOpen(false);
+      }
+    };
+
+    if (isCustomerDropdownOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [isCustomerDropdownOpen]);
 
   useEffect(() => {
     applyFilters();
@@ -1107,18 +1126,63 @@ const Orders = () => {
           </div>
 
           <div className="filter-group">
-            <SearchableDropdown
-              options={[
-                { value: '', label: 'All Customers' },
-                ...customers.map(customer => ({ value: customer.id, label: customer.name }))
-              ]}
-              value={filters.customer}
-              onChange={handleFilterChange}
-              placeholder="Select Customer"
-              searchPlaceholder="Search customers..."
-              name="customer"
-              className="filter-select"
-            />
+            <div className="custom-filter-dropdown">
+              <button
+                type="button"
+                className="filter-select"
+                onClick={() => {
+                  setIsCustomerDropdownOpen(!isCustomerDropdownOpen);
+                  setCustomerFilterSearch('');
+                }}
+              >
+                {filters.customer ? customers.find(c => c.id === filters.customer)?.name : 'All Customers'}
+                <span className="dropdown-arrow">▼</span>
+              </button>
+              
+              {isCustomerDropdownOpen && (
+                <div className="custom-dropdown-menu">
+                  <div className="dropdown-search-container">
+                    <input
+                      type="text"
+                      className="dropdown-search-input"
+                      placeholder="Search customers..."
+                      value={customerFilterSearch}
+                      onChange={(e) => setCustomerFilterSearch(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="dropdown-options">
+                    <div
+                      className={`dropdown-option ${!filters.customer ? 'selected' : ''}`}
+                      onClick={() => {
+                        handleFilterChange({ target: { name: 'customer', value: '' } });
+                        setIsCustomerDropdownOpen(false);
+                      }}
+                    >
+                      All Customers
+                    </div>
+                    {customers
+                      .filter(customer => 
+                        customer.name.toLowerCase().includes(customerFilterSearch.toLowerCase())
+                      )
+                      .map(customer => (
+                        <div
+                          key={customer.id}
+                          className={`dropdown-option ${filters.customer === customer.id ? 'selected' : ''}`}
+                          onClick={() => {
+                            handleFilterChange({ target: { name: 'customer', value: customer.id } });
+                            setIsCustomerDropdownOpen(false);
+                          }}
+                        >
+                          {customer.name}
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
