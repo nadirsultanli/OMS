@@ -309,7 +309,17 @@ const CustomerDetail = () => {
       setMessage('Address deleted successfully!');
       await fetchCustomerAddresses();
     } catch (error) {
-      setErrors({ general: 'Failed to delete address.' });
+      // Handle specific error for primary address deletion
+      if (error.response && error.response.status === 400) {
+        setErrors({ general: error.response.data.detail || 'Cannot delete the primary address.' });
+      } else {
+        setErrors({ general: 'Failed to delete address. Please try again.' });
+      }
+      
+      // Clear error after 5 seconds
+      setTimeout(() => {
+        setErrors({});
+      }, 5000);
     }
   };
 
@@ -623,7 +633,12 @@ const CustomerDetail = () => {
                         <button 
                           onClick={() => handleDeleteAddress(address.id)}
                           className="delete-btn"
-                          title="Delete address"
+                          title={address.is_default ? "Primary address cannot be deleted" : "Delete address"}
+                          disabled={address.is_default}
+                          style={{ 
+                            cursor: address.is_default ? 'not-allowed' : 'pointer',
+                            opacity: address.is_default ? 0.5 : 1 
+                          }}
                         >
                           <Trash2 size={14} />
                         </button>
