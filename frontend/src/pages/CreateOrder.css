@@ -599,11 +599,17 @@
   background: #dc3545;
   color: white;
   border: none;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-size: 14px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  line-height: 1;
 }
 
 .remove-line-btn:hover {
