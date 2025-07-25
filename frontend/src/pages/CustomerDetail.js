@@ -51,6 +51,28 @@ const CustomerDetail = () => {
     fetchCustomerAddresses();
   }, [customerId]);
 
+  // Prevent body scrolling when modal is open
+  useEffect(() => {
+    if (showAddressForm) {
+      // Save current scroll position
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        // Restore scroll position when modal closes
+        const scrollY = document.body.style.top;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      };
+    }
+  }, [showAddressForm]);
+
   const fetchCustomerDetails = async () => {
     try {
       const result = await customerService.getCustomerById(customerId);
@@ -222,10 +244,8 @@ const CustomerDetail = () => {
         tenant_id: tenantId,
         created_by: currentUser.id,
         is_default: false, // Always set to false since we removed the checkbox
-        // Format coordinates as PostgreSQL POINT if they exist
-        coordinates: addressForm.coordinates ? 
-          `POINT(${addressForm.coordinates[0]} ${addressForm.coordinates[1]})` : 
-          null
+        // Send coordinates as array - backend will convert to POINT format
+        coordinates: addressForm.coordinates || null
       };
       
       // Final validation - ensure no required fields are missing
@@ -310,10 +330,8 @@ const CustomerDetail = () => {
       const addressData = {
         ...addressForm,
         is_default: editingAddress.is_default, // Keep the existing default status when updating
-        // Format coordinates as PostgreSQL POINT if they exist
-        coordinates: addressForm.coordinates ? 
-          `POINT(${addressForm.coordinates[0]} ${addressForm.coordinates[1]})` : 
-          null
+        // Send coordinates as array - backend will convert to POINT format
+        coordinates: addressForm.coordinates || null
       };
       
       // Debug: Log the address data being sent
