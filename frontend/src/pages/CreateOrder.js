@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './CreateOrder.css';
 import customerService from '../services/customerService';
 import variantService from '../services/variantService';
+import productService from '../services/productService';
 import orderService from '../services/orderService';
 import priceListService from '../services/priceListService';
 import stockService from '../services/stockService';
@@ -36,11 +37,32 @@ const CreateOrder = () => {
   // Dropdown data
   const [customers, setCustomers] = useState([]);
   const [variants, setVariants] = useState([]);
+  const [products, setProducts] = useState([]);
   const [priceLists, setPriceLists] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedPriceList, setSelectedPriceList] = useState('');
   const [availableVariants, setAvailableVariants] = useState([]);
   const [priceListLines, setPriceListLines] = useState([]);
+  
+  // Product-based addition state (cleaned up - removing unused showProductForm)
+  const [productFormData, setProductFormData] = useState({
+    product_id: '',
+    gas_price: '',
+    deposit_price: '',
+    pricing_unit: 'per_cylinder',
+    scenario: 'OUT',
+    quantity: 1
+  });
+  
+  // New state for the improved workflow
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [previewLines, setPreviewLines] = useState([]);
+  const [showPreview, setShowPreview] = useState(false);
+  
+  // New state for multiple product selection
+  const [availableProducts, setAvailableProducts] = useState([]);
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
   
   // Stock management
   const [stockLevels, setStockLevels] = useState({});
@@ -66,43 +88,80 @@ const CreateOrder = () => {
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      // Load customers, variants, price lists, and warehouses in parallel
-      const [customersResponse, variantsResponse, priceListsResponse, warehousesResponse] = await Promise.all([
+      console.log('Starting to load initial data...');
+      
+      // Load customers, variants, products, price lists, and warehouses in parallel
+      const [customersResponse, variantsResponse, productsResponse, priceListsResponse, warehousesResponse] = await Promise.allSettled([
         customerService.getCustomers({ limit: 100 }),
         variantService.getVariants({ 
           tenant_id: authService.getCurrentUser()?.tenant_id,
           limit: 100,
           active_only: true
         }),
+        productService.getProducts(authService.getCurrentUser()?.tenant_id, { limit: 100 }),
         priceListService.getPriceLists(authService.getCurrentUser()?.tenant_id, { limit: 100 }),
         warehouseService.getWarehouses(1, 100, { type: 'FIL' }) // Get filling warehouses as default
       ]);
+      
+      // Handle each response individually
+      const [customersResult, variantsResult, productsResult, priceListsResult, warehousesResult] = [
+        customersResponse.status === 'fulfilled' ? customersResponse.value : { success: false, error: customersResponse.reason },
+        variantsResponse.status === 'fulfilled' ? variantsResponse.value : { success: false, error: variantsResponse.reason },
+        productsResponse.status === 'fulfilled' ? productsResponse.value : { success: false, error: productsResponse.reason },
+        priceListsResponse.status === 'fulfilled' ? priceListsResponse.value : { success: false, error: priceListsResponse.reason },
+        warehousesResponse.status === 'fulfilled' ? warehousesResponse.value : { success: false, error: warehousesResponse.reason }
+      ];
+      
+      console.log('All API calls completed, processing responses...');
 
-      if (customersResponse.success) {
+      if (customersResult.success) {
         // Filter active customers only
-        const activeCustomers = customersResponse.data.customers.filter(
+        const activeCustomers = customersResult.data.customers.filter(
           customer => customer.status === 'active' || customer.status === 'pending'
         );
         setCustomers(activeCustomers);
+      } else {
+        console.error('Failed to fetch customers:', customersResult.error);
       }
 
-      if (variantsResponse.success) {
-        const allVariants = variantsResponse.data.variants || [];
+      if (variantsResult.success) {
+        const allVariants = variantsResult.data.variants || [];
         setVariants(allVariants);
         setAvailableVariants(allVariants); // Initially show all variants
+      } else {
+        console.error('Failed to fetch variants:', variantsResult.error);
       }
 
-      if (priceListsResponse.success) {
-        setPriceLists(priceListsResponse.data.price_lists || []);
+      if (productsResult.success) {
+        // Handle different response formats
+        const allProducts = productsResult.data.products || productsResult.data || [];
+        console.log('Products fetched:', productsResult.data);
+        console.log('All products array:', allProducts);
+        setProducts(allProducts);
+      } else {
+        console.error('Failed to fetch products:', productsResult.error);
       }
 
-      if (warehousesResponse.success && warehousesResponse.data.warehouses.length > 0) {
+      if (priceListsResult.success) {
+        setPriceLists(priceListsResult.data.price_lists || []);
+      } else {
+        console.error('Failed to fetch price lists:', priceListsResult.error);
+      }
+
+      if (warehousesResult.success && warehousesResult.data.warehouses.length > 0) {
         // Set first warehouse as default
-        setDefaultWarehouse(warehousesResponse.data.warehouses[0]);
+        setDefaultWarehouse(warehousesResult.data.warehouses[0]);
+      } else {
+        console.error('Failed to fetch warehouses:', warehousesResult.error);
       }
 
     } catch (error) {
       console.error('Error loading initial data:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data
+      });
       setMessage('Failed to load required data. Please refresh the page.');
     } finally {
       setLoading(false);
@@ -188,10 +247,16 @@ const CreateOrder = () => {
 
   const handlePriceListChange = async (priceListId) => {
     setSelectedPriceList(priceListId);
+    setFormData(prev => ({ ...prev, order_lines: [] })); // Clear existing lines
+    setSelectedProducts([]); // Clear selected products
+    setAvailableProducts([]);
     
     if (priceListId) {
       // Load price list lines and filter available variants
       await loadPriceListAndFilterVariants(priceListId);
+      
+      // Get products from price list
+      await getProductsFromPriceList(priceListId);
       
       // Update all order lines with new prices
       if (formData.order_lines.length > 0) {
@@ -202,6 +267,7 @@ const CreateOrder = () => {
       const filteredVariants = filterVariantsByStock(variants, !hideOutOfStock);
       setAvailableVariants(filteredVariants);
       setPriceListLines([]);
+      setAvailableProducts([]);
     }
   };
 
@@ -406,6 +472,383 @@ const CreateOrder = () => {
       ...prev,
       order_lines: prev.order_lines.filter(line => line.id !== lineId)
     }));
+  };
+
+  // Product-based order line addition
+  const addProductOrderLines = () => {
+    if (!productFormData.product_id || !selectedPriceList) {
+      setMessage('Please select both a product and a price list before adding.');
+      return;
+    }
+
+    const selectedProduct = products.find(p => p.id === productFormData.product_id);
+    if (!selectedProduct) {
+      setMessage('Selected product not found.');
+      return;
+    }
+
+    // Get all variants for this product
+    const productVariants = variants.filter(v => v.product_id === productFormData.product_id);
+    
+    if (productVariants.length === 0) {
+      setMessage('No variants found for the selected product.');
+      return;
+    }
+
+    const newLines = [];
+    const quantity = parseFloat(productFormData.quantity) || 1;
+    const gasPrice = parseFloat(productFormData.gas_price) || 0;
+    const depositPrice = parseFloat(productFormData.deposit_price) || 0;
+    const scenario = productFormData.scenario;
+
+    // Create lines based on scenario and variants
+    productVariants.forEach(variant => {
+      if (!variant.sku) return;
+
+      const skuUpper = variant.sku.toUpperCase();
+      let shouldAdd = false;
+      let price = 0;
+
+      // GAS variants (consumable) - always add
+      if (variant.sku_type === 'CONSUMABLE' || skuUpper.includes('GAS')) {
+        shouldAdd = true;
+        price = gasPrice;
+        if (productFormData.pricing_unit === 'per_kg' && variant.capacity_kg) {
+          price = gasPrice * variant.capacity_kg;
+        }
+      }
+      // DEP variants (deposit) - add for OUT scenarios
+      else if (variant.sku_type === 'DEPOSIT' || skuUpper.includes('DEP')) {
+        if (scenario === 'OUT' || scenario === 'BOTH') {
+          shouldAdd = true;
+          price = depositPrice;
+          if (productFormData.pricing_unit === 'per_kg' && variant.capacity_kg) {
+            price = depositPrice * variant.capacity_kg;
+          }
+        }
+      }
+      // EMPTY variants (asset returns) - add for XCH scenarios
+      else if (variant.sku_type === 'ASSET' && skuUpper.includes('EMPTY')) {
+        if (scenario === 'XCH' || scenario === 'BOTH') {
+          shouldAdd = true;
+          price = -Math.abs(depositPrice); // Negative for credit
+          if (productFormData.pricing_unit === 'per_kg' && variant.capacity_kg) {
+            price = -Math.abs(depositPrice * variant.capacity_kg);
+          }
+        }
+      }
+
+      if (shouldAdd) {
+        // Get price and tax information from price list
+        const priceInfo = getPriceForVariant(variant.id);
+        
+        const newLine = {
+          id: Date.now() + Math.random(), // Temporary ID
+          product_type: 'variant',
+          variant_id: variant.id,
+          qty_ordered: quantity,
+          list_price: price,
+          manual_unit_price: '',
+          scenario: scenario,
+          tax_rate: priceInfo?.tax_rate || 0,
+          tax_code: priceInfo?.tax_code || 'TX_STD',
+          tax_amount: priceInfo?.tax_amount || 0,
+          gross_price: priceInfo?.gross_price || price,
+          priceFound: !!priceInfo
+        };
+
+        newLines.push(newLine);
+      }
+    });
+
+    if (newLines.length === 0) {
+      setMessage(`No variants found for scenario "${scenario}". Please check the product variants.`);
+      return;
+    }
+
+    // Add all new lines to the order
+    setFormData(prev => ({
+      ...prev,
+      order_lines: [...prev.order_lines, ...newLines]
+    }));
+
+    // Reset product form
+    setProductFormData({
+      product_id: '',
+      gas_price: '',
+      deposit_price: '',
+      pricing_unit: 'per_cylinder',
+      scenario: 'OUT',
+      quantity: 1
+    });
+    setShowProductForm(false);
+
+    setMessage(`Added ${newLines.length} order lines for ${selectedProduct.name}`);
+  };
+
+  // New function to handle product selection and generate preview
+  const handleProductSelection = (productId) => {
+    if (!productId || !selectedPriceList) {
+      setSelectedProduct(null);
+      setPreviewLines([]);
+      setShowPreview(false);
+      return;
+    }
+
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    setSelectedProduct(product);
+    
+    // Get all variants for this product
+    const productVariants = variants.filter(v => v.product_id === productId);
+    
+    if (productVariants.length === 0) {
+      setMessage('No variants found for the selected product.');
+      return;
+    }
+
+    // Generate preview lines for gas and deposit variants
+    const preview = [];
+    
+    // Find GAS variant
+    const gasVariant = productVariants.find(v => 
+      v.sku_type === 'CONSUMABLE' || v.sku.toUpperCase().includes('GAS')
+    );
+    
+    // Find DEP variant
+    const depVariant = productVariants.find(v => 
+      v.sku_type === 'DEPOSIT' || v.sku.toUpperCase().includes('DEP')
+    );
+
+    if (gasVariant) {
+      const priceInfo = getPriceForVariant(gasVariant.id);
+      preview.push({
+        id: `preview_gas_${gasVariant.id}`,
+        variant: gasVariant,
+        type: 'GAS_FILL',
+        description: 'Gas Fill (Taxable)',
+        price: priceInfo?.min_unit_price || 0,
+        tax_rate: priceInfo?.tax_rate || 23.00,
+        tax_code: priceInfo?.tax_code || 'TX_STD',
+        quantity: 1
+      });
+    }
+
+    if (depVariant) {
+      const priceInfo = getPriceForVariant(depVariant.id);
+      preview.push({
+        id: `preview_dep_${depVariant.id}`,
+        variant: depVariant,
+        type: 'CYLINDER_DEPOSIT',
+        description: 'Cylinder Deposit (Zero-rated)',
+        price: priceInfo?.min_unit_price || 0,
+        tax_rate: 0.00,
+        tax_code: 'TX_DEP',
+        quantity: 1
+      });
+    }
+
+    setPreviewLines(preview);
+    setShowPreview(preview.length > 0);
+    
+    if (preview.length === 0) {
+      setMessage('No gas or deposit variants found for this product.');
+    } else {
+      setMessage(`Found ${preview.length} variants for ${product.name}. Review and confirm below.`);
+    }
+  };
+
+  // Function to confirm and add the preview lines
+  const confirmAndAddPreviewLines = () => {
+    if (previewLines.length === 0) return;
+
+    const newLines = previewLines.map(preview => ({
+      id: Date.now() + Math.random(),
+      product_type: 'variant',
+      variant_id: preview.variant.id,
+      qty_ordered: preview.quantity,
+      list_price: preview.price,
+      manual_unit_price: preview.price,
+      scenario: 'OUT',
+      component_type: preview.type,
+      tax_rate: preview.tax_rate,
+      tax_code: preview.tax_code,
+      tax_amount: (preview.price * preview.tax_rate / 100),
+      gross_price: preview.price * (1 + preview.tax_rate / 100),
+      priceFound: true
+    }));
+
+    // Add lines to order
+    setFormData(prev => ({
+      ...prev,
+      order_lines: [...prev.order_lines, ...newLines]
+    }));
+
+    // Reset preview state
+    setSelectedProduct(null);
+    setPreviewLines([]);
+    setShowPreview(false);
+    setShowProductForm(false);
+
+    setMessage(`✅ Added ${newLines.length} order lines for ${selectedProduct?.name}`);
+  };
+
+  // Function to cancel preview
+  const cancelPreview = () => {
+    setSelectedProduct(null);
+    setPreviewLines([]);
+    setShowPreview(false);
+    setShowProductForm(false);
+    setMessage('');
+  };
+
+  // New function to get products from price list
+  const getProductsFromPriceList = async (priceListId) => {
+    if (!priceListId) {
+      setAvailableProducts([]);
+      return;
+    }
+
+    try {
+      // Get price list lines to find which products have variants in this price list
+      const priceListLines = await priceListService.getPriceListLines(priceListId);
+      
+      if (priceListLines.success) {
+        // Get unique product IDs from price list lines
+        const productIds = [...new Set(
+          priceListLines.data
+            .filter(line => line.variant_id)
+            .map(line => {
+              const variant = variants.find(v => v.id === line.variant_id);
+              return variant?.product_id;
+            })
+            .filter(Boolean)
+        )];
+
+        // Get products that have variants in this price list
+        const productsInPriceList = products.filter(product => 
+          productIds.includes(product.id)
+        );
+
+        console.log('Debug - Price list lines:', priceListLines.data.length);
+        console.log('Debug - Product IDs found:', productIds);
+        console.log('Debug - Total products available:', products.length);
+        console.log('Debug - Products in price list:', productsInPriceList.length);
+
+        setAvailableProducts(productsInPriceList);
+        setMessage(productsInPriceList.length === 0 ? 'No products found for this price list.' : `✅ Found ${productsInPriceList.length} products with pricing in this price list`);
+      }
+    } catch (error) {
+      console.error('Error getting products from price list:', error);
+      setAvailableProducts([]);
+      setMessage('Error loading products from price list');
+    }
+  };
+
+  // Function to handle product selection (Step 2 - just adds to selection)
+  const handleProductSelectionFromPriceList = (productId) => {
+    if (!productId || !selectedPriceList) return;
+
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    // Check if product is already selected
+    if (selectedProducts.find(p => p.id === productId)) {
+      setMessage('Product already selected');
+      return;
+    }
+
+    // Get all variants for this product that are in the price list
+    const productVariants = variants.filter(v => v.product_id === productId);
+    const relevantPriceListLines = priceListLines.filter(line => 
+      productVariants.some(v => v.id === line.variant_id)
+    );
+
+    if (relevantPriceListLines.length === 0) {
+      setMessage(`No variants found for ${product.name} in this price list`);
+      return;
+    }
+
+    // Add product to selected list (don't create order lines yet)
+    setSelectedProducts(prev => [...prev, product]);
+
+    setMessage(`✅ Added ${product.name} to selection (${relevantPriceListLines.length} variants will be auto-generated)`);
+  };
+
+  // Function to remove selected product
+  const removeSelectedProduct = (productId) => {
+    const product = selectedProducts.find(p => p.id === productId);
+    if (!product) return;
+
+    // Remove from selected products
+    setSelectedProducts(prev => prev.filter(p => p.id !== productId));
+
+    setMessage(`Removed ${product.name} from selection`);
+  };
+
+  // Function to clear all selected products
+  const clearAllSelectedProducts = () => {
+    setSelectedProducts([]);
+    setFormData(prev => ({
+      ...prev,
+      order_lines: []
+    }));
+    setMessage('Cleared all selected products');
+  };
+
+  // Function to auto-generate Gas & Deposit lines from selected products
+  const handleCreateOrderLinesFromSelectedProducts = () => {
+    if (selectedProducts.length === 0) return;
+
+    // Clear existing order lines first
+    setFormData(prev => ({
+      ...prev,
+      order_lines: []
+    }));
+
+    let totalLinesAdded = 0;
+
+    // Process each selected product
+    selectedProducts.forEach(product => {
+      // Get all variants for this product that are in the price list
+      const productVariants = variants.filter(v => v.product_id === product.id);
+      const relevantPriceListLines = priceListLines.filter(line => 
+        productVariants.some(v => v.id === line.variant_id)
+      );
+
+      // Create order lines for all variants of this product
+      const newLines = relevantPriceListLines.map(line => {
+        const variant = productVariants.find(v => v.id === line.variant_id);
+        if (!variant) return null;
+
+        totalLinesAdded++;
+        return {
+          id: Date.now() + Math.random() + totalLinesAdded,
+          product_type: 'variant',
+          variant_id: variant.id,
+          qty_ordered: 1,
+          list_price: line.min_unit_price || 0,
+          manual_unit_price: line.min_unit_price || 0,
+          scenario: 'OUT',
+          component_type: variant.sku_type === 'CONSUMABLE' ? 'GAS_FILL' : 
+                         variant.sku_type === 'DEPOSIT' ? 'CYLINDER_DEPOSIT' : 'STANDARD',
+          tax_rate: line.tax_rate || 0,
+          tax_code: line.tax_code || 'TX_STD',
+          tax_amount: (line.min_unit_price || 0) * (line.tax_rate || 0) / 100,
+          gross_price: (line.min_unit_price || 0) * (1 + (line.tax_rate || 0) / 100),
+          priceFound: true
+        };
+      }).filter(Boolean);
+
+      // Add lines to order
+      setFormData(prev => ({
+        ...prev,
+        order_lines: [...prev.order_lines, ...newLines]
+      }));
+    });
+
+    setMessage(`✅ Step 3 Complete: Auto-generated ${totalLinesAdded} Gas & Deposit lines from ${selectedProducts.length} products. Ready for Step 4: Review & Confirm.`);
   };
 
   const updateOrderLine = (lineId, field, value) => {
@@ -632,6 +1075,20 @@ const CreateOrder = () => {
             apiLine.manual_unit_price = parseFloat(line.manual_unit_price);
           }
 
+          // Include tax information to ensure frontend/backend sync
+          if (line.tax_rate !== undefined) {
+            apiLine.tax_rate = parseFloat(line.tax_rate) || 0;
+          }
+          if (line.tax_code) {
+            apiLine.tax_code = line.tax_code;
+          }
+          if (line.tax_amount !== undefined) {
+            apiLine.tax_amount = parseFloat(line.tax_amount) || 0;
+          }
+          if (line.gross_price !== undefined) {
+            apiLine.gross_price = parseFloat(line.gross_price) || 0;
+          }
+
           // Include scenario for cylinder OUT/XCH logic
           if (line.scenario) {
             apiLine.scenario = line.scenario;
@@ -732,7 +1189,7 @@ const CreateOrder = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="priceList">Price List</label>
+            <label htmlFor="priceList">Step 1: Choose Price List</label>
             <select
               id="priceList"
               value={selectedPriceList}
@@ -754,6 +1211,59 @@ const CreateOrder = () => {
               <small className="form-help">Select a price list to automatically populate prices and filter available products</small>
             )}
           </div>
+
+          {/* Step 2: Product Selection - Clean workflow */}
+          {selectedPriceList && (
+            <div className="product-search-section">
+              <h4>Step 2: Choose Product</h4>
+              <p className="form-description">
+                Search and select a product to auto-generate Gas & Deposit variants.
+              </p>
+              <div className="product-search-container">
+                <div className="form-group">
+                  <label htmlFor="product_search">Search Products</label>
+                  <input
+                    type="text"
+                    id="product_search"
+                    value={productSearchTerm}
+                    onChange={(e) => setProductSearchTerm(e.target.value)}
+                    placeholder="Type to search products..."
+                    className="product-search-input"
+                  />
+                </div>
+                <div className="available-products-list">
+                  {availableProducts
+                    .filter(product => product.name.toLowerCase().includes(productSearchTerm.toLowerCase()))
+                    .map(product => (
+                      <div key={product.id} className="available-product-item">
+                        <div className="product-info">
+                          <span className="product-name">{product.name}</span>
+                          <span className="product-category">({product.category})</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleProductSelectionFromPriceList(product.id)}
+                          className="add-product-btn"
+                        >
+                          ➕ Add
+                        </button>
+                      </div>
+                    ))}
+                  {availableProducts.length === 0 && (
+                    <div className="no-products-message">No products available for this price list.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* No products available message */}
+          {selectedPriceList && availableProducts.length === 0 && (
+            <div className="no-products-warning">
+              ⚠️ No products found for the selected price list "{priceLists.find(p => p.id === selectedPriceList)?.name}". 
+              Please add product variants to this price list or select a different price list.
+            </div>
+          )}
 
           <div className="form-group">
             <div className="stock-filter-toggle">
@@ -854,17 +1364,21 @@ const CreateOrder = () => {
         {/* Order Lines */}
         <div className="form-section">
           <div className="section-header">
-            <h3>Order Items</h3>
-            <button
-              type="button"
-              ref={addLineButtonRef}
-              onClick={addOrderLine}
-              className="add-line-btn"
-              disabled={!selectedCustomer}
-            >
-              ➕ Add Item
-            </button>
+            <h3>Step 4: Review & Confirm Order Items</h3>
+            <div className="add-buttons-group">
+              <button
+                type="button"
+                ref={addLineButtonRef}
+                onClick={addOrderLine}
+                className="add-line-btn"
+                disabled={!selectedCustomer}
+                title="Add individual order line manually"
+              >
+                ➕ Add Manual Item
+              </button>
+            </div>
           </div>
+
 
           {errors.order_lines && <span className="error-text">{errors.order_lines}</span>}
 
@@ -1083,197 +1597,4 @@ const CreateOrder = () => {
                       type="number"
                       value={line.list_price}
                       onChange={(e) => updateOrderLine(line.id, 'list_price', parseFloat(e.target.value) || 0)}
-                      className={errors[`line_${line.id}_list_price`] || errors[`line_${line.id}_no_price`] ? 'error' : 
-                                 (line.priceFound === true ? 'success' : '')}
-                      min="0"
-                      step="0.01"
-                      required
-                      disabled={selectedPriceList && line.priceFound === false}
-                    />
-                    {selectedPriceList && line.priceFound === true && (
-                      <small className="form-help success-text">
-                        ✅ Price loaded from "{priceLists.find(p => p.id === selectedPriceList)?.name}"
-                      </small>
-                    )}
-                    {selectedPriceList && line.priceFound === false && line.variant_id && (
-                      <small className="form-help error-text">
-                        ❌ No price found in "{priceLists.find(p => p.id === selectedPriceList)?.name}" for this product
-                      </small>
-                    )}
-                    {selectedPriceList && !line.variant_id && (
-                      <small className="form-help">
-                        💰 Price will auto-populate from "{priceLists.find(p => p.id === selectedPriceList)?.name}" when you select a product
-                      </small>
-                    )}
-                    {!selectedPriceList && (
-                      <small className="form-help">
-                        💡 Select a price list above to auto-populate prices
-                      </small>
-                    )}
-                    {errors[`line_${line.id}_list_price`] && 
-                      <span className="error-text">{errors[`line_${line.id}_list_price`]}</span>}
-                  </div>
-
-                  {/* Tax Information Display */}
-                  {line.tax_rate !== undefined && line.tax_rate > 0 && (
-                    <div className="form-group">
-                      <label>Tax Info</label>
-                      <div className="tax-info-display">
-                        <div className="tax-detail">
-                          <span className="tax-label">{line.tax_code || 'TX_STD'}:</span>
-                          <span className="tax-rate">{line.tax_rate}%</span>
-                        </div>
-                        <div className="tax-amounts">
-                          <div>Tax: ${(line.tax_amount * (line.qty_ordered || 0)).toFixed(2)}</div>
-                          <div className="gross-total">Gross: ${(line.gross_price * (line.qty_ordered || 0)).toFixed(2)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Zero tax items */}
-                  {line.tax_rate !== undefined && line.tax_rate === 0 && (
-                    <div className="form-group">
-                      <label>Tax Info</label>
-                      <div className="tax-info-display zero-tax">
-                        <span className="tax-label">{line.tax_code}: 0% (Tax Exempt)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Manual Price (Credit customers only) */}
-                  <div className="form-group">
-                    <label>
-                      Manual Price 
-                      {selectedCustomer?.customer_type === 'credit' ? 
-                        ' (Optional)' : 
-                        ' (Not allowed for cash customers)'
-                      }
-                    </label>
-                    <input
-                      type="number"
-                      value={line.manual_unit_price}
-                      onChange={(e) => updateOrderLine(line.id, 'manual_unit_price', e.target.value)}
-                      className={errors[`line_${line.id}_manual_unit_price`] ? 'error' : ''}
-                      min="0"
-                      step="0.01"
-                      disabled={selectedCustomer?.customer_type === 'cash'}
-                      placeholder={selectedCustomer?.customer_type === 'cash' ? 'Not allowed' : 'Override list price'}
-                    />
-                    {errors[`line_${line.id}_manual_unit_price`] && 
-                      <span className="error-text">{errors[`line_${line.id}_manual_unit_price`]}</span>}
-                  </div>
-                </div>
-
-                {/* Line Total */}
-                <div className="line-total">
-                  <strong>
-                    Line Total: ${((line.manual_unit_price || line.list_price || 0) * (line.qty_ordered || 0)).toFixed(2)}
-                  </strong>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Order Summary */}
-        {formData.order_lines.length > 0 && (
-          <div className="form-section order-summary">
-            <h3>Order Summary</h3>
-            <div className="summary-content">
-              <div className="summary-row">
-                <span>Items:</span>
-                <span>{formData.order_lines.length}</span>
-              </div>
-              <div className="summary-row">
-                <span>Total Quantity:</span>
-                <span>{formData.order_lines.reduce((sum, line) => sum + (line.qty_ordered || 0), 0)}</span>
-              </div>
-              
-              {/* Tax Breakdown */}
-              {(() => {
-                const totals = calculateOrderTotals();
-                return (
-                  <>
-                    <div className="summary-row">
-                      <span>Subtotal (Net):</span>
-                      <span>${totals.subtotal}</span>
-                    </div>
-                    <div className="summary-row">
-                      <span>Tax Amount:</span>
-                      <span>${totals.tax}</span>
-                    </div>
-                    <div className="summary-row total-row">
-                      <span>Total (Gross):</span>
-                      <span>${totals.total}</span>
-                    </div>
-                  </>
-                );
-              })()}
-              
-              {selectedCustomer && (
-                <div className="summary-row">
-                  <span>Customer Type:</span>
-                  <span className={`customer-type ${selectedCustomer.customer_type}`}>
-                    {selectedCustomer.customer_type?.toUpperCase()}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Submit Button */}
-        <div className="form-actions">
-          {/* Show pricing validation warnings */}
-          {selectedPriceList && formData.order_lines.some(line => line.priceFound === false && line.variant_id) && (
-            <div className="pricing-warning">
-              ⚠️ Some products don't have prices in the selected price list. Please fix pricing issues before creating the order.
-            </div>
-          )}
-          
-          <button
-            type="submit"
-            className="submit-btn"
-            disabled={
-              isSubmitting || 
-              !selectedCustomer || 
-              formData.order_lines.length === 0 ||
-              (selectedPriceList && formData.order_lines.some(line => line.priceFound === false && line.variant_id))
-            }
-          >
-            {isSubmitting ? (
-              <>
-                <div className="spinner small"></div>
-                Creating Order...
-              </>
-            ) : (
-              'Create Order'
-            )}
-          </button>
-          
-          <button
-            type="button"
-            className="cancel-btn"
-            onClick={() => {
-              setFormData({
-                customer_id: '',
-                requested_date: '',
-                delivery_instructions: '',
-                payment_terms: '',
-                order_lines: []
-              });
-              setSelectedCustomer(null);
-              setErrors({});
-              setMessage('');
-            }}
-          >
-            Clear Form
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-};
-
-export default CreateOrder; 
+                      className={errors[`line_${line.id}_list_price`] || errors[`line_${line.id}_no_price`

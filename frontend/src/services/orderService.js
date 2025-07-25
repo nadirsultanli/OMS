@@ -102,12 +102,17 @@ const orderService = {
   },
 
   // Update order status
-  updateOrderStatus: async (orderId, status) => {
+  updateOrderStatus: async (orderId, newStatus) => {
     try {
-      const response = await api.patch(`/orders/${orderId}/status`, { status });
+      console.log(`Updating order ${orderId} status to ${newStatus}`);
+      const response = await api.patch(`/orders/${orderId}/status`, {
+        status: newStatus
+      });
+      console.log('Order status update response:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error updating order status:', error);
+      console.error('Error response:', error.response?.data);
       return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to update order status' };
     }
   },

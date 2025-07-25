@@ -49,6 +49,31 @@
   text-transform: uppercase;
 }
 
+/* Auto-calculated field styling */
+.auto-calculated {
+  background-color: #f8f9fa !important;
+  color: #6c757d !important;
+  cursor: not-allowed;
+  border: 1px solid #e9ecef !important;
+}
+
+.auto-calc {
+  color: #28a745;
+  font-size: 12px;
+  font-weight: normal;
+  background: #d4edda;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 8px;
+}
+
+.help-text {
+  color: #6c757d;
+  font-size: 12px;
+  margin-top: 4px;
+  font-style: italic;
+}
+
 .type-badge.asset {
   background: #e8f5e9;
   color: #2e7d32;

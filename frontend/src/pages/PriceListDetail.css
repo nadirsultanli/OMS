@@ -439,4 +439,111 @@
   background-color: #fee;
   border-color: #fcc;
   color: #dc2626;
+}
+
+/* Section Actions */
+.section-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Product Pricing Button */
+.add-product-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: #059669;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-product-btn:hover:not(:disabled) {
+  background-color: #047857;
+}
+
+.add-product-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Product Form Card */
+.product-form-card {
+  border-left: 4px solid #059669;
+}
+
+.product-form-card h3 {
+  color: #059669;
+}
+
+.form-description {
+  background-color: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #065f46;
+  line-height: 1.5;
+}
+
+/* Product Form Grid */
+.product-form-card .form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+/* SKU Display Improvements */
+.sku-display {
+  font-weight: bold;
+  color: #2563eb;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.tax-info {
+  font-size: 0.8em;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.price-with-tax {
+  font-weight: bold;
+  color: #111827;
+}
+
+.tax-amount {
+  font-size: 0.8em;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.product-option-sku {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  color: #059669;
+}
+
+/* Mobile responsiveness for section actions */
+@media (max-width: 768px) {
+  .section-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .add-line-btn,
+  .add-product-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .product-form-card .form-grid {
+    grid-template-columns: 1fr;
+  }
 } 
