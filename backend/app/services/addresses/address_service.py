@@ -32,6 +32,10 @@ class AddressService:
         return await self.address_repository.update_address(address_id, address)
 
     async def delete_address(self, address_id: str, deleted_by: Optional[UUID] = None) -> bool:
+        # Check if the address exists and if it's a default address
+        address = await self.get_address_by_id(address_id)
+        if address.is_default:
+            raise ValueError("Cannot delete the primary address. Please set another address as primary first.")
         return await self.address_repository.delete_address(address_id, deleted_by)
 
     async def set_default_address(self, customer_id: str, address_id: str, updated_by: Optional[UUID] = None) -> bool:
