@@ -1,74 +1,146 @@
+/* Warehouses Page Styles - Professional Admin Panel UI/UX Overhaul */
+
+/* ============================================
+   ROOT VARIABLES & BASE STYLES
+   ============================================ */
 .warehouses-container {
-  padding: 32px;
-  max-width: 1400px;
-  margin: 0 auto;
-  animation: fadeIn 0.3s ease-in-out;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 24px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-sizing: border-box;
+  color: #374151;
 }
 
+/* ============================================
+   HEADER SECTION
+   ============================================ */
 .warehouses-header {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 24px 32px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
 }
 
 .warehouses-title-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   flex: 1;
 }
 
 .warehouses-title {
-  font-size: 32px;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: 700;
   color: #1f2937;
   margin: 0;
   letter-spacing: -0.5px;
+  line-height: 1.2;
 }
 
 .warehouses-subtitle {
-  color: #6b7280;
-  margin-top: 8px;
   font-size: 16px;
+  color: #2563eb;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
 }
 
+/* ============================================
+   PRIMARY BUTTON - PROFESSIONAL STYLING
+   ============================================ */
 .create-warehouse-btn {
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
   transition: all 0.2s ease-in-out;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  min-height: 44px;
+  white-space: nowrap;
 }
 
-.create-warehouse-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+.create-warehouse-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
 }
 
+.create-warehouse-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ============================================
+   MESSAGES & ALERTS - IMPROVED LAYOUT
+   ============================================ */
+.success-message {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  padding: 16px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideDown 0.3s ease-out;
+}
+
+.error-message {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  padding: 16px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideDown 0.3s ease-out;
+}
+
+/* ============================================
+   FILTERS SECTION - IMPROVED SPACING
+   ============================================ */
 .warehouses-filters {
   background: white;
   border-radius: 16px;
-  padding: 24px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
   gap: 16px;
-  align-items: center;
-  margin-bottom: 24px;
+  align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .search-container {
-  flex: 1;
   position: relative;
+  flex: 1;
+  min-width: 300px;
+  max-width: 400px;
 }
 
 .search-icon {
@@ -77,15 +149,20 @@
   top: 50%;
   transform: translateY(-50%);
   color: #6b7280;
+  z-index: 2;
 }
 
 .search-input {
   width: 100%;
+  height: 44px;
   padding: 12px 12px 12px 48px;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
-  font-size: 14px;
-  transition: all 0.2s ease-in-out;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background: white;
+  color: #374151;
+  box-sizing: border-box;
 }
 
 .search-input:focus {
@@ -94,14 +171,27 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+.search-input::placeholder {
+  color: #9ca3af;
+  font-size: 15px;
+}
+
 .filter-select {
-  padding: 12px 16px;
+  height: 44px;
+  padding: 12px 30px 12px 16px;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
   background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%236b7280' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  min-width: 160px;
+  color: #374151;
 }
 
 .filter-select:focus {
@@ -111,118 +201,110 @@
 }
 
 .refresh-btn {
-  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   background: white;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  transition: all 0.2s ease;
+  color: #64748b;
 }
 
-.refresh-btn:hover {
+.refresh-btn:hover:not(:disabled) {
   border-color: #2563eb;
   color: #2563eb;
+  background: #f0f4ff;
+  transform: translateY(-1px);
 }
 
+/* ============================================
+   TABLE CONTAINER - PROFESSIONAL DESIGN
+   ============================================ */
 .warehouses-table-container {
   background: white;
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   overflow: hidden;
-  margin-bottom: 24px; /* Add margin to ensure pagination is visible */
+  margin-bottom: 24px;
 }
 
 .warehouses-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 14px;
+  min-width: 1200px;
+  position: relative;
 }
 
 .warehouses-table thead {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: #f8f9fb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .warehouses-table th {
   padding: 16px;
   text-align: left;
   font-weight: 600;
-  color: #495057;
-  font-size: 14px;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 2px solid #dee2e6;
+  white-space: nowrap;
 }
 
 .warehouses-table td {
   padding: 16px;
-  border-bottom: 1px solid #e9ecef;
-  color: #495057;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  vertical-align: middle;
+  position: relative;
+  max-width: 200px;
 }
 
 .warehouses-table tbody tr {
-  transition: background-color 0.2s ease-in-out;
+  transition: background-color 0.15s ease;
+  cursor: pointer;
 }
 
 .warehouses-table tbody tr:hover {
-  background-color: #f8f9fa;
+  background-color: #f9fafb;
 }
 
-.warehouse-row {
-  transition: all 0.2s ease-in-out;
+.warehouses-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
-.warehouse-row:hover {
-  background-color: #f1f5f9 !important;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
+/* Table Cell Specific Styling */
 .warehouse-code {
+  font-family: 'SF Mono', Monaco, monospace;
   font-weight: 600;
   color: #2563eb;
+  white-space: nowrap;
+  max-width: 120px;
 }
 
 .warehouse-name-cell {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-weight: 600;
+  color: #1f2937;
+  max-width: 200px;
 }
 
 .warehouse-type-icon {
   width: 20px;
   height: 20px;
   color: #6b7280;
-}
-
-.warehouse-type-badge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.warehouse-type-fil {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.warehouse-type-sto {
-  background: #f3e8ff;
-  color: #6b21a8;
-}
-
-.warehouse-type-mob {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.warehouse-type-blk {
-  background: #d1fae5;
-  color: #065f46;
+  flex-shrink: 0;
 }
 
 .location-cell {
@@ -230,6 +312,7 @@
   align-items: center;
   gap: 6px;
   color: #6b7280;
+  max-width: 250px;
 }
 
 .location-cell svg {
@@ -245,49 +328,78 @@
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  max-width: 200px;
+}
+
+/* Text Overflow Handling */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================
+   BADGES - PROFESSIONAL STYLING
+   ============================================ */
+.warehouse-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.warehouse-type-fil {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.warehouse-type-sto {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+.warehouse-type-mob {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.warehouse-type-blk {
+  background: #dcfce7;
+  color: #166534;
 }
 
 .capability-tag {
-  padding: 2px 8px;
-  background: #f3f4f6;
-  color: #4b5563;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
-.action-btn {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-}
-
-.action-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-}
-
-.loading-container {
+/* ============================================
+   LOADING & EMPTY STATES
+   ============================================ */
+.loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  color: #6b7280;
-}
-
-.empty-state {
   padding: 80px 20px;
-  text-align: center;
   color: #6b7280;
 }
 
-.spinner {
+.loading-spinner {
   width: 40px;
   height: 40px;
   border: 4px solid #e5e7eb;
@@ -302,76 +414,93 @@
   100% { transform: rotate(360deg); }
 }
 
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.empty-state svg {
+  color: #d1d5db;
+  margin-bottom: 16px;
+}
+
 .empty-state h3 {
-  margin: 16px 0 8px;
-  color: #1f2937;
   font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
 }
 
 .empty-state p {
+  font-size: 14px;
   color: #6b7280;
-  font-size: 16px;
+  margin: 0;
+  max-width: 400px;
+  line-height: 1.5;
 }
 
-.error-message {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.success-message {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #166534;
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: slideIn 0.3s ease-in-out;
-}
-
+/* ============================================
+   PAGINATION - PROFESSIONAL LAYOUT
+   ============================================ */
 .pagination {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding: 24px;
+  padding: 20px 32px;
+  background: #fafbfc;
+  border-top: 1px solid #e5e7eb;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .pagination-btn {
-  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  height: 36px;
+  padding: 0 16px;
   border: 2px solid #e0e0e0;
+  border-radius: 6px;
   background: white;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
   font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
 }
 
 .pagination-btn:hover:not(:disabled) {
   border-color: #2563eb;
   color: #2563eb;
+  background: #f0f4ff;
 }
 
 .pagination-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  background: #f9fafb;
+  color: #9ca3af;
 }
 
-.pagination-info {
-  color: #6b7280;
-  font-size: 14px;
-}
-
-/* Modal Styles */
+/* ============================================
+   MODAL SYSTEM - PROFESSIONAL DESIGN
+   ============================================ */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -379,11 +508,12 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn 0.2s ease-in-out;
+  animation: fadeIn 0.2s ease-out;
 }
 
 .modal-content {
@@ -392,87 +522,100 @@
   width: 90%;
   max-width: 700px;
   max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
   animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  display: flex;
+  flex-direction: column;
+  margin: 20px;
 }
 
 .modal-header {
-  padding: 24px 32px;
-  border-bottom: 1px solid #e5e7eb;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 24px 32px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafbfc;
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
-  margin: 0;
-  font-size: 24px;
+  font-size: 20px;
+  font-weight: 600;
   color: #1f2937;
+  margin: 0;
+  line-height: 1.3;
 }
 
 .modal-close-btn {
   background: none;
   border: none;
-  font-size: 28px;
+  font-size: 24px;
   color: #6b7280;
   cursor: pointer;
-  padding: 0;
-  width: 36px;
-  height: 36px;
+  padding: 8px;
+  line-height: 1;
+  transition: all 0.2s ease;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  transition: all 0.2s ease-in-out;
 }
 
 .modal-close-btn:hover {
+  color: #374151;
   background: #f3f4f6;
-  color: #1f2937;
 }
 
+/* ============================================
+   FORM SYSTEM - PROFESSIONAL LAYOUT
+   ============================================ */
 .create-warehouse-form {
   padding: 32px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
 }
 
 .form-group label {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: #374151;
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
 }
 
 .form-group input,
 .form-group select {
+  height: 44px;
   padding: 12px 16px;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
-  font-size: 14px;
-  transition: all 0.2s ease-in-out;
+  font-size: 16px;
+  color: #1f2937;
+  background-color: #ffffff;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  font-family: inherit;
 }
 
 .form-group input:focus,
@@ -482,33 +625,75 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+.form-group input.error,
+.form-group select.error {
+  border-color: #dc2626;
+  background-color: #fef2f2;
+}
+
+.form-group input::placeholder {
+  color: #9ca3af;
+  font-size: 15px;
+}
+
+.form-group input:disabled,
+.form-group select:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.form-error {
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+/* ============================================
+   CHECKBOX GROUP - PROFESSIONAL STYLING
+   ============================================ */
 .checkbox-group {
   display: flex;
-  align-items: flex-start;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .checkbox-group label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   cursor: pointer;
-  font-weight: normal;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+  padding: 12px 0;
 }
 
 .checkbox-group input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   cursor: pointer;
+  accent-color: #2563eb;
 }
 
 .form-hint {
+  margin: 0;
   font-size: 12px;
   color: #6b7280;
-  margin-left: 26px;
+  line-height: 1.4;
 }
 
+/* ============================================
+   FORM SECTIONS - IMPROVED ORGANIZATION
+   ============================================ */
 .form-section {
   margin-bottom: 32px;
 }
@@ -533,76 +718,143 @@
   font-size: 14px;
 }
 
-.form-error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 24px;
-  font-size: 14px;
-}
-
+/* ============================================
+   MODAL FOOTER - PROFESSIONAL BUTTON LAYOUT
+   ============================================ */
 .modal-footer {
-  padding: 24px 32px;
-  border-top: 1px solid #e5e7eb;
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 16px;
+  padding: 24px 32px;
+  border-top: 1px solid #e5e7eb;
+  background: #fafbfc;
+  flex-shrink: 0;
 }
 
+/* Secondary Button Style */
 .cancel-btn {
+  height: 44px;
   padding: 12px 24px;
-  border: 2px solid #e0e0e0;
   background: white;
+  color: #2563eb;
+  border: 2px solid #2563eb;
   border-radius: 12px;
   font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
 }
 
-.cancel-btn:hover {
-  border-color: #6b7280;
-  background: #f9fafb;
+.cancel-btn:hover:not(:disabled) {
+  background: #f0f4ff;
+  transform: translateY(-1px);
 }
 
+/* Primary Button Style */
 .submit-btn {
+  height: 44px;
   padding: 12px 24px;
   background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   color: white;
   border: none;
   border-radius: 12px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-width: 120px;
 }
 
 .submit-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
 }
 
-.submit-btn:disabled {
-  opacity: 0.7;
+.submit-btn:disabled,
+.cancel-btn:disabled {
+  background: #9ca3af;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
+  border: none;
+  opacity: 0.7;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN - MOBILE FIRST
+   ============================================ */
+@media (max-width: 1024px) {
   .warehouses-container {
     padding: 16px;
+  }
+  
+  .search-container {
+    min-width: 250px;
+  }
+  
+  .warehouses-table {
+    min-width: 1000px;
+  }
+}
+
+@media (max-width: 768px) {
+  .warehouses-container {
+    padding: 12px;
   }
 
   .warehouses-header {
     flex-direction: column;
-    align-items: flex-start;
     gap: 16px;
+    align-items: stretch;
+    padding: 20px;
+  }
+
+  .warehouses-title {
+    font-size: 24px;
+  }
+
+  .warehouses-subtitle {
+    font-size: 14px;
   }
 
   .create-warehouse-btn {
@@ -612,13 +864,21 @@
 
   .warehouses-filters {
     flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
   }
 
   .search-container {
-    width: 100%;
+    min-width: 100%;
+    max-width: none;
   }
 
   .filter-select {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .refresh-btn {
     width: 100%;
   }
 
@@ -627,35 +887,162 @@
   }
 
   .warehouses-table {
-    min-width: 800px;
+    font-size: 12px;
+    min-width: 900px;
   }
 
-  .modal-content {
-    width: 95%;
-    margin: 16px;
+  .warehouses-table th,
+  .warehouses-table td {
+    padding: 12px 8px;
   }
 
   .form-grid {
     grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .modal-content {
+    margin: 10px;
+    max-width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .modal-header,
+  .create-warehouse-form {
+    padding: 20px;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cancel-btn,
+  .submit-btn {
+    width: 100%;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 20px;
+  }
+
+  .pagination-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .capabilities-tags {
+    flex-direction: column;
+    gap: 4px;
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
+@media (max-width: 480px) {
+  .warehouses-container {
+    padding: 8px;
   }
-  to {
-    opacity: 1;
+
+  .warehouses-title {
+    font-size: 20px;
+  }
+
+  .warehouses-subtitle {
+    font-size: 13px;
+  }
+
+  .modal-content {
+    margin: 5px;
+    max-width: calc(100vw - 10px);
+    border-radius: 12px;
+  }
+
+  .warehouses-table {
+    font-size: 11px;
+    min-width: 700px;
+  }
+
+  .warehouses-table th,
+  .warehouses-table td {
+    padding: 8px 6px;
+  }
+
+  .warehouse-type-badge,
+  .capability-tag {
+    font-size: 9px;
+    padding: 4px 8px;
+  }
+
+  .pagination-btn {
+    min-width: 60px;
+    height: 32px;
+    font-size: 12px;
   }
 }
 
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
+/* ============================================
+   HIGH CONTRAST MODE SUPPORT
+   ============================================ */
+@media (prefers-contrast: high) {
+  .warehouses-header,
+  .warehouses-filters,
+  .warehouses-table-container,
+  .modal-content {
+    border: 2px solid #000;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .form-group input,
+  .form-group select,
+  .search-input,
+  .filter-select {
+    border-width: 2px;
+  }
+
+  .submit-btn,
+  .create-warehouse-btn {
+    background: #2563eb;
+    border: 2px solid #2563eb;
+  }
+
+  .cancel-btn {
+    border-width: 2px;
+  }
+
+  .pagination-btn {
+    border-width: 2px;
+  }
+}
+
+/* ============================================
+   DARK MODE SUPPORT (Future Enhancement)
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  /* Future dark mode implementation */
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .warehouses-container {
+    background: white;
+    padding: 0;
+  }
+  
+  .create-warehouse-btn,
+  .warehouses-filters,
+  .pagination,
+  .modal-overlay {
+    display: none;
+  }
+  
+  .warehouses-table-container {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+  
+  .warehouses-table {
+    font-size: 12px;
   }
 }
