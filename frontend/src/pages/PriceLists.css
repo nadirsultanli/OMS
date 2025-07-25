@@ -1,172 +1,396 @@
-/* PriceLists Container */
+/* Price Lists Page Styles - Professional Admin Panel UI/UX Overhaul */
+
+/* ============================================
+   ROOT VARIABLES & BASE STYLES
+   ============================================ */
 .pricelists-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-sizing: border-box;
+  color: #374151;
 }
 
-/* Header */
+/* ============================================
+   HEADER SECTION
+   ============================================ */
 .pricelists-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 32px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 24px 32px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
 }
 
 .header-content {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
+  flex: 1;
 }
 
-.header-text h1 {
+.header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
   margin: 0;
-  font-size: 24px;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.page-subtitle {
+  font-size: 16px;
+  color: #2563eb;
+  margin: 0;
   font-weight: 600;
-  color: #1a1a1a;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
 }
 
-.header-text p {
-  margin: 4px 0 0;
-  color: #666;
-  font-size: 14px;
-}
-
+/* ============================================
+   PRIMARY BUTTON - PROFESSIONAL STYLING
+   ============================================ */
 .create-pricelist-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  background-color: #0066cc;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  min-height: 44px;
+  white-space: nowrap;
 }
 
 .create-pricelist-btn:hover:not(:disabled) {
-  background-color: #0052a3;
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
 }
 
 .create-pricelist-btn:disabled {
-  opacity: 0.6;
+  background: #9ca3af;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-/* Messages */
+/* ============================================
+   MESSAGES & ALERTS - IMPROVED LAYOUT
+   ============================================ */
 .message {
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 16px;
+  padding: 16px 20px;
+  border-radius: 12px;
   font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 24px;
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideDown 0.3s ease-out;
 }
 
 .success-message {
-  background-color: #e7f5e7;
-  color: #0a5d0a;
-  border: 1px solid #c3e5c3;
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
 }
 
 .error-message {
-  background-color: #fee;
-  color: #c53030;
-  border: 1px solid #fcc;
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
 }
 
-/* Filters */
+/* ============================================
+   FILTERS SECTION - IMPROVED SPACING
+   ============================================ */
 .filters-section {
-  background-color: #f8f9fa;
-  padding: 16px;
-  border-radius: 8px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 24px;
   margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .filters-row {
   display: flex;
   gap: 16px;
+  align-items: flex-end;
   flex-wrap: wrap;
 }
 
 .search-group {
   position: relative;
   flex: 1;
-  min-width: 250px;
+  min-width: 300px;
+  max-width: 400px;
 }
 
 .search-icon {
   position: absolute;
-  left: 12px;
+  left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: #666;
+  color: #6b7280;
+  z-index: 2;
 }
 
 .search-input {
   width: 100%;
-  padding: 8px 12px 8px 40px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
+  height: 44px;
+  padding: 12px 12px 12px 48px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background: white;
+  color: #374151;
+  box-sizing: border-box;
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #0066cc;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.search-input::placeholder {
+  color: #9ca3af;
+  font-size: 15px;
 }
 
 .filter-group {
-  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .filter-select {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  height: 44px;
+  padding: 12px 30px 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
   font-size: 14px;
-  background-color: white;
+  background: white;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%236b7280' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  min-width: 160px;
+  color: #374151;
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: #0066cc;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-/* Table Container */
+/* ============================================
+   TABLE CONTAINER - PROFESSIONAL DESIGN
+   ============================================ */
 .table-container {
-  background-color: white;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   overflow: hidden;
-  margin-bottom: 24px; /* Add margin to ensure pagination is visible */
+  margin-bottom: 24px;
 }
 
-/* Loading and Empty States */
-.loading-state,
-.empty-state {
-  padding: 48px;
-  text-align: center;
-  color: #666;
+.pricelists-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 1200px;
+  position: relative;
+}
+
+.pricelists-table thead {
+  background: #f8f9fb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.pricelists-table th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.pricelists-table td {
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  vertical-align: middle;
+  position: relative;
+  max-width: 200px;
+}
+
+.pricelists-table tbody tr {
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+
+.pricelists-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.pricelists-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Table Cell Specific Styling */
+.name-cell {
+  font-weight: 600;
+  color: #1f2937;
+  max-width: 200px;
+}
+
+.currency-cell {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-weight: 600;
+  color: #059669;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.date-cell {
+  color: #6b7280;
+  font-size: 13px;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.actions-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-width: 140px;
+}
+
+/* Text Overflow Handling */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================
+   BADGES - PROFESSIONAL STYLING
+   ============================================ */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.status-badge.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.effective-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.effective-badge.yes {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.effective-badge.no {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* ============================================
+   LOADING & EMPTY STATES
+   ============================================ */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: #6b7280;
 }
 
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #f3f4f6;
-  border-top-color: #0066cc;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #2563eb;
   border-radius: 50%;
-  margin: 0 auto 16px;
-  animation: spin 0.8s linear infinite;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
 }
 
 .empty-icon {
@@ -175,166 +399,102 @@
 }
 
 .empty-state h3 {
-  margin: 0 0 8px;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: #1f2937;
+  margin: 0 0 8px 0;
 }
 
 .empty-state p {
+  font-size: 14px;
+  color: #6b7280;
   margin: 0;
-  color: #666;
+  max-width: 400px;
+  line-height: 1.5;
 }
 
-/* Table */
-.pricelists-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.pricelists-table thead {
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.pricelists-table th {
-  padding: 12px 16px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 14px;
-  color: #374151;
-}
-
-.pricelists-table tbody tr {
-  border-bottom: 1px solid #e5e7eb;
-  transition: background-color 0.1s;
-}
-
-.pricelists-table tbody tr:hover {
-  background-color: #f9fafb;
-}
-
-.pricelists-table td {
-  padding: 16px;
-  font-size: 14px;
-  color: #1f2937;
-}
-
-.name-cell {
-  font-weight: 500;
-}
-
-.currency-cell {
-  font-family: 'SF Mono', Monaco, monospace;
-  font-weight: 500;
-}
-
-.date-cell {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-/* Status Badge */
-.status-badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.status-badge.active {
-  background-color: #e7f5e7;
-  color: #0a5d0a;
-}
-
-.status-badge.inactive {
-  background-color: #f3f4f6;
-  color: #6b7280;
-}
-
-/* Effective Badge */
-.effective-badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.effective-badge.yes {
-  background-color: #e0f2fe;
-  color: #0369a1;
-}
-
-.effective-badge.no {
-  background-color: #f3f4f6;
-  color: #6b7280;
-}
-
-/* Actions */
-.actions-cell {
-  display: flex;
-  gap: 8px;
-}
-
+/* ============================================
+   ACTION BUTTONS - PROFESSIONAL STYLING
+   ============================================ */
 .action-icon-btn {
-  padding: 6px;
-  background: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
   cursor: pointer;
-  color: #6b7280;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .action-icon-btn:hover:not(:disabled) {
-  background-color: #f3f4f6;
-  color: #1f2937;
+  background: #e2e8f0;
+  color: #475569;
+  transform: translateY(-1px);
 }
 
 .action-icon-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
-/* Modal */
+.action-icon-btn.delete:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* ============================================
+   MODAL SYSTEM - PROFESSIONAL DESIGN
+   ============================================ */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
 }
 
 .modal-content {
-  background-color: white;
-  border-radius: 12px;
-  max-width: 600px;
+  background: white;
+  border-radius: 16px;
   width: 90%;
+  max-width: 600px;
   max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+  margin: 20px;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px;
+  padding: 24px 32px;
   border-bottom: 1px solid #e5e7eb;
+  background: #fafbfc;
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
-  margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: #1f2937;
+  margin: 0;
+  line-height: 1.3;
 }
 
 .close-btn {
@@ -343,34 +503,42 @@
   font-size: 24px;
   color: #6b7280;
   cursor: pointer;
-  width: 32px;
-  height: 32px;
+  padding: 8px;
+  line-height: 1;
+  transition: all 0.2s ease;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  border-radius: 8px;
 }
 
 .close-btn:hover {
-  background-color: #f3f4f6;
+  color: #374151;
+  background: #f3f4f6;
 }
 
-/* Form */
+/* ============================================
+   FORM SYSTEM - PROFESSIONAL LAYOUT
+   ============================================ */
 .pricelist-form {
-  padding: 24px;
+  padding: 32px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
   margin-bottom: 24px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
 
 .form-group.full-width {
@@ -378,107 +546,409 @@
 }
 
 .form-group label {
-  margin-bottom: 6px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: #374151;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
 }
 
 .form-group input,
 .form-group select {
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
+  height: 44px;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #1f2937;
+  background-color: #ffffff;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  font-family: inherit;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #0066cc;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .form-group input.error,
 .form-group select.error {
   border-color: #dc2626;
+  background-color: #fef2f2;
+}
+
+.form-group input::placeholder {
+  color: #9ca3af;
+  font-size: 15px;
+}
+
+.form-group input:disabled,
+.form-group select:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .error-text {
-  margin-top: 4px;
-  font-size: 12px;
   color: #dc2626;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
 }
 
-/* Checkbox Group */
+/* ============================================
+   CHECKBOX GROUP - PROFESSIONAL STYLING
+   ============================================ */
 .checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   cursor: pointer;
   font-size: 14px;
   color: #374151;
+  font-weight: 500;
+  padding: 12px 0;
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   cursor: pointer;
+  accent-color: #2563eb;
 }
 
 .field-hint {
   margin: 0;
   font-size: 12px;
   color: #6b7280;
+  line-height: 1.4;
 }
 
-/* Form Actions */
+/* ============================================
+   FORM ACTIONS - PROFESSIONAL BUTTON LAYOUT
+   ============================================ */
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding-top: 20px;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
   border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
 }
 
-.cancel-btn,
-.submit-btn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
+/* Secondary Button Style */
 .cancel-btn {
-  background-color: white;
-  border: 1px solid #d1d5db;
-  color: #374151;
+  height: 44px;
+  padding: 12px 24px;
+  background: white;
+  color: #2563eb;
+  border: 2px solid #2563eb;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
 }
 
 .cancel-btn:hover:not(:disabled) {
-  background-color: #f3f4f6;
+  background: #f0f4ff;
+  transform: translateY(-1px);
 }
 
+/* Primary Button Style */
 .submit-btn {
-  background-color: #0066cc;
-  border: none;
+  height: 44px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
 }
 
 .submit-btn:hover:not(:disabled) {
-  background-color: #0052a3;
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
 }
 
-.cancel-btn:disabled,
-.submit-btn:disabled {
-  opacity: 0.6;
+.submit-btn:disabled,
+.cancel-btn:disabled {
+  background: #9ca3af;
   cursor: not-allowed;
-} 
+  transform: none;
+  box-shadow: none;
+  border: none;
+  opacity: 0.7;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN - MOBILE FIRST
+   ============================================ */
+@media (max-width: 1024px) {
+  .pricelists-container {
+    padding: 16px;
+  }
+  
+  .search-group {
+    min-width: 250px;
+  }
+  
+  .pricelists-table {
+    min-width: 1000px;
+  }
+}
+
+@media (max-width: 768px) {
+  .pricelists-container {
+    padding: 12px;
+  }
+
+  .pricelists-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+    padding: 20px;
+  }
+
+  .header-content {
+    gap: 12px;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .page-subtitle {
+    font-size: 14px;
+  }
+
+  .create-pricelist-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .filters-row {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .search-group {
+    min-width: 100%;
+    max-width: none;
+  }
+
+  .filter-group {
+    width: 100%;
+  }
+
+  .filter-select {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .modal-content {
+    margin: 10px;
+    max-width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .modal-header,
+  .pricelist-form {
+    padding: 20px;
+  }
+
+  .pricelists-table {
+    font-size: 12px;
+    min-width: 900px;
+  }
+
+  .pricelists-table th,
+  .pricelists-table td {
+    padding: 12px 8px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cancel-btn,
+  .submit-btn {
+    width: 100%;
+  }
+
+  .actions-cell {
+    flex-direction: column;
+    gap: 4px;
+    min-width: 60px;
+  }
+
+  .action-icon-btn {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pricelists-container {
+    padding: 8px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+  }
+
+  .modal-content {
+    margin: 5px;
+    max-width: calc(100vw - 10px);
+    border-radius: 12px;
+  }
+
+  .pricelists-table {
+    font-size: 11px;
+    min-width: 700px;
+  }
+
+  .pricelists-table th,
+  .pricelists-table td {
+    padding: 8px 6px;
+  }
+
+  .status-badge,
+  .effective-badge {
+    font-size: 9px;
+    padding: 4px 8px;
+  }
+
+  .action-icon-btn {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* ============================================
+   HIGH CONTRAST MODE SUPPORT
+   ============================================ */
+@media (prefers-contrast: high) {
+  .pricelists-header,
+  .filters-section,
+  .table-container,
+  .modal-content {
+    border: 2px solid #000;
+  }
+
+  .form-group input,
+  .form-group select,
+  .search-input,
+  .filter-select {
+    border-width: 2px;
+  }
+
+  .submit-btn,
+  .create-pricelist-btn {
+    background: #2563eb;
+    border: 2px solid #2563eb;
+  }
+
+  .cancel-btn {
+    border-width: 2px;
+  }
+}
+
+/* ============================================
+   DARK MODE SUPPORT (Future Enhancement)
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  /* Future dark mode implementation */
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .pricelists-container {
+    background: white;
+    padding: 0;
+  }
+  
+  .create-pricelist-btn,
+  .filters-section,
+  .actions-cell,
+  .modal-overlay {
+    display: none;
+  }
+  
+  .table-container {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+  
+  .pricelists-table {
+    font-size: 12px;
+  }
+}
