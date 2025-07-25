@@ -22,6 +22,9 @@ const Customers = () => {
     customer_type: ''
   });
 
+  // Debounced search value
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
   // Form data for creating new customer
   const [formData, setFormData] = useState({
     name: '',
@@ -48,13 +51,34 @@ const Customers = () => {
     currentPage: 1
   });
 
+  // Debounce search input
   useEffect(() => {
-    fetchCustomers();
-  }, [pagination.limit, pagination.offset]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  // Reset pagination when debounced search changes
+  useEffect(() => {
+    if (debouncedSearch !== '') {
+      setPagination(prev => ({
+        ...prev,
+        offset: 0,
+        currentPage: 1
+      }));
+    }
+  }, [debouncedSearch]);
 
   useEffect(() => {
-    applyFilters();
-  }, [customers, filters]);
+    fetchCustomers();
+  }, [pagination.limit, pagination.offset, filters.status, filters.customer_type, debouncedSearch]);
+
+  // Remove the applyFilters useEffect since we'll handle filtering server-side
+  // useEffect(() => {
+  //   applyFilters();
+  // }, [customers, filters]);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -64,7 +88,8 @@ const Customers = () => {
         offset: pagination.offset
       };
 
-      // Only add non-search filters to API request (since backend search may not work)
+      // Add all filters to API request
+      if (debouncedSearch) params.search = debouncedSearch;
       if (filters.status) params.status = filters.status;
       if (filters.customer_type) params.customer_type = filters.customer_type;
 
@@ -72,6 +97,8 @@ const Customers = () => {
 
       if (result.success) {
         setCustomers(result.data.customers || []);
+        // Set filtered customers to the same as customers since filtering is done server-side
+        setFilteredCustomers(result.data.customers || []);
         setPagination(prev => ({
           ...prev,
           total: result.data.total || 0
@@ -91,23 +118,24 @@ const Customers = () => {
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...customers];
+  // Remove the applyFilters function since we'll handle filtering server-side
+  // const applyFilters = () => {
+  //   let filtered = [...customers];
 
-    // Apply search filter (client-side)
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(customer =>
-        customer.name?.toLowerCase().includes(searchTerm) ||
-        customer.addresses?.some(addr => 
-          addr.email?.toLowerCase().includes(searchTerm) ||
-          addr.phone?.toLowerCase().includes(searchTerm)
-        )
-      );
-    }
+  //   // Apply search filter (client-side)
+  //   if (filters.search) {
+  //     const searchTerm = filters.search.toLowerCase();
+  //     filtered = filtered.filter(customer =>
+  //       customer.name?.toLowerCase().includes(searchTerm) ||
+  //       customer.addresses?.some(addr => 
+  //         addr.email?.toLowerCase().includes(searchTerm) ||
+  //         addr.phone?.toLowerCase().includes(searchTerm)
+  //       )
+  //     );
+  //   }
 
-    setFilteredCustomers(filtered);
-  };
+  //   setFilteredCustomers(filtered);
+  // };
 
 
   const handleFilterChange = (e) => {
@@ -116,8 +144,15 @@ const Customers = () => {
       ...prev,
       [name]: value
     }));
-    // Reset pagination when filters change
-    resetPaginationOnFilter();
+    
+    // Reset pagination when filters change (except for search which is debounced)
+    if (name !== 'search') {
+      setPagination(prev => ({
+        ...prev,
+        offset: 0,
+        currentPage: 1
+      }));
+    }
   };
 
   const handleInputChange = (e) => {
@@ -393,14 +428,6 @@ const Customers = () => {
     }
     
     return { pages, start, end, totalPages };
-  };
-
-  const resetPaginationOnFilter = () => {
-    setPagination(prev => ({
-      ...prev,
-      offset: 0,
-      currentPage: 1
-    }));
   };
 
   return (

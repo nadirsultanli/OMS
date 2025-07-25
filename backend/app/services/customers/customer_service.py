@@ -41,6 +41,29 @@ class CustomerService:
     async def get_customers_by_status(self, status: CustomerStatus) -> List[Customer]:
         return await self.customer_repository.get_by_status(status)
 
+    async def get_customers_with_filters(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        status: Optional[str] = None,
+        customer_type: Optional[str] = None,
+        search: Optional[str] = None
+    ) -> tuple[List[Customer], int]:
+        """Get customers with optional filters and return both customers and total count"""
+        customers, total = await self.customer_repository.get_with_filters(
+            limit=limit,
+            offset=offset,
+            status=status,
+            customer_type=customer_type,
+            search=search
+        )
+        
+        # Load addresses for each customer
+        for customer in customers:
+            customer.addresses = await self.address_service.get_addresses_by_customer(str(customer.id))
+        
+        return customers, total
+
     async def create_customer(self, tenant_id: UUID, customer_type: CustomerType, name: str, created_by: Optional[UUID] = None, user_role: Optional[str] = None, **kwargs) -> Customer:
         # Set status based on customer_type and user role
         if customer_type == CustomerType.CASH:
