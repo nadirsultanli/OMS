@@ -91,6 +91,12 @@
   border: 1px solid #fecaca;
 }
 
+.info-message {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
 /* Filters Section */
 .filters-section {
   background: white;
@@ -255,6 +261,12 @@
   color: #059669;
 }
 
+.weight-cell {
+  font-weight: 500;
+  color: #6b7280;
+  text-align: center;
+}
+
 .date-cell {
   color: #64748b;
   font-size: 0.9rem;
@@ -409,24 +421,64 @@
   font-weight: 600;
 }
 
-.close-btn {
+/* Modal Header Actions */
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.refresh-btn {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 40px;
+  height: 40px;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857, #059669);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.close-btn {
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  border-radius: 6px;
   width: 40px;
   height: 40px;
-  border: none;
-  background: #f1f5f9;
-  color: #64748b;
-  border-radius: 8px;
-  cursor: pointer;
   font-size: 1.5rem;
-  transition: all 0.2s ease;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .close-btn:hover {
-  background: #e2e8f0;
-  color: #475569;
+  background: #e5e7eb;
+  color: #1f2937;
 }
 
 /* Order Form */
@@ -668,30 +720,396 @@
   padding-bottom: 8px;
 }
 
+/* Enhanced Order Details Modal Styling */
+
+/* Full width for delivery instructions */
+.detail-group.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Order Lines Table Enhancements */
 .order-lines-table {
   width: 100%;
   border-collapse: collapse;
-  border: 1px solid #e5e7eb;
+  margin-top: 15px;
+  background: white;
   border-radius: 8px;
   overflow: hidden;
-}
-
-.order-lines-table thead {
-  background: #f9fafb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .order-lines-table th {
-  padding: 12px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: white;
+  padding: 12px 15px;
   text-align: left;
   font-weight: 600;
-  color: #374151;
   font-size: 0.9rem;
-  border-bottom: 1px solid #e5e7eb;
 }
 
 .order-lines-table td {
-  padding: 12px;
+  padding: 12px 15px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+.order-lines-table tr:last-child td {
+  border-bottom: none;
+}
+
+.order-lines-table tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Product Info in Table */
+.product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.product-name {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.price-override-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.variant-type-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  width: fit-content;
+  margin-right: 4px;
+}
+
+/* Gas Cylinder Tax Breakdown Styles */
+.gas-cylinder-breakdown {
+  margin: 12px 0;
+  padding: 8px 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.component-section {
+  margin: 8px 0;
+  padding: 4px 0;
+}
+
+.component-section.gas-fill .component-header .pricing-label {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.component-section.deposits .component-header .pricing-label {
+  color: #059669;
+  font-weight: 600;
+}
+
+.component-section.returns .component-header .pricing-label {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.component-section.assets .component-header .pricing-label {
+  color: #ea580c;
+  font-weight: 600;
+}
+
+.pricing-label.indent {
+  font-size: 0.9em;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.pricing-value.tax-amount {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.pricing-value.zero-tax {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.pricing-value.refund {
+  color: #7c3aed;
+  font-weight: 500;
+}
+
+.component-subtotal {
   border-bottom: 1px solid #f3f4f6;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.tax-summary-section {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 2px solid #e5e7eb;
+}
+
+.pricing-row.tax-summary .pricing-label {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.pricing-value.tax-total {
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.pricing-value.compliance-note {
+  font-size: 0.85em;
+  color: #059669;
+  font-style: italic;
+}
+
+.pricing-row.tax-compliance {
+  margin-top: 4px;
+}
+
+/* Enhanced pricing row styles */
+.pricing-row.component-header {
+  margin: 4px 0;
+}
+
+.pricing-row.component-detail {
+  margin: 2px 0;
+  font-size: 0.9em;
+}
+
+.pricing-row.component-subtotal {
+  margin: 2px 0 8px 0;
+  font-weight: 500;
+}
+
+/* Price Breakdown in Table Cells */
+.price-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.list-price-struck {
+  font-size: 0.85rem;
+  color: #64748b;
+  text-decoration: line-through;
+}
+
+.final-price {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Table Cell Alignment */
+.quantity-cell {
+  text-align: center;
+  font-weight: 500;
+}
+
+.price-cell, .total-cell {
+  text-align: right;
+  font-weight: 500;
+}
+
+/* Pricing Summary Section */
+.pricing-summary-section {
+  margin-top: 30px;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.pricing-summary-section h3 {
+  margin: 0 0 20px 0;
+  color: #1e293b;
+  font-size: 1.3rem;
+  font-weight: 600;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 10px;
+}
+
+.pricing-summary-content {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 30px;
+}
+
+@media (max-width: 768px) {
+  .pricing-summary-content {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* Pricing Breakdown */
+.pricing-breakdown {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+.pricing-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pricing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.pricing-row:last-child {
+  border-bottom: none;
+}
+
+.pricing-label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.pricing-value {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Special row styling */
+.pricing-row.discount-row {
+  background: #fef3c7;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 4px 0;
+}
+
+.pricing-row.subtotal-row {
+  background: #e0f2fe;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 4px 0;
+}
+
+.pricing-row.total-row {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: white;
+  border-radius: 8px;
+  padding: 15px 12px;
+  margin: 10px 0 0 0;
+  font-size: 1.1rem;
+}
+
+.pricing-row.total-row .pricing-label,
+.pricing-row.total-row .pricing-value {
+  color: white;
+  font-weight: 700;
+}
+
+.pricing-row.tax-info,
+.pricing-row.deposit-info {
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 4px 0;
+}
+
+/* Special value styling */
+.pricing-value.discount {
+  color: #d97706;
+  font-weight: 700;
+}
+
+.pricing-value.total {
+  font-size: 1.2rem;
+}
+
+.pricing-value.tax-note,
+.pricing-value.deposit-note {
+  font-style: italic;
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+/* Financial Info Sidebar */
+.financial-info {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  height: fit-content;
+}
+
+.info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Status-specific styling */
+.info-value.status-draft {
+  color: #6b7280;
+}
+
+.info-value.status-submitted {
+  color: #2563eb;
+}
+
+.info-value.status-approved {
+  color: #059669;
+}
+
+.info-value.status-allocated {
+  color: #7c3aed;
+}
+
+.info-value.status-loaded {
+  color: #dc2626;
+}
+
+.info-value.status-in_transit {
+  color: #ea580c;
+}
+
+.info-value.status-delivered {
+  color: #16a34a;
 }
 
 /* Responsive Design */
@@ -749,5 +1167,215 @@
   .modal-content {
     margin: 10px;
     max-height: calc(100vh - 20px);
+  }
+}
+
+/* Responsive Design for Modal */
+@media (max-width: 1024px) {
+  .modal-content.large-modal {
+    width: 95%;
+    max-width: 800px;
+  }
+  
+  .pricing-summary-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .order-lines-table {
+    font-size: 0.85rem;
+  }
+  
+  .order-lines-table th,
+  .order-lines-table td {
+    padding: 8px 10px;
+  }
+  
+  .pricing-summary-section {
+    padding: 15px;
+  }
+  
+  .pricing-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .pricing-row.total-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+/* Animation for modal appearance */
+.modal-overlay {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modal-content {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Empty Order Lines State */
+.empty-order-lines {
+  text-align: center;
+  padding: 40px 20px;
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  margin-top: 15px;
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+  opacity: 0.7;
+}
+
+.empty-order-lines h4 {
+  color: #374151;
+  margin: 0 0 10px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.empty-order-lines p {
+  color: #6b7280;
+  margin: 0 0 20px 0;
+  font-size: 0.95rem;
+}
+
+/* Data Inconsistency Warning */
+.data-inconsistency-warning {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.warning-icon {
+  font-size: 1.2rem;
+  margin-right: 8px;
+}
+
+.data-inconsistency-warning strong {
+  display: block;
+  color: #92400e;
+  margin-bottom: 8px;
+  font-size: 1rem;
+}
+
+.data-inconsistency-warning p {
+  color: #a16207;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Empty State Actions */
+.empty-state-actions {
+  margin-top: 20px;
+}
+
+.add-items-btn {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.add-items-btn:hover {
+  background: linear-gradient(135deg, #047857, #059669);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+/* Special Pricing Row States */
+.pricing-row.inconsistency-row {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 4px 0;
+}
+
+.pricing-row.mismatch-row {
+  background: #fee2e2;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 4px 0;
+}
+
+.pricing-value.warning {
+  color: #d97706;
+  font-weight: 700;
+}
+
+.pricing-value.error {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* Debug Info Styling */
+.info-row.debug-info {
+  background: #f3f4f6;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: 4px 0;
+}
+
+.info-value.debug {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: #6b7280;
+  word-break: break-all;
+}
+
+/* Enhanced responsiveness for empty states */
+@media (max-width: 768px) {
+  .empty-order-lines {
+    padding: 30px 15px;
+  }
+  
+  .empty-state-icon {
+    font-size: 2.5rem;
+  }
+  
+  .data-inconsistency-warning {
+    padding: 12px;
+    margin: 15px 0;
+  }
+  
+  .data-inconsistency-warning strong {
+    font-size: 0.95rem;
+  }
+  
+  .data-inconsistency-warning p {
+    font-size: 0.85rem;
   }
 }

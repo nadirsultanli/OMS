@@ -42,7 +42,8 @@ async def validate_driver_order_creation(
     trip_id: UUID = Path(..., description="Trip ID"),
     request: Dict[str, Any] = ...,  # Order creation request
     current_user: User = Depends(get_current_user),
-    permissions_service: DriverPermissionsService = Depends(get_driver_permissions_service)
+    permissions_service: DriverPermissionsService = Depends(get_driver_permissions_service),
+    trip_service: TripService = Depends(get_trip_service)
 ):
     """Validate if driver can create a new order during trip"""
     try:
@@ -50,13 +51,38 @@ async def validate_driver_order_creation(
         if current_user.role != UserRoleType.DRIVER:
             raise HTTPException(status_code=403, detail="Only drivers can create orders")
         
-        # Mock truck inventory for validation
-        truck_inventory = {
-            "prod-1_var-1": {
-                "remaining_qty": 15,
-                "product_name": "13kg LPG Cylinder"
+        # Validate trip exists and is in correct status
+        trip = await trip_service.get_trip_by_id(trip_id)
+        if trip.trip_status != TripStatus.IN_PROGRESS:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot create orders for trip in status: {trip.trip_status.value}"
+            )
+        
+        # Get real truck inventory from vehicle warehouse service
+        from app.services.vehicles.vehicle_warehouse_service import VehicleWarehouseService
+        from app.services.dependencies.stock_levels import get_stock_level_service
+        from app.services.dependencies.stock_docs import get_stock_doc_service
+        
+        # Initialize services (this should be properly injected in a real implementation)
+        stock_doc_service = get_stock_doc_service()
+        stock_level_service = get_stock_level_service()
+        vehicle_warehouse_service = VehicleWarehouseService(stock_doc_service, stock_level_service)
+        
+        # Get truck inventory (vehicles act as mobile warehouses during trips)
+        truck_inventory_data = await vehicle_warehouse_service.get_vehicle_inventory_as_warehouse(
+            vehicle_id=trip.vehicle_id,
+            trip_id=trip_id
+        )
+        
+        # Convert to format expected by permissions service
+        truck_inventory = {}
+        for item in truck_inventory_data:
+            product_key = f"{item['product_id']}_{item['variant_id']}"
+            truck_inventory[product_key] = {
+                "remaining_qty": item["available_qty"],
+                "product_name": f"Product {item['product_id']}"  # Would need product service to get real name
             }
-        }
         
         validation = permissions_service.validate_driver_order_creation_request(
             driver=current_user,
@@ -64,8 +90,15 @@ async def validate_driver_order_creation(
             truck_inventory=truck_inventory
         )
         
+        # Add truck inventory info to response
+        validation["truck_inventory"] = truck_inventory_data
+        validation["trip_status"] = trip.trip_status.value
+        validation["vehicle_id"] = str(trip.vehicle_id)
+        
         return validation
         
+    except HTTPException:
+        raise
     except Exception as e:
         default_logger.error(f"Failed to validate driver order creation: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")

@@ -92,6 +92,21 @@ class OrderLineModel(Base):
     manual_unit_price: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
     final_price: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     
+    # Tax fields
+    tax_code: Mapped[str] = mapped_column(String(20), nullable=True, default='TX_STD')
+    tax_rate: Mapped[Decimal] = mapped_column(Numeric(5,2), nullable=True, default=Decimal('0.00'))
+    tax_amount: Mapped[Decimal] = mapped_column(Numeric(10,2), nullable=True, default=Decimal('0.00'))
+    list_price_incl_tax: Mapped[Decimal] = mapped_column(Numeric(10,2), nullable=True, default=Decimal('0.00'))
+    final_price_incl_tax: Mapped[Decimal] = mapped_column(Numeric(10,2), nullable=True, default=Decimal('0.00'))
+    
+    # New tax fields
+    net_amount: Mapped[Decimal] = mapped_column(Numeric(10,2), nullable=True, default=Decimal('0.00'))
+    gross_amount: Mapped[Decimal] = mapped_column(Numeric(10,2), nullable=True, default=Decimal('0.00'))
+    is_tax_inclusive: Mapped[bool] = mapped_column(Boolean, nullable=True, default=False)
+    
+    # Component type for business logic
+    component_type: Mapped[str] = mapped_column(String(50), nullable=True, default='STANDARD')
+    
     # Audit fields
     created_by: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))

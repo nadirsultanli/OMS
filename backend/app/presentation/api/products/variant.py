@@ -498,12 +498,12 @@ async def create_complete_variant_set(
             created_by=request.created_by
         )
         
-        # Create deposit variant
+        # Always create deposit variant for complete sets - deposit amount handled in price lists
         deposit_variant = await variant_service.create_deposit_variant(
             tenant_id=request.tenant_id,
             product_id=request.product_id,
             size=request.size,
-            deposit_amount=float(request.deposit_amount),
+            deposit_amount=float(request.deposit_amount) if request.deposit_amount else 0.0,
             created_by=request.created_by
         )
         

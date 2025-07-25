@@ -11,18 +11,25 @@ from app.presentation.schemas.price_lists.input_schemas import (
     UpdatePriceListRequest,
     CreatePriceListLineRequest,
     UpdatePriceListLineRequest,
+    CreateProductPricingRequest,
     GetPriceRequest
 )
 from app.presentation.schemas.price_lists.output_schemas import (
     PriceListResponse,
     PriceListListResponse,
     PriceListLineResponse,
+    ProductPricingResponse,
     PriceResponse,
     MessageResponse
 )
 from app.services.price_lists.price_list_service import PriceListService
 from app.services.price_lists.pricing_service import PricingService
-from app.services.dependencies.price_lists import get_price_list_service, get_pricing_service
+from app.services.price_lists.product_pricing_service import ProductPricingService
+from app.services.dependencies.price_lists import (
+    get_price_list_service, 
+    get_pricing_service,
+    get_product_pricing_service
+)
 
 router = APIRouter(prefix="/price-lists", tags=["Price Lists"])
 
@@ -397,5 +404,65 @@ async def get_active_price_list_summary(
         
         summary = await pricing_service.get_active_price_list_summary(UUID(tenant_id))
         return summary
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post("/{price_list_id}/product-pricing", response_model=ProductPricingResponse)
+async def create_product_pricing(
+    price_list_id: str,
+    request: CreateProductPricingRequest,
+    product_pricing_service: ProductPricingService = Depends(get_product_pricing_service),
+    price_list_service: PriceListService = Depends(get_price_list_service),
+    user: User = current_user
+):
+    """Create product-based pricing (automatically generates gas + deposit price list lines)"""
+    try:
+        price_list_uuid = UUID(price_list_id)
+        
+        # Verify price list exists and user has access
+        price_list = await price_list_service.get_price_list_by_id(price_list_id)
+        if not price_list:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Price list not found"
+            )
+        
+        if str(user.tenant_id) != str(price_list.tenant_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this tenant"
+            )
+        
+        # Create product pricing lines
+        created_lines = await product_pricing_service.create_product_pricing_lines(
+            price_list_id=price_list_uuid,
+            product_id=request.product_id,
+            gas_price=request.gas_price,
+            deposit_price=request.deposit_price,
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            pricing_unit=request.pricing_unit,
+            scenario=request.scenario
+        )
+        
+        # Save all created lines to the database
+        for line in created_lines:
+            await price_list_service.create_price_list_line_from_entity(price_list_id, line)
+        
+        # Generate summary response
+        summary = product_pricing_service.get_pricing_summary(
+            product_id=request.product_id,
+            gas_price=request.gas_price,
+            deposit_price=request.deposit_price,
+            scenario=request.scenario,
+            pricing_unit=request.pricing_unit,
+            created_lines=created_lines
+        )
+        
+        return ProductPricingResponse(**summary)
+    
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) 

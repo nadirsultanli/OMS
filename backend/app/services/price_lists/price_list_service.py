@@ -153,6 +153,16 @@ class PriceListService:
         
         return await self.price_list_repository.create_price_list_line(line)
     
+    async def create_price_list_line_from_entity(
+        self,
+        price_list_id: UUID,
+        line_entity: PriceListLineEntity
+    ) -> PriceListLineEntity:
+        """Create a new price list line from PriceListLineEntity object"""
+        # Set the price_list_id if not already set
+        line_entity.price_list_id = price_list_id
+        return await self.price_list_repository.create_price_list_line(line_entity)
+    
     async def get_price_list_lines(self, price_list_id: str) -> List[PriceListLineEntity]:
         """Get all lines for a price list"""
         return await self.price_list_repository.get_price_list_lines(UUID(price_list_id))

@@ -4,6 +4,8 @@ import customerService from '../services/customerService';
 import variantService from '../services/variantService';
 import orderService from '../services/orderService';
 import priceListService from '../services/priceListService';
+import stockService from '../services/stockService';
+import warehouseService from '../services/warehouseService';
 import { authService } from '../services/authService';
 
 /**
@@ -39,6 +41,12 @@ const CreateOrder = () => {
   const [selectedPriceList, setSelectedPriceList] = useState('');
   const [availableVariants, setAvailableVariants] = useState([]);
   const [priceListLines, setPriceListLines] = useState([]);
+  
+  // Stock management
+  const [stockLevels, setStockLevels] = useState({});
+  const [defaultWarehouse, setDefaultWarehouse] = useState(null);
+  const [stockValidationErrors, setStockValidationErrors] = useState({});
+  const [hideOutOfStock, setHideOutOfStock] = useState(false);
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -58,15 +66,16 @@ const CreateOrder = () => {
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      // Load customers, variants, and price lists in parallel
-      const [customersResponse, variantsResponse, priceListsResponse] = await Promise.all([
+      // Load customers, variants, price lists, and warehouses in parallel
+      const [customersResponse, variantsResponse, priceListsResponse, warehousesResponse] = await Promise.all([
         customerService.getCustomers({ limit: 100 }),
         variantService.getVariants({ 
           tenant_id: authService.getCurrentUser()?.tenant_id,
           limit: 100,
           active_only: true
         }),
-        priceListService.getPriceLists(authService.getCurrentUser()?.tenant_id, { limit: 100 })
+        priceListService.getPriceLists(authService.getCurrentUser()?.tenant_id, { limit: 100 }),
+        warehouseService.getWarehouses(1, 100, { type: 'FIL' }) // Get filling warehouses as default
       ]);
 
       if (customersResponse.success) {
@@ -86,6 +95,12 @@ const CreateOrder = () => {
       if (priceListsResponse.success) {
         setPriceLists(priceListsResponse.data.price_lists || []);
       }
+
+      if (warehousesResponse.success && warehousesResponse.data.warehouses.length > 0) {
+        // Set first warehouse as default
+        setDefaultWarehouse(warehousesResponse.data.warehouses[0]);
+      }
+
     } catch (error) {
       console.error('Error loading initial data:', error);
       setMessage('Failed to load required data. Please refresh the page.');
@@ -117,7 +132,8 @@ const CreateOrder = () => {
       qty_ordered: 1,
       list_price: 0,
       manual_unit_price: '',
-      product_type: 'variant' // 'variant' or 'gas'
+      product_type: 'variant', // 'variant' or 'gas'
+      scenario: 'OUT' // Default to 'OUT' for cylinder sales
     };
 
     setFormData(prev => ({
@@ -182,8 +198,9 @@ const CreateOrder = () => {
         updateAllOrderLinePrices();
       }
     } else {
-      // No price list selected - show all variants
-      setAvailableVariants(variants);
+      // No price list selected - show all variants (with stock filter if enabled)
+      const filteredVariants = filterVariantsByStock(variants, !hideOutOfStock);
+      setAvailableVariants(filteredVariants);
       setPriceListLines([]);
     }
   };
@@ -200,7 +217,9 @@ const CreateOrder = () => {
           return lines.some(line => line.variant_id === variant.id);
         });
         
-        setAvailableVariants(variantsWithPrices);
+        // Apply stock filter if enabled
+        const filteredVariants = filterVariantsByStock(variantsWithPrices, !hideOutOfStock);
+        setAvailableVariants(filteredVariants);
         
         console.log(`Price list loaded: ${lines.length} price lines`);
         console.log(`Filtered variants: ${variantsWithPrices.length} out of ${variants.length} total variants`);
@@ -241,6 +260,119 @@ const CreateOrder = () => {
       ...prev,
       order_lines: updatedLines
     }));
+  };
+
+  // ============================================================================
+  // STOCK VALIDATION AND DISPLAY FUNCTIONS
+  // ============================================================================
+
+  const loadStockLevel = async (warehouseId, variantId) => {
+    try {
+      if (!warehouseId || !variantId) return null;
+      
+      const stockResponse = await stockService.getAvailableStock(warehouseId, variantId, 'ON_HAND');
+      if (stockResponse.success) {
+        return {
+          available_quantity: stockResponse.available_quantity || 0,
+          total_quantity: stockResponse.total_quantity || 0,
+          reserved_quantity: stockResponse.reserved_quantity || 0
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error loading stock level:', error);
+      return null;
+    }
+  };
+
+  const updateStockLevelsForVariant = async (variantId) => {
+    if (!defaultWarehouse || !variantId) return;
+    
+    const stockLevel = await loadStockLevel(defaultWarehouse.id, variantId);
+    if (stockLevel) {
+      setStockLevels(prev => ({
+        ...prev,
+        [variantId]: stockLevel
+      }));
+    }
+  };
+
+  const validateStockAvailability = async (orderLines) => {
+    const errors = {};
+    
+    for (const [index, line] of orderLines.entries()) {
+      if (line.variant_id && line.qty_ordered > 0) {
+        const stockLevel = stockLevels[line.variant_id];
+        
+        if (!stockLevel) {
+          // Try to load stock level if not cached
+          await updateStockLevelsForVariant(line.variant_id);
+          continue;
+        }
+        
+        if (line.qty_ordered > stockLevel.available_quantity) {
+          errors[`line_${index}_stock`] = `Insufficient stock: Only ${stockLevel.available_quantity} available, requested ${line.qty_ordered}`;
+        }
+      }
+    }
+    
+    setStockValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const getStockDisplayClass = (availableQty, requestedQty = 0) => {
+    if (availableQty === 0) return 'stock-unavailable';
+    if (requestedQty > availableQty) return 'stock-insufficient';
+    if (availableQty < 10) return 'stock-low';
+    return 'stock-available';
+  };
+
+  const getStockDisplayText = (stockLevel) => {
+    if (!stockLevel) return 'Loading...';
+    if (stockLevel.available_quantity === 0) return 'Out of Stock';
+    return `${stockLevel.available_quantity} available`;
+  };
+
+  const filterVariantsByStock = (variants, includeOutOfStock = true) => {
+    if (includeOutOfStock) return variants;
+    
+    return variants.filter(variant => {
+      const stockLevel = stockLevels[variant.id];
+      return stockLevel && stockLevel.available_quantity > 0;
+    });
+  };
+
+  const getVariantDisplayNameWithStock = (variant) => {
+    const baseDisplayName = getVariantDisplayName(variant);
+    const stockLevel = stockLevels[variant.id];
+    
+    if (stockLevel) {
+      const stockText = stockLevel.available_quantity === 0 
+        ? ' - OUT OF STOCK' 
+        : ` - ${stockLevel.available_quantity} in stock`;
+      return baseDisplayName + stockText;
+    }
+    
+    return baseDisplayName;
+  };
+
+  const handleStockFilterToggle = () => {
+    const newHideOutOfStock = !hideOutOfStock;
+    setHideOutOfStock(newHideOutOfStock);
+    
+    // Re-filter available variants based on new setting
+    if (selectedPriceList) {
+      // If price list is selected, re-apply price list filtering with stock filter
+      const variantsWithPrices = variants.filter(variant => {
+        return priceListLines.some(line => line.variant_id === variant.id);
+      });
+      const filteredVariants = filterVariantsByStock(variantsWithPrices, !newHideOutOfStock);
+      setAvailableVariants(filteredVariants);
+    } else {
+      // No price list selected, just filter all variants by stock
+      const filteredVariants = filterVariantsByStock(variants, !newHideOutOfStock);
+      setAvailableVariants(filteredVariants);
+    }
   };
   
   // Calculate order totals with tax breakdown
@@ -285,6 +417,11 @@ const CreateOrder = () => {
           : line
       )
     }));
+
+    // Load stock level when variant is selected
+    if (field === 'variant_id' && value) {
+      updateStockLevelsForVariant(value);
+    }
 
     // Auto-populate price when variant is selected and we have a price list
     if (field === 'variant_id' && value && selectedPriceList) {
@@ -368,7 +505,7 @@ const CreateOrder = () => {
     }
   };
 
-  const validateForm = () => {
+  const validateForm = async () => {
     const newErrors = {};
 
     // Customer validation
@@ -417,6 +554,14 @@ const CreateOrder = () => {
         newErrors[`${linePrefix}_qty_ordered`] = 'Quantity must be greater than 0';
       }
 
+      // Stock availability validation
+      if (line.variant_id && line.qty_ordered > 0) {
+        const stockLevel = stockLevels[line.variant_id];
+        if (stockLevel && line.qty_ordered > stockLevel.available_quantity) {
+          newErrors[`${linePrefix}_stock`] = `Insufficient stock: Only ${stockLevel.available_quantity} available, requested ${line.qty_ordered}`;
+        }
+      }
+
       // Price validation - require positive price
       if (selectedPriceList && (!line.list_price || line.list_price <= 0)) {
         newErrors[`${linePrefix}_list_price`] = 'Valid price is required. Please ensure the product has pricing in the selected price list.';
@@ -434,6 +579,12 @@ const CreateOrder = () => {
       }
     });
 
+    // Validate stock availability for all order lines
+    await validateStockAvailability(formData.order_lines);
+    
+    // Merge stock validation errors
+    Object.assign(newErrors, stockValidationErrors);
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -449,7 +600,8 @@ const CreateOrder = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    const isValid = await validateForm();
+    if (!isValid) {
       setMessage('Please fix the errors below before submitting.');
       return;
     }
@@ -478,6 +630,11 @@ const CreateOrder = () => {
 
           if (line.manual_unit_price && line.manual_unit_price !== '') {
             apiLine.manual_unit_price = parseFloat(line.manual_unit_price);
+          }
+
+          // Include scenario for cylinder OUT/XCH logic
+          if (line.scenario) {
+            apiLine.scenario = line.scenario;
           }
 
           return apiLine;
@@ -596,6 +753,28 @@ const CreateOrder = () => {
             ) : (
               <small className="form-help">Select a price list to automatically populate prices and filter available products</small>
             )}
+          </div>
+
+          <div className="form-group">
+            <div className="stock-filter-toggle">
+              <label className="toggle-label">
+                <input
+                  type="checkbox"
+                  checked={hideOutOfStock}
+                  onChange={handleStockFilterToggle}
+                  className="toggle-checkbox"
+                />
+                <span className="toggle-text">
+                  📦 Hide out-of-stock products
+                  {defaultWarehouse && ` (${defaultWarehouse.name})`}
+                </span>
+              </label>
+              {hideOutOfStock && (
+                <small className="form-help">
+                  Showing only products with available stock
+                </small>
+              )}
+            </div>
           </div>
 
           {selectedCustomer && (
@@ -762,7 +941,7 @@ const CreateOrder = () => {
                         </option>
                         {availableVariants.map(variant => (
                           <option key={variant.id} value={variant.id}>
-                            {getVariantDisplayName(variant)}
+                            {getVariantDisplayNameWithStock(variant)}
                           </option>
                         ))}
                       </select>
@@ -781,6 +960,81 @@ const CreateOrder = () => {
                         <span className="error-text">{errors[`line_${line.id}_variant_id`]}</span>}
                       {errors[`line_${line.id}_no_price`] && 
                         <span className="error-text pricing-error">⚠️ {errors[`line_${line.id}_no_price`]}</span>}
+                      {errors[`line_${line.id}_stock`] && 
+                        <span className="error-text stock-error">📦 {errors[`line_${line.id}_stock`]}</span>}
+                      
+                      {/* Stock Level Display */}
+                      {line.variant_id && (
+                        <div className={`stock-display ${getStockDisplayClass(stockLevels[line.variant_id]?.available_quantity || 0, line.qty_ordered)}`}>
+                          <span className="stock-icon">📦</span>
+                          <span className="stock-text">
+                            {getStockDisplayText(stockLevels[line.variant_id])}
+                            {defaultWarehouse && ` (${defaultWarehouse.name})`}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* OUT vs XCH Scenario Toggle for Cylinders */}
+                      {line.variant_id && (() => {
+                        const selectedVariant = variants.find(v => v.id === line.variant_id);
+                        const isCylinder = selectedVariant && (
+                          selectedVariant.sku.includes('CYL') || 
+                          selectedVariant.sku.includes('PROP') ||
+                          selectedVariant.sku_type === 'ASSET'
+                        );
+                        
+                        if (!isCylinder) return null;
+                        
+                        return (
+                          <div className="scenario-toggle-container">
+                            <label>Sale Type *</label>
+                            <div className="scenario-toggle">
+                              <div className="toggle-option">
+                                <input
+                                  type="radio"
+                                  id={`scenario_out_${line.id}`}
+                                  name={`scenario_${line.id}`}
+                                  value="OUT"
+                                  checked={line.scenario === 'OUT'}
+                                  onChange={(e) => updateOrderLine(line.id, 'scenario', e.target.value)}
+                                />
+                                <label htmlFor={`scenario_out_${line.id}`} className="scenario-label">
+                                  <span className="scenario-icon">💰</span>
+                                  <div className="scenario-details">
+                                    <strong>Outright Sale (OUT)</strong>
+                                    <small>Gas Fill + Cylinder Deposit</small>
+                                  </div>
+                                </label>
+                              </div>
+                              <div className="toggle-option">
+                                <input
+                                  type="radio"
+                                  id={`scenario_xch_${line.id}`}
+                                  name={`scenario_${line.id}`}
+                                  value="XCH"
+                                  checked={line.scenario === 'XCH'}
+                                  onChange={(e) => updateOrderLine(line.id, 'scenario', e.target.value)}
+                                />
+                                <label htmlFor={`scenario_xch_${line.id}`} className="scenario-label">
+                                  <span className="scenario-icon">🔄</span>
+                                  <div className="scenario-details">
+                                    <strong>Exchange (XCH)</strong>
+                                    <small>Gas Fill + Empty Return Credit</small>
+                                  </div>
+                                </label>
+                              </div>
+                            </div>
+                            {line.scenario && (
+                              <div className="scenario-explanation">
+                                {line.scenario === 'OUT' ? 
+                                  '📋 This will add: Gas Fill (23% VAT) + Deposit (0% VAT)' :
+                                  '📋 This will add: Gas Fill (23% VAT) + Empty Return Credit (0% VAT)'
+                                }
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div className="form-group">

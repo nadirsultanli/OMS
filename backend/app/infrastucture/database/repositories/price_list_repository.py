@@ -37,6 +37,9 @@ class PriceListRepositoryImpl(PriceListRepository):
                         variant_id=convert_uuid(line_model.variant_id),
                         gas_type=line_model.gas_type,
                         min_unit_price=line_model.min_unit_price,
+                        tax_code=line_model.tax_code,
+                        tax_rate=line_model.tax_rate,
+                        is_tax_inclusive=line_model.is_tax_inclusive,
                         created_at=line_model.created_at,
                         created_by=convert_uuid(line_model.created_by),
                         updated_at=line_model.updated_at,
@@ -78,6 +81,9 @@ class PriceListRepositoryImpl(PriceListRepository):
             variant_id=convert_uuid(model.variant_id),
             gas_type=model.gas_type,
             min_unit_price=model.min_unit_price,
+            tax_code=model.tax_code,
+            tax_rate=model.tax_rate,
+            is_tax_inclusive=model.is_tax_inclusive,
             created_at=model.created_at,
             created_by=convert_uuid(model.created_by),
             updated_at=model.updated_at,
@@ -110,6 +116,9 @@ class PriceListRepositoryImpl(PriceListRepository):
             variant_id=entity.variant_id,
             gas_type=entity.gas_type,
             min_unit_price=entity.min_unit_price,
+            tax_code=entity.tax_code,
+            tax_rate=entity.tax_rate,
+            is_tax_inclusive=entity.is_tax_inclusive,
             created_at=entity.created_at,
             created_by=entity.created_by,
             updated_at=entity.updated_at,
@@ -287,6 +296,9 @@ class PriceListRepositoryImpl(PriceListRepository):
         model.variant_id = line.variant_id
         model.gas_type = line.gas_type
         model.min_unit_price = line.min_unit_price
+        model.tax_code = line.tax_code
+        model.tax_rate = line.tax_rate
+        model.is_tax_inclusive = line.is_tax_inclusive
         model.updated_at = line.updated_at
         model.updated_by = line.updated_by
         

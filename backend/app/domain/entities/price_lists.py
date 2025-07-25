@@ -6,15 +6,29 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class PriceListLineEntity(BaseModel):
-    """Price list line domain entity"""
+    """Price list line domain entity with product-based pricing support"""
     id: Optional[UUID] = None
     price_list_id: UUID
+    
+    # Legacy variant-based pricing (for backward compatibility)
     variant_id: Optional[UUID] = None
     gas_type: Optional[str] = None
-    min_unit_price: Decimal  # Removed ge=0 constraint to allow negative prices for empty returns
+    min_unit_price: Optional[Decimal] = None  # Keep existing field name
+    
+    # New product-based pricing with automatic component generation (disabled until migration applied)
+    # product_id: Optional[UUID] = None
+    # gas_price: Optional[Decimal] = None
+    # deposit_price: Optional[Decimal] = None
+    # pricing_unit: str = Field(default='per_cylinder')  # 'per_cylinder' or 'per_kg'
+    # scenario: str = Field(default='OUT')  # 'OUT', 'XCH', or 'BOTH'
+    # component_type: str = Field(default='AUTO')  # 'AUTO', 'MANUAL', 'GAS_ONLY', 'DEPOSIT_ONLY'
+    
+    # Tax settings (existing fields in database)
     tax_code: str = Field(default="TX_STD", max_length=20)
     tax_rate: Decimal = Field(default=Decimal('23.00'), ge=0, le=100)
     is_tax_inclusive: bool = False
+    
+    # Audit fields
     created_at: Optional[datetime] = None
     created_by: Optional[UUID] = None
     updated_at: Optional[datetime] = None
@@ -22,10 +36,37 @@ class PriceListLineEntity(BaseModel):
 
     @field_validator('min_unit_price')
     def validate_min_unit_price(cls, v):
-        # Allow negative prices for empty returns (e.g., CYL13-EMPTY = -€25)
-        if v < Decimal('-999999.99'):
-            raise ValueError('Minimum unit price cannot be less than -999999.99')
+        if v is not None and v < Decimal('-999999.99'):
+            raise ValueError('Min unit price cannot be less than -999999.99')
         return v
+    
+    # Disabled validators for new product pricing fields
+    # @field_validator('gas_price', 'deposit_price')
+    # def validate_component_prices(cls, v):
+    #     if v is not None and v < Decimal('-999999.99'):
+    #         raise ValueError('Component prices cannot be less than -999999.99')
+    #     return v
+    # 
+    # @field_validator('pricing_unit')
+    # def validate_pricing_unit(cls, v):
+    #     valid_units = ['per_cylinder', 'per_kg']
+    #     if v not in valid_units:
+    #         raise ValueError(f'Pricing unit must be one of: {valid_units}')
+    #     return v
+    # 
+    # @field_validator('scenario')
+    # def validate_scenario(cls, v):
+    #     valid_scenarios = ['OUT', 'XCH', 'BOTH']
+    #     if v not in valid_scenarios:
+    #         raise ValueError(f'Scenario must be one of: {valid_scenarios}')
+    #     return v
+    # 
+    # @field_validator('component_type')
+    # def validate_component_type(cls, v):
+    #     valid_types = ['AUTO', 'MANUAL', 'GAS_ONLY', 'DEPOSIT_ONLY']
+    #     if v not in valid_types:
+    #         raise ValueError(f'Component type must be one of: {valid_types}')
+    #     return v
     
     @field_validator('tax_code')
     def validate_tax_code(cls, v):
@@ -45,9 +86,21 @@ class PriceListLineEntity(BaseModel):
         return {
             'id': str(self.id) if self.id else None,
             'price_list_id': str(self.price_list_id),
+            
+            # Legacy fields
             'variant_id': str(self.variant_id) if self.variant_id else None,
             'gas_type': self.gas_type,
-            'min_unit_price': float(self.min_unit_price),
+            'min_unit_price': float(self.min_unit_price) if self.min_unit_price else None,
+            
+            # Product-based pricing fields (disabled until migration applied)
+            # 'product_id': str(self.product_id) if self.product_id else None,
+            # 'gas_price': float(self.gas_price) if self.gas_price else None,
+            # 'deposit_price': float(self.deposit_price) if self.deposit_price else None,
+            # 'pricing_unit': self.pricing_unit,
+            # 'scenario': self.scenario,
+            # 'component_type': self.component_type,
+            
+            # Tax and audit fields
             'tax_code': self.tax_code,
             'tax_rate': float(self.tax_rate),
             'is_tax_inclusive': self.is_tax_inclusive,

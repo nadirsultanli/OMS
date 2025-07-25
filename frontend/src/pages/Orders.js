@@ -304,27 +304,39 @@ const Orders = () => {
     // Validate order lines
     formData.order_lines.forEach((line, index) => {
       // Check if at least one of variant_id or gas_type is provided
-      if (!line.variant_id && (!line.gas_type || line.gas_type.trim() === '')) {
+      const gasType = typeof line.gas_type === 'string' ? line.gas_type.trim() : line.gas_type;
+      if (!line.variant_id && (!line.gas_type || gasType === '')) {
         newErrors[`line_${index}_product`] = 'Product or gas type is required';
       }
       
       // Validate quantity - must be a positive number
       const qty = parseFloat(line.qty_ordered);
-      if (!line.qty_ordered || line.qty_ordered.trim() === '' || isNaN(qty) || qty <= 0) {
+      const qtyStr = typeof line.qty_ordered === 'string' ? line.qty_ordered.trim() : String(line.qty_ordered);
+      if (!line.qty_ordered || (typeof line.qty_ordered === 'string' && qtyStr === '') || isNaN(qty) || qty <= 0) {
         newErrors[`line_${index}_qty`] = 'Quantity must be a valid number greater than 0';
       }
       
       // Validate list price - must be a non-negative number
       const listPrice = parseFloat(line.list_price);
-      if (!line.list_price || line.list_price.trim() === '' || isNaN(listPrice) || listPrice < 0) {
+      const listPriceStr = typeof line.list_price === 'string' ? line.list_price.trim() : String(line.list_price);
+      if (line.list_price === null || line.list_price === undefined || 
+          (typeof line.list_price === 'string' && listPriceStr === '') || 
+          isNaN(listPrice) || listPrice < 0) {
         newErrors[`line_${index}_price`] = 'List price must be a valid non-negative number';
       }
       
       // Validate manual unit price (optional) - if provided, must be valid
-      if (line.manual_unit_price && line.manual_unit_price.trim() !== '') {
-        const manualPrice = parseFloat(line.manual_unit_price);
-        if (isNaN(manualPrice) || manualPrice < 0) {
-          newErrors[`line_${index}_manual_price`] = 'Manual price must be a valid non-negative number';
+      if (line.manual_unit_price !== null && line.manual_unit_price !== undefined && line.manual_unit_price !== '') {
+        const manualPriceStr = typeof line.manual_unit_price === 'string' ? line.manual_unit_price.trim() : String(line.manual_unit_price);
+        if (typeof line.manual_unit_price === 'string' && manualPriceStr !== '') {
+          const manualPrice = parseFloat(line.manual_unit_price);
+          if (isNaN(manualPrice) || manualPrice < 0) {
+            newErrors[`line_${index}_manual_price`] = 'Manual price must be a valid non-negative number';
+          }
+        } else if (typeof line.manual_unit_price === 'number') {
+          if (line.manual_unit_price < 0) {
+            newErrors[`line_${index}_manual_price`] = 'Manual price must be a valid non-negative number';
+          }
         }
       }
     });
@@ -542,21 +554,140 @@ const Orders = () => {
     }
   };
 
-  const handleViewOrder = (order) => {
-    setSelectedOrder(order);
-    setShowViewModal(true);
+  const handleViewOrder = async (order) => {
+    try {
+      setLoading(true);
+      setShowViewModal(true);
+      setSelectedOrder(order); // Show cached data first for immediate feedback
+      
+      // Fetch fresh order data from API
+      const result = await orderService.getOrderById(order.id);
+      
+      if (result.success) {
+        // Update with fresh data from API
+        setSelectedOrder(result.data);
+        
+        // Fetch variant details for any order lines that have variant_id
+        const variantIds = result.data.order_lines
+          ?.filter(line => line.variant_id)
+          .map(line => line.variant_id) || [];
+        
+        if (variantIds.length > 0) {
+          // Check if we already have these variants loaded
+          const missingVariantIds = variantIds.filter(id => 
+            !variants.find(v => v.id === id)
+          );
+          
+          if (missingVariantIds.length > 0) {
+            // Fetch missing variants
+            try {
+              const variantPromises = missingVariantIds.map(id => 
+                variantService.getVariantById(id).catch(() => ({ success: false }))
+              );
+              
+              const variantResponses = await Promise.all(variantPromises);
+              const newVariants = [];
+              
+              variantResponses.forEach((response, index) => {
+                if (response.success) {
+                  newVariants.push(response.data);
+                }
+              });
+              
+              if (newVariants.length > 0) {
+                // Add new variants to the existing variants array
+                setVariants(prev => [...prev, ...newVariants]);
+              }
+            } catch (error) {
+              console.error('Error fetching variant details:', error);
+            }
+          }
+        }
+        
+        setMessage({ type: 'success', text: 'Order details refreshed successfully' });
+        // Clear the message after 3 seconds
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        console.error('Failed to fetch fresh order data:', result.error);
+        setMessage({ type: 'error', text: 'Failed to load latest order details' });
+      }
+    } catch (error) {
+      console.error('Error fetching order details:', error);
+      setMessage({ type: 'error', text: 'Failed to load order details' });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEditClick = (order) => {
-    setSelectedOrder(order);
-    setFormData({
-      customer_id: order.customer_id,
-      requested_date: order.requested_date || '',
-      delivery_instructions: order.delivery_instructions || '',
-      payment_terms: order.payment_terms || '',
-      order_lines: order.order_lines || []
-    });
-    setShowEditForm(true);
+  const handleEditClick = async (order) => {
+    try {
+      setLoading(true);
+      setSelectedOrder(order); // Set basic order data first
+      
+      // Fetch complete order data including order lines
+      const result = await orderService.getOrderById(order.id);
+      
+      if (result.success) {
+        const fullOrderData = result.data;
+        setSelectedOrder(fullOrderData);
+        
+        // Populate the edit form with complete order data including lines
+        setFormData({
+          customer_id: fullOrderData.customer_id,
+          requested_date: fullOrderData.requested_date || '',
+          delivery_instructions: fullOrderData.delivery_instructions || '',
+          payment_terms: fullOrderData.payment_terms || '',
+          order_lines: fullOrderData.order_lines || []
+        });
+        
+        // Fetch variant details for any order lines that have variant_id
+        const variantIds = fullOrderData.order_lines
+          ?.filter(line => line.variant_id)
+          .map(line => line.variant_id) || [];
+        
+        if (variantIds.length > 0) {
+          // Check if we already have these variants loaded
+          const missingVariantIds = variantIds.filter(id => 
+            !variants.find(v => v.id === id)
+          );
+          
+          if (missingVariantIds.length > 0) {
+            // Fetch missing variants
+            try {
+              const variantPromises = missingVariantIds.map(id => 
+                variantService.getVariantById(id).catch(() => ({ success: false }))
+              );
+              
+              const variantResponses = await Promise.all(variantPromises);
+              const newVariants = [];
+              
+              variantResponses.forEach((response, index) => {
+                if (response.success) {
+                  newVariants.push(response.data);
+                }
+              });
+              
+              if (newVariants.length > 0) {
+                // Add new variants to the existing variants array
+                setVariants(prev => [...prev, ...newVariants]);
+              }
+            } catch (error) {
+              console.error('Error fetching variant details:', error);
+            }
+          }
+        }
+        
+        setShowEditForm(true);
+      } else {
+        console.error('Failed to fetch order details:', result.error);
+        setMessage({ type: 'error', text: 'Failed to load order details for editing' });
+      }
+    } catch (error) {
+      console.error('Error loading order for edit:', error);
+      setMessage({ type: 'error', text: 'Failed to load order details for editing' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetForm = () => {
@@ -672,7 +803,17 @@ const Orders = () => {
 
   const getVariantName = (variantId) => {
     const variant = variants.find(v => v.id === variantId);
-    return variant ? variant.name : 'Unknown Variant';
+    if (!variant) return 'Unknown Variant';
+    
+    // Use SKU as the primary display name
+    let displayName = variant.sku || 'Unknown SKU';
+    
+    // Add capacity if available for better identification
+    if (variant.capacity_kg) {
+      displayName += ` (${variant.capacity_kg}kg)`;
+    }
+    
+    return displayName;
   };
 
   const formatCurrency = (amount) => {
@@ -689,6 +830,110 @@ const Orders = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // Calculate comprehensive gas cylinder tax breakdown
+  const calculateGasCylinderTaxBreakdown = () => {
+    const breakdown = {
+      gasFill: { items: 0, netAmount: 0, taxAmount: 0, grossAmount: 0 },
+      deposits: { items: 0, netAmount: 0, taxAmount: 0, grossAmount: 0 },
+      returns: { items: 0, netAmount: 0, taxAmount: 0, grossAmount: 0 },
+      assets: { items: 0, netAmount: 0, taxAmount: 0, grossAmount: 0 },
+      totals: { netAmount: 0, taxAmount: 0, grossAmount: 0 }
+    };
+
+    if (!selectedOrder.order_lines || selectedOrder.order_lines.length === 0) {
+      return breakdown;
+    }
+
+    selectedOrder.order_lines.forEach(line => {
+      // Determine component type from line data (if available) or variant
+      let componentType = line.component_type || 'STANDARD';
+      
+      // If no component type, infer from variant or gas type
+      if (componentType === 'STANDARD' && line.variant_id) {
+        const variant = variants.find(v => v.id === line.variant_id);
+        if (variant) {
+          if (variant.sku && variant.sku.startsWith('GAS')) {
+            componentType = 'GAS_FILL';
+          } else if (variant.sku && variant.sku.startsWith('DEP')) {
+            componentType = 'CYLINDER_DEPOSIT';
+          } else if (variant.sku && variant.sku.endsWith('-EMPTY')) {
+            componentType = 'EMPTY_RETURN';
+          } else if (variant.sku_type === 'ASSET' || (variant.sku && variant.sku.startsWith('CYL'))) {
+            // CYL variants (like CYL13-UPDATED) are asset sales - taxable cylinder sales
+            componentType = 'ASSET_SALE';
+          }
+        }
+      } else if (componentType === 'STANDARD' && line.gas_type) {
+        componentType = 'GAS_FILL';
+      }
+
+      // Calculate amounts - final_price is already the line total in the database
+      const lineTotal = line.final_price; // final_price is already line total, not unit price
+      let netAmount = line.net_amount || lineTotal || 0;
+      let taxAmount = line.tax_amount || 0;
+      let grossAmount = line.gross_amount || 0;
+      
+      // Simulate tax calculation if backend data is missing
+      if (!line.tax_amount && !line.net_amount && netAmount > 0) {
+        if (componentType === 'ASSET_SALE' || componentType === 'GAS_FILL') {
+          // Taxable items - 23% VAT
+          taxAmount = netAmount * 0.23;
+          grossAmount = netAmount + taxAmount;
+        } else {
+          // Zero-rated items (deposits, returns)
+          taxAmount = 0;
+          grossAmount = netAmount;
+        }
+      } else if (!grossAmount) {
+        grossAmount = netAmount + taxAmount;
+      }
+
+      // Add to appropriate category
+      switch (componentType) {
+        case 'GAS_FILL':
+          breakdown.gasFill.items += line.qty_ordered;
+          breakdown.gasFill.netAmount += netAmount;
+          breakdown.gasFill.taxAmount += taxAmount;
+          breakdown.gasFill.grossAmount += grossAmount;
+          break;
+        case 'CYLINDER_DEPOSIT':
+          breakdown.deposits.items += line.qty_ordered;
+          breakdown.deposits.netAmount += netAmount;
+          breakdown.deposits.taxAmount += taxAmount;
+          breakdown.deposits.grossAmount += grossAmount;
+          break;
+        case 'EMPTY_RETURN':
+          breakdown.returns.items += line.qty_ordered;
+          breakdown.returns.netAmount += netAmount;
+          breakdown.returns.taxAmount += taxAmount;
+          breakdown.returns.grossAmount += grossAmount;
+          break;
+        case 'ASSET_SALE':
+          breakdown.assets.items += line.qty_ordered;
+          breakdown.assets.netAmount += netAmount;
+          breakdown.assets.taxAmount += taxAmount;
+          breakdown.assets.grossAmount += grossAmount;
+          break;
+        default:
+          // Treat as general taxable item
+          breakdown.gasFill.items += line.qty_ordered;
+          breakdown.gasFill.netAmount += netAmount;
+          breakdown.gasFill.taxAmount += taxAmount;
+          breakdown.gasFill.grossAmount += grossAmount;
+      }
+    });
+
+    // Calculate totals
+    breakdown.totals.netAmount = breakdown.gasFill.netAmount + breakdown.deposits.netAmount + 
+                                breakdown.returns.netAmount + breakdown.assets.netAmount;
+    breakdown.totals.taxAmount = breakdown.gasFill.taxAmount + breakdown.deposits.taxAmount + 
+                                breakdown.returns.taxAmount + breakdown.assets.taxAmount;
+    breakdown.totals.grossAmount = breakdown.gasFill.grossAmount + breakdown.deposits.grossAmount + 
+                                  breakdown.returns.grossAmount + breakdown.assets.grossAmount;
+
+    return breakdown;
   };
 
   const getStatusIcon = (status) => {
@@ -730,8 +975,8 @@ const Orders = () => {
       </div>
 
       {message && (
-        <div className="message success-message">
-          {message}
+        <div className={`message ${typeof message === 'object' ? `${message.type}-message` : 'success-message'}`}>
+          {typeof message === 'object' ? message.text : message}
         </div>
       )}
 
@@ -807,6 +1052,7 @@ const Orders = () => {
                 <th>Customer</th>
                 <th>Status</th>
                 <th>Total</th>
+                <th>Weight</th>
                 <th>Requested Date</th>
                 <th>Created</th>
                 <th>Actions</th>
@@ -826,6 +1072,9 @@ const Orders = () => {
                     </span>
                   </td>
                   <td className="amount-cell">{formatCurrency(order.total_amount)}</td>
+                  <td className="weight-cell">
+                    {order.total_weight_kg ? `${order.total_weight_kg} kg` : '-'}
+                  </td>
                   <td>{formatDate(order.requested_date)}</td>
                   <td className="date-cell">{formatDate(order.created_at)}</td>
                   <td className="actions-cell">
@@ -1124,6 +1373,7 @@ const Orders = () => {
             </div>
 
             <div className="order-details">
+              {/* Basic Order Information */}
               <div className="details-grid">
                 <div className="detail-group">
                   <label>Customer:</label>
@@ -1137,50 +1387,326 @@ const Orders = () => {
                   </span>
                 </div>
                 <div className="detail-group">
-                  <label>Total Amount:</label>
-                  <span>{formatCurrency(selectedOrder.total_amount)}</span>
-                </div>
-                <div className="detail-group">
                   <label>Requested Date:</label>
                   <span>{formatDate(selectedOrder.requested_date)}</span>
                 </div>
                 <div className="detail-group">
+                  <label>Payment Terms:</label>
+                  <span>{selectedOrder.payment_terms || 'Cash on delivery'}</span>
+                </div>
+                <div className="detail-group full-width">
                   <label>Delivery Instructions:</label>
                   <span>{selectedOrder.delivery_instructions || 'None'}</span>
                 </div>
-                <div className="detail-group">
-                  <label>Payment Terms:</label>
-                  <span>{selectedOrder.payment_terms || 'None'}</span>
-                </div>
               </div>
 
-              {selectedOrder.order_lines && selectedOrder.order_lines.length > 0 && (
+              {/* Order Lines Section */}
+              {selectedOrder.order_lines && selectedOrder.order_lines.length > 0 ? (
                 <div className="order-lines-section">
-                  <h3>Order Lines</h3>
+                  <h3>Order Items</h3>
                   <table className="order-lines-table">
                     <thead>
                       <tr>
-                        <th>Product</th>
+                        <th>Variant</th>
                         <th>Quantity</th>
-                        <th>Price</th>
-                        <th>Total</th>
+                        <th>Unit Price</th>
+                        <th>Line Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedOrder.order_lines.map((line, index) => (
                         <tr key={index}>
                           <td>
-                            {line.variant_id ? getVariantName(line.variant_id) : line.gas_type}
+                            <div className="product-info">
+                              <span className="product-name">
+                                {line.variant_id ? getVariantName(line.variant_id) : (line.gas_type ? `Bulk ${line.gas_type}` : 'Unknown Item')}
+                              </span>
+                              {line.variant_id && (() => {
+                                const variant = variants.find(v => v.id === line.variant_id);
+                                return variant && variant.sku_type && (
+                                  <span className="variant-type-badge">{variant.sku_type}</span>
+                                );
+                              })()}
+                              {line.manual_unit_price && line.manual_unit_price !== line.list_price && (
+                                <span className="price-override-badge">Custom Price</span>
+                              )}
+                            </div>
                           </td>
-                          <td>{line.qty_ordered}</td>
-                          <td>{formatCurrency(line.manual_unit_price || line.list_price)}</td>
-                          <td>{formatCurrency(line.final_price)}</td>
+                          <td className="quantity-cell">{line.qty_ordered}</td>
+                          <td className="price-cell">
+                            <div className="price-breakdown">
+                              {line.manual_unit_price && line.manual_unit_price !== line.list_price ? (
+                                <>
+                                  <span className="list-price-struck">{formatCurrency(line.list_price)}</span>
+                                  <span className="final-price">{formatCurrency(line.manual_unit_price)}</span>
+                                </>
+                              ) : (
+                                <span className="final-price">{formatCurrency(line.list_price)}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="total-cell">{formatCurrency(line.final_price)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+              ) : (
+                <div className="order-lines-section">
+                  <h3>Order Items</h3>
+                  <div className="empty-order-lines">
+                    <div className="empty-state-icon">📦</div>
+                    <h4>No Items Found</h4>
+                    <p>This order has no line items but shows a total amount of {formatCurrency(selectedOrder.total_amount)}.</p>
+                    {selectedOrder.total_amount > 0 && (
+                      <div className="data-inconsistency-warning">
+                        <span className="warning-icon">⚠️</span>
+                        <strong>Data Inconsistency Detected</strong>
+                        <p>This order has a total amount but no line items. This may indicate a data issue that needs attention.</p>
+                      </div>
+                    )}
+                    {['draft', 'submitted'].includes(selectedOrder.order_status) && (
+                      <div className="empty-state-actions">
+                        <button 
+                          className="btn btn-primary add-items-btn"
+                          onClick={() => {
+                            // Navigate to edit order or show add items modal
+                            setMessage({ type: 'info', text: 'Order editing functionality coming soon' });
+                          }}
+                        >
+                          Add Items to Order
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
+
+              {/* Pricing Summary Section */}
+              <div className="pricing-summary-section">
+                <h3>Pricing Summary</h3>
+                <div className="pricing-summary-content">
+                  <div className="pricing-breakdown">
+                    {(() => {
+                      // Calculate pricing breakdown
+                      let subtotal = 0;
+                      let totalDiscount = 0;
+                      let hasCustomPricing = false;
+                      let hasOrderLines = selectedOrder.order_lines && selectedOrder.order_lines.length > 0;
+
+                      if (hasOrderLines) {
+                        selectedOrder.order_lines.forEach(line => {
+                          const listTotal = line.list_price * line.qty_ordered;
+                          const finalTotal = line.final_price;
+                          subtotal += listTotal;
+                          
+                          if (line.manual_unit_price && line.manual_unit_price !== line.list_price) {
+                            const discount = listTotal - finalTotal;
+                            totalDiscount += discount;
+                            hasCustomPricing = true;
+                          }
+                        });
+                      }
+
+                      return (
+                        <div className="pricing-rows">
+                          <div className="pricing-row">
+                            <span className="pricing-label">Subtotal (List Prices):</span>
+                            <span className="pricing-value">{formatCurrency(subtotal)}</span>
+                          </div>
+                          
+                          {hasCustomPricing && (
+                            <div className="pricing-row discount-row">
+                              <span className="pricing-label">Price Adjustments:</span>
+                              <span className="pricing-value discount">
+                                {totalDiscount > 0 ? '-' : '+'}{formatCurrency(Math.abs(totalDiscount))}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {hasOrderLines ? (
+                            <div className="pricing-row subtotal-row">
+                              <span className="pricing-label">Net Amount:</span>
+                              <span className="pricing-value">{formatCurrency(selectedOrder.total_amount)}</span>
+                            </div>
+                          ) : (
+                            <div className="pricing-row inconsistency-row">
+                              <span className="pricing-label">Stored Total Amount:</span>
+                              <span className="pricing-value warning">{formatCurrency(selectedOrder.total_amount)}</span>
+                            </div>
+                          )}
+                          
+                          {/* Show data mismatch warning if subtotal doesn't match total */}
+                          {hasOrderLines && Math.abs(subtotal - selectedOrder.total_amount) > 0.01 && (
+                            <div className="pricing-row mismatch-row">
+                              <span className="pricing-label">⚠️ Data Mismatch:</span>
+                              <span className="pricing-value error">
+                                Difference: {formatCurrency(Math.abs(subtotal - selectedOrder.total_amount))}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Comprehensive Gas Cylinder Tax Breakdown */}
+                          {(() => {
+                            const taxBreakdown = calculateGasCylinderTaxBreakdown();
+                            const hasAnyData = taxBreakdown.totals.netAmount !== 0 || taxBreakdown.totals.taxAmount !== 0;
+                            
+                            if (!hasAnyData) {
+                              return (
+                                <>
+                                  <div className="pricing-row tax-info">
+                                    <span className="pricing-label">Tax Information:</span>
+                                    <span className="pricing-value tax-note">No tax data available</span>
+                                  </div>
+                                  <div className="pricing-row deposit-info">
+                                    <span className="pricing-label">Deposits:</span>
+                                    <span className="pricing-value deposit-note">No deposit data available</span>
+                                  </div>
+                                </>
+                              );
+                            }
+                            
+                            return (
+                              <div className="gas-cylinder-breakdown">
+                                {/* Gas Fill Section (Taxable) */}
+                                {taxBreakdown.gasFill.items > 0 && (
+                                  <div className="component-section gas-fill">
+                                    <div className="pricing-row component-header">
+                                      <span className="pricing-label">🔥 Gas Fill Service (Taxable):</span>
+                                      <span className="pricing-value">{formatCurrency(taxBreakdown.gasFill.netAmount)}</span>
+                                    </div>
+                                    <div className="pricing-row component-detail">
+                                      <span className="pricing-label indent">  VAT (23%):</span>
+                                      <span className="pricing-value tax-amount">+{formatCurrency(taxBreakdown.gasFill.taxAmount)}</span>
+                                    </div>
+                                    <div className="pricing-row component-subtotal">
+                                      <span className="pricing-label indent">  Subtotal (incl. VAT):</span>
+                                      <span className="pricing-value">{formatCurrency(taxBreakdown.gasFill.grossAmount)}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Cylinder Deposit Section (Zero-rated) */}
+                                {taxBreakdown.deposits.items > 0 && (
+                                  <div className="component-section deposits">
+                                    <div className="pricing-row component-header">
+                                      <span className="pricing-label">🛡️ Cylinder Deposit (Zero-rated):</span>
+                                      <span className="pricing-value">{formatCurrency(taxBreakdown.deposits.netAmount)}</span>
+                                    </div>
+                                    <div className="pricing-row component-detail">
+                                      <span className="pricing-label indent">  VAT (0% - Deposit):</span>
+                                      <span className="pricing-value zero-tax">+{formatCurrency(0)}</span>
+                                    </div>
+                                    <div className="pricing-row component-subtotal">
+                                      <span className="pricing-label indent">  Subtotal (zero-rated):</span>
+                                      <span className="pricing-value">{formatCurrency(taxBreakdown.deposits.grossAmount)}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Empty Return Section (Refund) */}
+                                {taxBreakdown.returns.items > 0 && (
+                                  <div className="component-section returns">
+                                    <div className="pricing-row component-header">
+                                      <span className="pricing-label">↩️ Empty Return Credit:</span>
+                                      <span className="pricing-value refund">{formatCurrency(taxBreakdown.returns.netAmount)}</span>
+                                    </div>
+                                    <div className="pricing-row component-detail">
+                                      <span className="pricing-label indent">  VAT (0% - Refund):</span>
+                                      <span className="pricing-value zero-tax">{formatCurrency(0)}</span>
+                                    </div>
+                                    <div className="pricing-row component-subtotal">
+                                      <span className="pricing-label indent">  Subtotal (refund):</span>
+                                      <span className="pricing-value refund">{formatCurrency(taxBreakdown.returns.grossAmount)}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Asset Sales Section (Taxable) */}
+                                {taxBreakdown.assets.items > 0 && (
+                                  <div className="component-section assets">
+                                    <div className="pricing-row component-header">
+                                      <span className="pricing-label">🏷️ Cylinder Sales (Taxable):</span>
+                                      <span className="pricing-value">{formatCurrency(taxBreakdown.assets.netAmount)}</span>
+                                    </div>
+                                    <div className="pricing-row component-detail">
+                                      <span className="pricing-label indent">  VAT (23%):</span>
+                                      <span className="pricing-value tax-amount">+{formatCurrency(taxBreakdown.assets.taxAmount)}</span>
+                                    </div>
+                                    <div className="pricing-row component-subtotal">
+                                      <span className="pricing-label indent">  Subtotal (incl. VAT):</span>
+                                      <span className="pricing-value">{formatCurrency(taxBreakdown.assets.grossAmount)}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Tax Summary */}
+                                <div className="tax-summary-section">
+                                  <div className="pricing-row tax-summary">
+                                    <span className="pricing-label">Total VAT:</span>
+                                    <span className="pricing-value tax-total">{formatCurrency(taxBreakdown.totals.taxAmount)}</span>
+                                  </div>
+                                  <div className="pricing-row tax-compliance">
+                                    <span className="pricing-label">Tax Compliance:</span>
+                                    <span className="pricing-value compliance-note">
+                                      {taxBreakdown.totals.taxAmount > 0 ? 'VAT applicable' : 'Zero-rated only'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                          
+                          <div className="pricing-row total-row">
+                            <span className="pricing-label">Total Amount:</span>
+                            <span className="pricing-value total">
+                              {(() => {
+                                const taxBreakdown = calculateGasCylinderTaxBreakdown();
+                                const calculatedTotal = taxBreakdown.totals.grossAmount;
+                                // Use calculated total if available, otherwise fall back to stored total
+                                return formatCurrency(calculatedTotal > 0 ? calculatedTotal : selectedOrder.total_amount);
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  
+                  {/* Additional Financial Information */}
+                  <div className="financial-info">
+                    <div className="info-row">
+                      <span className="info-label">Order Status:</span>
+                      <span className={`info-value status-${selectedOrder.order_status}`}>
+                        {orderService.getOrderStatusLabel(selectedOrder.order_status)}
+                      </span>
+                    </div>
+                    <div className="info-row">
+                      <span className="info-label">Line Items:</span>
+                      <span className="info-value">
+                        {selectedOrder.order_lines ? selectedOrder.order_lines.length : 0} items
+                      </span>
+                    </div>
+                    {selectedOrder.total_weight_kg && (
+                      <div className="info-row">
+                        <span className="info-label">Total Weight:</span>
+                        <span className="info-value">{selectedOrder.total_weight_kg} kg</span>
+                      </div>
+                    )}
+                    <div className="info-row">
+                      <span className="info-label">Created:</span>
+                      <span className="info-value">{formatDate(selectedOrder.created_at)}</span>
+                    </div>
+                    {/* Debug Info for problematic orders */}
+                    {(!selectedOrder.order_lines || selectedOrder.order_lines.length === 0) && selectedOrder.total_amount > 0 && (
+                      <div className="info-row debug-info">
+                        <span className="info-label">Debug Info:</span>
+                        <span className="info-value debug">Order ID: {selectedOrder.id}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

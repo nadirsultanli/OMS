@@ -32,6 +32,22 @@ class OrderLine:
     list_price: Decimal = Decimal('0')
     manual_unit_price: Optional[Decimal] = None
     final_price: Decimal = Decimal('0')
+    
+    # Tax fields
+    tax_code: str = 'TX_STD'
+    tax_rate: Decimal = Decimal('0.00')
+    tax_amount: Decimal = Decimal('0.00')
+    list_price_incl_tax: Decimal = Decimal('0.00')
+    final_price_incl_tax: Decimal = Decimal('0.00')
+    
+    # New tax fields
+    net_amount: Decimal = Decimal('0.00')
+    gross_amount: Decimal = Decimal('0.00')
+    is_tax_inclusive: bool = False
+    
+    # Component type for business logic (GAS_FILL, CYLINDER_DEPOSIT, EMPTY_RETURN)
+    component_type: str = 'STANDARD'
+    
     created_at: datetime = field(default_factory=datetime.utcnow)
     created_by: Optional[UUID] = None
     updated_at: datetime = field(default_factory=datetime.utcnow)
@@ -181,9 +197,26 @@ class Order:
 
     def _recalculate_totals(self):
         """Recalculate order totals based on order lines"""
-        self.total_amount = sum(line.final_price for line in self.order_lines)
-        # Note: total_weight_kg would need to be calculated based on variant weights
-        # This would require access to variant data
+        # Use gross_amount (includes tax) instead of final_price (before tax)
+        self.total_amount = sum(line.gross_amount or line.final_price for line in self.order_lines)
+        # Weight calculation will be handled by business service with variant data
+        # This method only recalculates totals from existing line data
+
+    def calculate_total_weight(self, variant_weights: dict):
+        """Calculate total weight based on order lines and variant weights
+        
+        Args:
+            variant_weights: Dict mapping variant_id -> weight_per_unit (Decimal)
+        """
+        total_weight = Decimal('0')
+        
+        for line in self.order_lines:
+            if line.variant_id and line.variant_id in variant_weights:
+                weight_per_unit = variant_weights[line.variant_id]
+                if weight_per_unit:
+                    total_weight += line.qty_ordered * weight_per_unit
+        
+        self.total_weight_kg = total_weight if total_weight > 0 else None
 
     def can_be_modified(self) -> bool:
         """Check if the order can be modified based on its status"""
