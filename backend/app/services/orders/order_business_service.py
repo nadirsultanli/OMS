@@ -40,7 +40,7 @@ class OrderBusinessService:
 
     def can_create_order(self, user: User) -> bool:
         """Check if user can create orders"""
-        return user.role in [UserRoleType.SALES_REP, UserRoleType.ACCOUNTS, UserRoleType.TENANT_ADMIN]
+        return user.role in [UserRoleType.SALES_REP, UserRoleType.ACCOUNTS, UserRoleType.TENANT_ADMIN, UserRoleType.DRIVER]
 
     def can_edit_order(self, user: User, order: Order) -> bool:
         """Check if user can edit an order"""
@@ -628,6 +628,30 @@ class OrderBusinessService:
         
         # Set rejection reason using existing delivery_instructions field
         order.set_rejection_reason(rejection_reason)
+        order.update_status(OrderStatus.CANCELLED, user.id)
+        
+        # Save to repository
+        return await self.order_repository.update_order(str(order.id), order)
+
+    async def cancel_order_with_business_rules(
+        self,
+        user: User,
+        order: Order
+    ) -> Order:
+        """Cancel order with business logic validation"""
+        # Check permissions
+        if not self.can_cancel_order(user, order):
+            raise OrderPermissionError(f"User role {user.role} cannot cancel orders")
+        
+        # Validate status transition to cancelled
+        if not self.validate_status_transition(order.order_status, OrderStatus.CANCELLED):
+            raise OrderStatusTransitionError(
+                order.order_status.value, 
+                OrderStatus.CANCELLED.value, 
+                str(order.id)
+            )
+        
+        # Update status to cancelled
         order.update_status(OrderStatus.CANCELLED, user.id)
         
         # Save to repository
