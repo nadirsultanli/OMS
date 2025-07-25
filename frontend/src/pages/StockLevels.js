@@ -24,6 +24,7 @@ const StockLevels = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [totalCount, setTotalCount] = useState(0);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -32,7 +33,7 @@ const StockLevels = () => {
     stockStatus: '',
     minQuantity: '',
     includeZeroStock: true,
-    limit: 100,
+    limit: 20,
     offset: 0
   });
 
@@ -86,7 +87,7 @@ const StockLevels = () => {
         setVariants(Array.isArray(variantsData) ? variantsData : []);
         
         // Load all stock levels immediately
-        await loadStockLevels();
+        await loadStockLevels(filters);
       } catch (err) {
         setError('Failed to load initial data: ' + err.message);
       } finally {
@@ -97,21 +98,23 @@ const StockLevels = () => {
     loadInitialData();
   }, []);
 
-  const loadStockLevels = useCallback(async () => {
+  const loadStockLevels = useCallback(async (searchFilters = filters) => {
     try {
       setLoading(true);
-      const response = await stockService.getStockLevels(filters);
+      const response = await stockService.getStockLevels(searchFilters);
       setStockLevels(response.stock_levels || []);
+      setTotalCount(response.total_count || response.stock_levels?.length || 0);
     } catch (err) {
       setError('Failed to load stock levels: ' + err.message);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
-  useEffect(() => {
-    loadStockLevels();
-  }, [loadStockLevels]);
+  // Only load initially, no auto-refresh on filter changes
+  const handleSearch = () => {
+    loadStockLevels(filters);
+  };
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({
@@ -167,7 +170,7 @@ const StockLevels = () => {
 
   const handleAdjustmentSuccess = (response) => {
     setSuccess('Stock adjustment completed successfully');
-    loadStockLevels(); // Refresh the data
+    loadStockLevels(filters); // Refresh the data
     setTimeout(() => setSuccess(null), 5000); // Clear success message after 5 seconds
   };
 
@@ -175,20 +178,20 @@ const StockLevels = () => {
     setSuccess(`Stock reservation completed successfully. Reserved: ${response.quantity_reserved}, Remaining available: ${response.remaining_available}`);
     // Force immediate refresh
     setTimeout(() => {
-      loadStockLevels();
+      loadStockLevels(filters);
     }, 100);
     setTimeout(() => setSuccess(null), 5000);
   };
 
   const handleTransferSuccess = (response) => {
     setSuccess('Stock transfer completed successfully');
-    loadStockLevels(); // Refresh the data
+    loadStockLevels(filters); // Refresh the data
     setTimeout(() => setSuccess(null), 5000);
   };
 
   const handlePhysicalCountSuccess = (response) => {
     setSuccess('Physical count reconciliation completed successfully');
-    loadStockLevels(); // Refresh the data
+    loadStockLevels(filters); // Refresh the data
     setTimeout(() => setSuccess(null), 5000);
   };
 
@@ -196,20 +199,42 @@ const StockLevels = () => {
     setSuccess(`Stock reservation released successfully. Released: ${response.quantity_reserved}, Available: ${response.remaining_available}`);
     // Force immediate refresh
     setTimeout(() => {
-      loadStockLevels();
+      loadStockLevels(filters);
     }, 100);
     setTimeout(() => setSuccess(null), 5000);
   };
+
+  // Pagination handlers
+  const handlePageChange = (newPage) => {
+    const newOffset = (newPage - 1) * filters.limit;
+    setFilters(prev => ({ ...prev, offset: newOffset }));
+  };
+
+  const handlePageSizeChange = (newSize) => {
+    setFilters(prev => ({ 
+      ...prev, 
+      limit: parseInt(newSize), 
+      offset: 0 // Reset to first page
+    }));
+  };
+
+  const currentPage = Math.floor(filters.offset / filters.limit) + 1;
+  const totalPages = Math.ceil(totalCount / filters.limit);
+  const showingFrom = filters.offset + 1;
+  const showingTo = Math.min(filters.offset + filters.limit, totalCount);
 
   if (loading && stockLevels.length === 0) {
     return (
       <div className="stock-levels-page">
         <div className="page-header">
-          <h1>Stock Levels</h1>
+          <div className="page-title-section">
+            <h1>Stock Levels</h1>
+            <p className="page-subtitle">Manage inventory across all warehouses</p>
+          </div>
         </div>
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Loading...</p>
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <p>Loading stock levels...</p>
         </div>
       </div>
     );
@@ -218,8 +243,8 @@ const StockLevels = () => {
   if (loading && warehouses.length === 0 && variants.length === 0) {
     return (
       <div className="stock-levels-page">
-        <div className="loading-container">
-          <div className="spinner"></div>
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
           <p>Loading stock levels...</p>
         </div>
       </div>
@@ -229,7 +254,10 @@ const StockLevels = () => {
   return (
     <div className="stock-levels-page">
       <div className="page-header">
-        <h1>Stock Levels</h1>
+        <div className="page-title-section">
+          <h1>Stock Levels</h1>
+          <p className="page-subtitle">Manage inventory across all warehouses</p>
+        </div>
         <div className="header-actions">
           <button 
             className="btn btn-secondary" 
@@ -338,7 +366,10 @@ const StockLevels = () => {
             />
           </div>
 
-          <div className="filter-group checkbox-group">
+        </div>
+
+        <div className="filter-actions">
+          <div className="checkbox-group">
             <label className="checkbox-label">
               <input
                 type="checkbox"
@@ -348,26 +379,25 @@ const StockLevels = () => {
               Include Zero Stock
             </label>
           </div>
-        </div>
-
-        <div className="filter-actions">
-          <button className="btn btn-primary" onClick={loadStockLevels}>
-            Search
-          </button>
-          <button 
-            className="btn btn-secondary" 
-            onClick={() => setFilters({
-              warehouseId: '',
-              variantId: '',
-              stockStatus: '',
-              minQuantity: '',
-              includeZeroStock: true,
-              limit: 100,
-              offset: 0
-            })}
-          >
-            Clear Filters
-          </button>
+          <div className="action-buttons">
+            <button className="btn btn-primary" onClick={handleSearch}>
+              Search
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setFilters({
+                warehouseId: '',
+                variantId: '',
+                stockStatus: '',
+                minQuantity: '',
+                includeZeroStock: true,
+                limit: 20,
+                offset: 0
+              })}
+            >
+              Clear Filters
+            </button>
+          </div>
         </div>
       </div>
 
@@ -378,7 +408,8 @@ const StockLevels = () => {
         </div>
       ) : (
         <div className="stock-levels-table">
-          <table className="table">
+          <div className="table-scroll-wrapper">
+            <table className="table">
             <thead>
               <tr>
                 <th>Warehouse</th>
@@ -418,8 +449,8 @@ const StockLevels = () => {
                       {formatQuantity(level.quantity)}
                     </td>
                     <td className="quantity-cell">
-                      <span className={level.reserved_qty > 0 ? 'reserved-qty' : ''}>
-                        {formatQuantity(level.reserved_qty)}
+                      <span className={level.reserved_qty > 0 ? 'reserved-qty' : 'text-muted'}>
+                        {level.reserved_qty > 0 ? formatQuantity(level.reserved_qty) : '-'}
                       </span>
                     </td>
                     <td className="quantity-cell">
@@ -473,6 +504,90 @@ const StockLevels = () => {
               )}
             </tbody>
           </table>
+          </div>
+          
+          {/* Pagination Controls */}
+          {totalCount > 0 && (
+            <div className="pagination-container">
+              <div className="pagination-info">
+                Showing {showingFrom} to {showingTo} of {totalCount} results
+              </div>
+              
+              <div className="pagination-controls">
+                <div className="page-size-selector">
+                  <label>Show</label>
+                  <select 
+                    value={filters.limit} 
+                    onChange={(e) => handlePageSizeChange(e.target.value)}
+                    className="form-control page-size-select"
+                  >
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                  <span>per page</span>
+                </div>
+                
+                <div className="pagination-buttons">
+                  <button 
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </button>
+                  <button 
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </button>
+                  
+                  <div className="page-numbers">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return pageNum <= totalPages ? (
+                        <button
+                          key={pageNum}
+                          className={`btn btn-sm ${pageNum === currentPage ? 'btn-primary' : 'btn-outline-secondary'}`}
+                          onClick={() => handlePageChange(pageNum)}
+                        >
+                          {pageNum}
+                        </button>
+                      ) : null;
+                    })}
+                  </div>
+                  
+                  <button 
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </button>
+                  <button 
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Last
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

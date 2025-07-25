@@ -243,9 +243,9 @@ const StockDashboard = () => {
         <div className="page-header">
           <h1>Stock Management Dashboard</h1>
         </div>
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Loading...</p>
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <p>Loading dashboard...</p>
         </div>
       </div>
     );
