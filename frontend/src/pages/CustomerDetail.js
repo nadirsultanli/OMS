@@ -646,7 +646,12 @@ const CustomerDetail = () => {
                         </div>
                       )}
                       
-                      {address.coordinates && (
+                      {address.coordinates && 
+                       address.coordinates !== 'null' && 
+                       address.coordinates !== 'undefined' && 
+                       address.coordinates !== '' &&
+                       address.coordinates !== 'POINT()' &&
+                       address.coordinates !== 'POINT( )' && (
                         <AddressMap 
                           coordinates={address.coordinates}
                           address={`${address.street}, ${address.city}`}
