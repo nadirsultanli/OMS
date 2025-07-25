@@ -39,13 +39,14 @@ const StockDocuments = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [totalCount, setTotalCount] = useState(0);
   
   // Filters
   const [filters, setFilters] = useState({
     docType: '',
     docStatus: '',
     warehouseId: '',
-    limit: 50,
+    limit: 20,
     offset: 0
   });
 
@@ -68,6 +69,7 @@ const StockDocuments = () => {
         
         setWarehouses(warehousesResponse.warehouses || []);
         setStockDocs(stockDocsResponse.stock_docs || []);
+        setTotalCount(stockDocsResponse.total_count || stockDocsResponse.stock_docs?.length || 0);
       } catch (err) {
         setError('Failed to load initial data: ' + err.message);
       } finally {
@@ -83,6 +85,7 @@ const StockDocuments = () => {
       setLoading(true);
       const response = await stockService.getStockDocuments(filters);
       setStockDocs(response.stock_docs || []);
+      setTotalCount(response.total_count || response.stock_docs?.length || 0);
     } catch (err) {
       setError('Failed to load stock documents: ' + err.message);
     } finally {
@@ -200,15 +203,37 @@ const StockDocuments = () => {
     loadStockDocuments();
   };
 
+  // Pagination handlers
+  const handlePageChange = (newPage) => {
+    const newOffset = (newPage - 1) * filters.limit;
+    setFilters(prev => ({ ...prev, offset: newOffset }));
+  };
+
+  const handlePageSizeChange = (newSize) => {
+    setFilters(prev => ({ 
+      ...prev, 
+      limit: parseInt(newSize), 
+      offset: 0 // Reset to first page
+    }));
+  };
+
+  const currentPage = Math.floor(filters.offset / filters.limit) + 1;
+  const totalPages = Math.ceil(totalCount / filters.limit);
+  const showingFrom = filters.offset + 1;
+  const showingTo = Math.min(filters.offset + filters.limit, totalCount);
+
   if (loading && stockDocs.length === 0) {
     return (
       <div className="stock-docs-page">
         <div className="page-header">
-          <h1>Stock Documents</h1>
+          <div className="page-title-section">
+            <h1>Stock Documents</h1>
+            <p className="page-subtitle">Manage inventory transactions and transfers</p>
+          </div>
         </div>
         <div className="loading-container">
           <div className="spinner"></div>
-          <p>Loading...</p>
+          <p>Loading stock documents...</p>
         </div>
       </div>
     );
@@ -217,7 +242,10 @@ const StockDocuments = () => {
   return (
     <div className="stock-docs-page">
       <div className="page-header">
-        <h1>Stock Documents</h1>
+        <div className="page-title-section">
+          <h1>Stock Documents</h1>
+          <p className="page-subtitle">Manage inventory transactions and transfers</p>
+        </div>
         <div className="header-actions">
           <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
             Create Document
@@ -301,7 +329,7 @@ const StockDocuments = () => {
               docType: '',
               docStatus: '',
               warehouseId: '',
-              limit: 50,
+              limit: 20,
               offset: 0
             })}
           >
@@ -431,6 +459,89 @@ const StockDocuments = () => {
             )}
           </tbody>
         </table>
+        
+        {/* Pagination Controls */}
+        {totalCount > 0 && (
+          <div className="pagination-container">
+            <div className="pagination-info">
+              Showing {showingFrom} to {showingTo} of {totalCount} results
+            </div>
+            
+            <div className="pagination-controls">
+              <div className="page-size-selector">
+                <label>Show</label>
+                <select 
+                  value={filters.limit} 
+                  onChange={(e) => handlePageSizeChange(e.target.value)}
+                  className="form-control page-size-select"
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+                <span>per page</span>
+              </div>
+              
+              <div className="pagination-buttons">
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                >
+                  First
+                </button>
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </button>
+                
+                <div className="page-numbers">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return pageNum <= totalPages ? (
+                      <button
+                        key={pageNum}
+                        className={`btn btn-sm ${pageNum === currentPage ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum}
+                      </button>
+                    ) : null;
+                  })}
+                </div>
+                
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </button>
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  Last
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
