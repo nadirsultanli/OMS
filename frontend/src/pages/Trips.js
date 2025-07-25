@@ -278,15 +278,9 @@ const Trips = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = tripStatuses.find(s => s.value === status);
+    const statusClass = status?.toLowerCase().replace(' ', '_');
     return (
-      <span 
-        className="status-badge" 
-        style={{ 
-          backgroundColor: `${statusConfig?.color}20`,
-          color: statusConfig?.color,
-          border: `1px solid ${statusConfig?.color}40`
-        }}
-      >
+      <span className={`status-badge ${statusClass}`}>
         {getStatusIcon(status)}
         {statusConfig?.label || status}
       </span>
