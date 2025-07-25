@@ -42,6 +42,7 @@ const CreateOrder = () => {
   const [priceLists, setPriceLists] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [activePriceList, setActivePriceList] = useState(null);
+  const [selectedPriceList, setSelectedPriceList] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [availableVariants, setAvailableVariants] = useState([]);
   const [priceListLines, setPriceListLines] = useState([]);
@@ -52,25 +53,8 @@ const CreateOrder = () => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   
-  // Product-based addition state (cleaned up - removing unused showProductForm)
-  const [productFormData, setProductFormData] = useState({
-    product_id: '',
-    gas_price: '',
-    deposit_price: '',
-    pricing_unit: 'per_cylinder',
-    scenario: 'OUT',
-    quantity: 1
-  });
-  
-  // New state for the improved workflow
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [previewLines, setPreviewLines] = useState([]);
-  const [showPreview, setShowPreview] = useState(false);
-  
-  // New state for multiple product selection
+  // Available products from active price list
   const [availableProducts, setAvailableProducts] = useState([]);
-  const [selectedProducts, setSelectedProducts] = useState([]);
-  const [productSearchTerm, setProductSearchTerm] = useState('');
   
   // Stock management
   const [stockLevels, setStockLevels] = useState({});
@@ -555,6 +539,19 @@ const CreateOrder = () => {
     return baseDisplayName;
   };
 
+  // Get variants filtered by selected product and active price list
+  const getFilteredVariantsForOrderLine = () => {
+    if (!activePriceList) return [];
+    
+    // If a product is selected, show only variants of that product
+    if (selectedProduct) {
+      return availableVariants.filter(variant => variant.product_id === selectedProduct.id);
+    }
+    
+    // Otherwise show all variants from active price list
+    return availableVariants;
+  };
+
   const handleStockFilterToggle = () => {
     const newHideOutOfStock = !hideOutOfStock;
     setHideOutOfStock(newHideOutOfStock);
@@ -930,58 +927,51 @@ const CreateOrder = () => {
     setMessage('Cleared all selected products');
   };
 
-  // Function to auto-generate Gas & Deposit lines from selected products
-  const handleCreateOrderLinesFromSelectedProducts = () => {
-    if (selectedProducts.length === 0) return;
+  // Function to auto-generate Gas & Deposit lines from selected product
+  const handleCreateOrderLinesFromSelectedProduct = () => {
+    if (!selectedProduct || !activePriceList) return;
 
-    // Clear existing order lines first
+    // Get all variants for this product that are in the price list
+    const productVariants = variants.filter(v => v.product_id === selectedProduct.id);
+    const relevantPriceListLines = priceListLines.filter(line => 
+      productVariants.some(v => v.id === line.variant_id)
+    );
+
+    if (relevantPriceListLines.length === 0) {
+      setMessage(`No variants found for ${selectedProduct.name} in the active price list.`);
+      return;
+    }
+
+    // Create order lines for all variants of this product
+    const newLines = relevantPriceListLines.map(line => {
+      const variant = productVariants.find(v => v.id === line.variant_id);
+      if (!variant) return null;
+
+      return {
+        id: Date.now() + Math.random(),
+        product_type: 'variant',
+        variant_id: variant.id,
+        qty_ordered: 1,
+        list_price: line.min_unit_price || 0,
+        manual_unit_price: line.min_unit_price || 0,
+        scenario: 'OUT',
+        component_type: variant.sku_type === 'CONSUMABLE' ? 'GAS_FILL' : 
+                       variant.sku_type === 'DEPOSIT' ? 'CYLINDER_DEPOSIT' : 'STANDARD',
+        tax_rate: line.tax_rate || 0,
+        tax_code: line.tax_code || 'TX_STD',
+        tax_amount: (line.min_unit_price || 0) * (line.tax_rate || 0) / 100,
+        gross_price: (line.min_unit_price || 0) * (1 + (line.tax_rate || 0) / 100),
+        priceFound: true
+      };
+    }).filter(Boolean);
+
+    // Add lines to order
     setFormData(prev => ({
       ...prev,
-      order_lines: []
+      order_lines: [...prev.order_lines, ...newLines]
     }));
 
-    let totalLinesAdded = 0;
-
-    // Process each selected product
-    selectedProducts.forEach(product => {
-      // Get all variants for this product that are in the price list
-      const productVariants = variants.filter(v => v.product_id === product.id);
-      const relevantPriceListLines = priceListLines.filter(line => 
-        productVariants.some(v => v.id === line.variant_id)
-      );
-
-      // Create order lines for all variants of this product
-      const newLines = relevantPriceListLines.map(line => {
-        const variant = productVariants.find(v => v.id === line.variant_id);
-        if (!variant) return null;
-
-        totalLinesAdded++;
-        return {
-          id: Date.now() + Math.random() + totalLinesAdded,
-          product_type: 'variant',
-          variant_id: variant.id,
-          qty_ordered: 1,
-          list_price: line.min_unit_price || 0,
-          manual_unit_price: line.min_unit_price || 0,
-          scenario: 'OUT',
-          component_type: variant.sku_type === 'CONSUMABLE' ? 'GAS_FILL' : 
-                         variant.sku_type === 'DEPOSIT' ? 'CYLINDER_DEPOSIT' : 'STANDARD',
-          tax_rate: line.tax_rate || 0,
-          tax_code: line.tax_code || 'TX_STD',
-          tax_amount: (line.min_unit_price || 0) * (line.tax_rate || 0) / 100,
-          gross_price: (line.min_unit_price || 0) * (1 + (line.tax_rate || 0) / 100),
-          priceFound: true
-        };
-      }).filter(Boolean);
-
-      // Add lines to order
-      setFormData(prev => ({
-        ...prev,
-        order_lines: [...prev.order_lines, ...newLines]
-      }));
-    });
-
-    setMessage(`✅ Step 3 Complete: Auto-generated ${totalLinesAdded} Gas & Deposit lines from ${selectedProducts.length} products. Ready for Step 4: Review & Confirm.`);
+    setMessage(`✅ Generated ${newLines.length} order lines for ${selectedProduct.name}`);
   };
 
   const updateOrderLine = (lineId, field, value) => {
@@ -1350,8 +1340,11 @@ const CreateOrder = () => {
                   options={availableProducts}
                   onSelect={(product) => {
                     if (product) {
+                      setSelectedProduct(product);
                       handleProductSelectionFromPriceList(product.id);
                       setProductSearch('');
+                    } else {
+                      setSelectedProduct(null);
                     }
                   }}
                   displayKey="name"
@@ -1368,6 +1361,32 @@ const CreateOrder = () => {
                   <div className="no-products-message">No products available for this price list.</div>
                 )}
               </div>
+
+              {/* Show selected product and generate order lines */}
+              {selectedProduct && (
+                <div className="selected-product-section">
+                  <h4>Selected Product: {selectedProduct.name}</h4>
+                  <p className="form-description">
+                    Click "Generate Order Lines" to automatically create gas and deposit line items for this product.
+                  </p>
+                  <div className="selected-product-actions">
+                    <button
+                      type="button"
+                      onClick={() => handleCreateOrderLinesFromSelectedProduct()}
+                      className="btn btn-primary"
+                    >
+                      ✨ Generate Order Lines
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProduct(null)}
+                      className="btn btn-secondary"
+                    >
+                      Clear Selection
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1562,12 +1581,14 @@ const CreateOrder = () => {
                         required
                       >
                         <option value="">
-                          {activePriceList ? 
-                            `Select a product (${availableVariants.length} products with prices)...` :
-                            'Select a product variant...'
+                          {selectedProduct ? 
+                            `Select variant of ${selectedProduct.name} (${getFilteredVariantsForOrderLine().length} available)...` :
+                            activePriceList ? 
+                              `Select a product (${availableVariants.length} products with prices)...` :
+                              'Select a product variant...'
                           }
                         </option>
-                        {availableVariants.map(variant => (
+                        {getFilteredVariantsForOrderLine().map(variant => (
                           <option key={variant.id} value={variant.id}>
                             {getVariantDisplayNameWithStock(variant)}
                           </option>

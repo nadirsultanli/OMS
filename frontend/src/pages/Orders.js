@@ -3,8 +3,10 @@ import orderService from '../services/orderService';
 import customerService from '../services/customerService';
 import variantService from '../services/variantService';
 import priceListService from '../services/priceListService';
+import productService from '../services/productService';
 import { extractErrorMessage } from '../utils/errorUtils';
 import { Search, Plus, Edit2, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Truck, X } from 'lucide-react';
+import SearchableDropdown from '../components/SearchableDropdown';
 import './Orders.css';
 
 const Orders = () => {
@@ -22,6 +24,15 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
+  
+  // New state variables
+  const [activePriceList, setActivePriceList] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [productVariants, setProductVariants] = useState({});
+  const [priceListLines, setPriceListLines] = useState([]);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [productSearchTerm, setProductSearchTerm] = useState('');
 
   // Filters
   const [filters, setFilters] = useState({
@@ -64,6 +75,7 @@ const Orders = () => {
     fetchCustomers();
     fetchVariants();
     fetchPriceLists();
+    fetchProducts();
   }, []);
 
   useEffect(() => {
@@ -116,7 +128,7 @@ const Orders = () => {
 
   const fetchVariants = async () => {
     try {
-      const result = await variantService.getVariants('332072c1-5405-4f09-a56f-a631defa911b');
+      const result = await variantService.getVariants();
       if (result.success) {
         console.log('Variants fetched:', result.data);
         const allVariants = result.data.variants || [];
@@ -132,15 +144,105 @@ const Orders = () => {
 
   const fetchPriceLists = async () => {
     try {
-      const result = await priceListService.getPriceLists('332072c1-5405-4f09-a56f-a631defa911b');
+      const result = await priceListService.getPriceLists();
       if (result.success) {
         console.log('Price lists fetched:', result.data);
-        setPriceLists(result.data.price_lists || []);
+        const allPriceLists = result.data.price_lists || [];
+        setPriceLists(allPriceLists);
+        
+        // Find the active price list
+        const active = allPriceLists.find(pl => pl.active === true);
+        if (active) {
+          setActivePriceList(active);
+          setSelectedPriceList(active.id);
+          // Load price list lines for the active price list
+          await loadPriceListLines(active.id);
+        }
       } else {
         console.error('Failed to fetch price lists:', result.error);
       }
     } catch (error) {
       console.error('Failed to fetch price lists:', error);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const result = await productService.getProducts();
+      if (result.success) {
+        console.log('Products fetched:', result.data);
+        setProducts(result.data.products || []);
+      } else {
+        console.error('Failed to fetch products:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+    }
+  };
+
+  const loadPriceListLines = async (priceListId) => {
+    try {
+      const result = await priceListService.getPriceListLines(priceListId);
+      if (result.success) {
+        setPriceListLines(result.data || []);
+        // After loading price list lines, filter available variants
+        filterVariantsByPriceList(result.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch price list lines:', error);
+    }
+  };
+
+  const filterVariantsByPriceList = (lines) => {
+    if (!lines || lines.length === 0) {
+      setAvailableVariants([]);
+      return;
+    }
+    
+    // Get all variant IDs from price list lines
+    const variantIdsInPriceList = lines
+      .filter(line => line.variant_id)
+      .map(line => line.variant_id);
+    
+    // Filter variants that have prices in the active price list
+    const filtered = variants.filter(variant => 
+      variantIdsInPriceList.includes(variant.id)
+    );
+    
+    setAvailableVariants(filtered);
+  };
+
+  const handleProductSelect = (productId) => {
+    setSelectedProduct(productId);
+    
+    if (!productId) {
+      // If no product selected, show all variants from active price list
+      if (activePriceList && priceListLines.length > 0) {
+        filterVariantsByPriceList(priceListLines);
+      } else {
+        setAvailableVariants([]);
+      }
+      return;
+    }
+    
+    // Filter variants by selected product and active price list
+    const productVariantsList = variants.filter(v => v.product_id === productId);
+    
+    if (activePriceList && priceListLines.length > 0) {
+      // Get variant IDs from price list
+      const variantIdsInPriceList = priceListLines
+        .filter(line => line.variant_id)
+        .map(line => line.variant_id);
+      
+      // Show only product variants that have prices in active price list
+      const filtered = productVariantsList.filter(variant => 
+        variantIdsInPriceList.includes(variant.id)
+      );
+      
+      setAvailableVariants(filtered);
+    } else {
+      // No active price list, show all product variants
+      setAvailableVariants(productVariantsList);
     }
   };
 
@@ -157,10 +259,10 @@ const Orders = () => {
   };
 
   const getPriceForVariant = async (variantId, gasType = null) => {
-    if (!selectedPriceList) return null;
+    if (!activePriceList) return null;
     
     try {
-      const result = await priceListService.getPriceListLines(selectedPriceList);
+      const result = await priceListService.getPriceListLines(activePriceList.id);
       if (result.success) {
         const lines = result.data || [];
         
@@ -186,7 +288,7 @@ const Orders = () => {
     
     if (priceListId) {
       // Load price list lines and filter available variants
-      await loadPriceListAndFilterVariants(priceListId);
+      await loadPriceListLines(priceListId);
       
       // Update all order lines with new prices
       if (formData.order_lines.length > 0) {
@@ -194,31 +296,6 @@ const Orders = () => {
       }
     } else {
       // No price list selected - show all variants
-      setAvailableVariants(variants);
-    }
-  };
-
-  const loadPriceListAndFilterVariants = async (priceListId) => {
-    try {
-      const result = await priceListService.getPriceListLines(priceListId);
-      if (result.success) {
-        const lines = result.data || [];
-        
-        // Filter variants to only show those with prices in this price list
-        const variantsWithPrices = variants.filter(variant => {
-          return lines.some(line => line.variant_id === variant.id);
-        });
-        
-        setAvailableVariants(variantsWithPrices);
-        
-        console.log(`Price list loaded: ${lines.length} price lines`);
-        console.log(`Filtered variants: ${variantsWithPrices.length} out of ${variants.length} total variants`);
-      } else {
-        console.error('Failed to load price list lines:', result.error);
-        setAvailableVariants(variants);
-      }
-    } catch (error) {
-      console.error('Error loading price list lines:', error);
       setAvailableVariants(variants);
     }
   };
@@ -306,7 +383,7 @@ const Orders = () => {
       // Check if at least one of variant_id or gas_type is provided
       const gasType = typeof line.gas_type === 'string' ? line.gas_type.trim() : line.gas_type;
       if (!line.variant_id && (!line.gas_type || gasType === '')) {
-        newErrors[`line_${index}_product`] = 'Product or gas type is required';
+        newErrors[`line_${index}_variant`] = 'Variant or gas type is required';
       }
       
       // Validate quantity - must be a positive number
@@ -698,7 +775,18 @@ const Orders = () => {
       payment_terms: '',
       order_lines: []
     });
+    setSelectedPriceList(activePriceList ? activePriceList.id : '');
+    setSelectedProduct('');
+    setCustomerSearchTerm('');
+    setProductSearchTerm('');
     setErrors({});
+    
+    // Reset available variants based on active price list
+    if (activePriceList && priceListLines.length > 0) {
+      filterVariantsByPriceList(priceListLines);
+    } else {
+      setAvailableVariants([]);
+    }
   };
 
   const addOrderLine = () => {
@@ -767,7 +855,7 @@ const Orders = () => {
     }));
 
     // If variant_id is changed and we have a price list selected, fetch the price
-    if (field === 'variant_id' && value && selectedPriceList) {
+    if (field === 'variant_id' && value && activePriceList) {
       const price = await getPriceForVariant(value);
       if (price !== null) {
         setFormData(prev => ({
@@ -780,7 +868,7 @@ const Orders = () => {
     }
 
     // If gas_type is changed and we have a variant selected, try to get price by gas type
-    if (field === 'gas_type' && value && selectedPriceList) {
+    if (field === 'gas_type' && value && activePriceList) {
       const currentLine = formData.order_lines[index];
       if (currentLine.variant_id) {
         const price = await getPriceForVariant(currentLine.variant_id, value);
@@ -965,7 +1053,10 @@ const Orders = () => {
           </div>
         </div>
         <button
-          onClick={() => setShowCreateForm(true)}
+          onClick={() => {
+            resetForm();
+            setShowCreateForm(true);
+          }}
           className="create-order-btn"
           disabled={loading}
         >
@@ -1016,23 +1107,24 @@ const Orders = () => {
           </div>
 
           <div className="filter-group">
-            <select
-              name="customer"
+            <SearchableDropdown
+              options={[
+                { value: '', label: 'All Customers' },
+                ...customers.map(customer => ({ value: customer.id, label: customer.name }))
+              ]}
               value={filters.customer}
               onChange={handleFilterChange}
+              placeholder="Select Customer"
+              searchPlaceholder="Search customers..."
+              name="customer"
               className="filter-select"
-            >
-              <option value="">All Customers</option>
-              {customers.map(customer => (
-                <option key={customer.id} value={customer.id}>{customer.name}</option>
-              ))}
-            </select>
+            />
           </div>
         </div>
       </div>
 
       {/* Orders Table */}
-      <div className="table-container">
+      <div className="orders-table-wrapper">
         {loading ? (
           <div className="loading-state">
             <div className="loading-spinner"></div>
@@ -1144,39 +1236,76 @@ const Orders = () => {
                 <div className="form-grid">
                   <div className="form-group">
                     <label htmlFor="customer_id">Customer *</label>
-                    <select
-                      id="customer_id"
-                      name="customer_id"
-                      value={formData.customer_id}
-                      onChange={handleInputChange}
-                      className={errors.customer_id ? 'error' : ''}
-                      required
-                    >
-                      <option value="">Select Customer</option>
-                      {customers.map(customer => (
-                        <option key={customer.id} value={customer.id}>{customer.name}</option>
-                      ))}
-                    </select>
+                    <div className="custom-dropdown">
+                      <select
+                        id="customer_id"
+                        name="customer_id"
+                        value={formData.customer_id}
+                        onChange={handleInputChange}
+                        className={`dropdown-with-search ${errors.customer_id ? 'error' : ''}`}
+                        required
+                      >
+                        <option value="">Select Customer</option>
+                        {customers
+                          .filter(customer => 
+                            customerSearchTerm === '' || 
+                            customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase())
+                          )
+                          .map(customer => (
+                            <option key={customer.id} value={customer.id}>{customer.name}</option>
+                          ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Search customers..."
+                        value={customerSearchTerm}
+                        onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                        className="dropdown-search"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
                     {errors.customer_id && <span className="error-text">{errors.customer_id}</span>}
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="price_list">Price List</label>
-                    <select
-                      id="price_list"
-                      name="price_list"
-                      value={selectedPriceList}
-                      onChange={(e) => handlePriceListChange(e.target.value)}
-                      className="form-select"
-                    >
-                      <option value="">Select Price List</option>
-                      {priceLists.map(priceList => (
-                        <option key={priceList.id} value={priceList.id}>
-                          {priceList.name} ({priceList.currency})
-                        </option>
-                      ))}
-                    </select>
-                    <small className="form-text">Select a price list to auto-populate prices</small>
+                    <label htmlFor="product_id">Product *</label>
+                    <div className="custom-dropdown">
+                      <select
+                        id="product_id"
+                        name="product_id"
+                        value={selectedProduct}
+                        onChange={(e) => handleProductSelect(e.target.value)}
+                        className="dropdown-with-search"
+                        required
+                      >
+                        <option value="">Select Product</option>
+                        {products
+                          .filter(product => 
+                            productSearchTerm === '' || 
+                            product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
+                          )
+                          .map(product => (
+                            <option key={product.id} value={product.id}>{product.name}</option>
+                          ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Search products..."
+                        value={productSearchTerm}
+                        onChange={(e) => setProductSearchTerm(e.target.value)}
+                        className="dropdown-search"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    {activePriceList ? (
+                      <small className="form-text success">
+                        Using active price list: {activePriceList.name} ({activePriceList.currency})
+                      </small>
+                    ) : (
+                      <small className="form-text warning">
+                        No active price list found. Please activate a price list.
+                      </small>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -1244,24 +1373,27 @@ const Orders = () => {
                     
                     <div className="line-grid">
                       <div className="form-group">
-                        <label>Product</label>
+                        <label>Variant Name</label>
                         <select
                           value={line.variant_id}
                           onChange={async (e) => await updateOrderLine(index, 'variant_id', e.target.value)}
-                          className={errors[`line_${index}_product`] ? 'error' : ''}
+                          className={errors[`line_${index}_variant`] ? 'error' : ''}
                         >
                           <option value="">
-                            {selectedPriceList ? 
-                              `Select Product (${availableVariants.length} with prices)` :
-                              'Select Product'
+                            {selectedProduct && activePriceList ? 
+                              `Select Variant (${availableVariants.length} available)` :
+                              selectedProduct ? 'No variants with pricing' :
+                              'Please select a product first'
                             }
                           </option>
                           {availableVariants.map(variant => (
-                            <option key={variant.id} value={variant.id}>{getVariantDisplayName(variant)}</option>
+                            <option key={variant.id} value={variant.id}>
+                              {variant.name || variant.sku} - {variant.state_attr || variant.sku_type}
+                            </option>
                           ))}
                         </select>
-                        {errors[`line_${index}_product`] && (
-                          <span className="error-text">{errors[`line_${index}_product`]}</span>
+                        {errors[`line_${index}_variant`] && (
+                          <span className="error-text">{errors[`line_${index}_variant`]}</span>
                         )}
                       </div>
 

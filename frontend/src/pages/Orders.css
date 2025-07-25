@@ -220,18 +220,14 @@
 }
 
 /* ============================================
-   TABLE CONTAINER - PROFESSIONAL DESIGN
+   TABLE SYSTEM - PROFESSIONAL DESIGN
    ============================================ */
-.table-container {
+.table-container,
+.orders-table-wrapper {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  margin-bottom: 24px;
-}
-
-.table-wrapper {
   width: 100%;
   overflow-x: auto;
   max-height: none;
@@ -243,6 +239,7 @@
   font-size: 14px;
   min-width: 1000px;
   position: relative;
+  table-layout: fixed; /* Ensures equal column spacing */
 }
 
 .orders-table thead {
@@ -264,13 +261,24 @@
   white-space: nowrap;
 }
 
+/* Column width distribution for equal spacing */
+.orders-table th:nth-child(1) { width: 12%; } /* Order No. */
+.orders-table th:nth-child(2) { width: 15%; } /* Customer */
+.orders-table th:nth-child(3) { width: 12%; } /* Status */
+.orders-table th:nth-child(4) { width: 12%; } /* Total */
+.orders-table th:nth-child(5) { width: 10%; } /* Weight */
+.orders-table th:nth-child(6) { width: 14%; } /* Requested Date */
+.orders-table th:nth-child(7) { width: 14%; } /* Created */
+.orders-table th:nth-child(8) { width: 11%; } /* Actions */
+
 .orders-table td {
   padding: 16px;
   border-bottom: 1px solid #e5e7eb;
   color: #374151;
   vertical-align: middle;
   position: relative;
-  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .orders-table tbody tr {
@@ -474,9 +482,14 @@
   transform: translateY(-1px);
 }
 
+.action-icon-btn.cancel {
+  background: #d1fae5;
+  color: #10b981;
+}
+
 .action-icon-btn.cancel:hover:not(:disabled) {
-  background: #fef3c7;
-  color: #d97706;
+  background: #fee2e2;
+  color: #ef4444;
 }
 
 .action-icon-btn:disabled {
@@ -1389,4 +1402,84 @@
   .data-inconsistency-warning p {
     font-size: 0.85rem;
   }
+}
+
+/* ============================================
+   CUSTOM DROPDOWN WITH SEARCH
+   ============================================ */
+.custom-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown-with-search {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2714%27%20height%3D%278%27%20viewBox%3D%270%200%2014%208%27%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%3E%3Cpath%20d%3D%27M1%201l6%206%206-6%27%20stroke%3D%27%23374151%27%20stroke-width%3D%272%27%20fill%3D%27none%27%20fill-rule%3D%27evenodd%27/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 40px;
+}
+
+.dropdown-with-search:hover {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+}
+
+.dropdown-with-search:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.dropdown-with-search.error {
+  border-color: #ef4444;
+}
+
+.dropdown-search {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  padding: 10px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: white;
+  z-index: 10;
+  display: none;
+}
+
+.custom-dropdown:hover .dropdown-search,
+.custom-dropdown:focus-within .dropdown-search {
+  display: block;
+}
+
+.dropdown-search:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+}
+
+/* Success and warning text for price list status */
+.form-text.success {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.form-text.warning {
+  color: #f59e0b;
+  font-weight: 500;
 }

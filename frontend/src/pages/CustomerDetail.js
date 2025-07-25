@@ -51,6 +51,28 @@ const CustomerDetail = () => {
     fetchCustomerAddresses();
   }, [customerId]);
 
+  // Prevent body scrolling when modal is open
+  useEffect(() => {
+    if (showAddressForm) {
+      // Save current scroll position
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        // Restore scroll position when modal closes
+        const scrollY = document.body.style.top;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      };
+    }
+  }, [showAddressForm]);
+
   const fetchCustomerDetails = async () => {
     try {
       const result = await customerService.getCustomerById(customerId);
@@ -222,10 +244,8 @@ const CustomerDetail = () => {
         tenant_id: tenantId,
         created_by: currentUser.id,
         is_default: false, // Always set to false since we removed the checkbox
-        // Format coordinates as PostgreSQL POINT if they exist
-        coordinates: addressForm.coordinates ? 
-          `POINT(${addressForm.coordinates[0]} ${addressForm.coordinates[1]})` : 
-          null
+        // Send coordinates as array - backend will convert to POINT format
+        coordinates: addressForm.coordinates || null
       };
       
       // Final validation - ensure no required fields are missing
@@ -289,7 +309,17 @@ const CustomerDetail = () => {
       setMessage('Address deleted successfully!');
       await fetchCustomerAddresses();
     } catch (error) {
-      setErrors({ general: 'Failed to delete address.' });
+      // Handle specific error for primary address deletion
+      if (error.response && error.response.status === 400) {
+        setErrors({ general: error.response.data.detail || 'Cannot delete the primary address.' });
+      } else {
+        setErrors({ general: 'Failed to delete address. Please try again.' });
+      }
+      
+      // Clear error after 5 seconds
+      setTimeout(() => {
+        setErrors({});
+      }, 5000);
     }
   };
 
@@ -310,10 +340,8 @@ const CustomerDetail = () => {
       const addressData = {
         ...addressForm,
         is_default: editingAddress.is_default, // Keep the existing default status when updating
-        // Format coordinates as PostgreSQL POINT if they exist
-        coordinates: addressForm.coordinates ? 
-          `POINT(${addressForm.coordinates[0]} ${addressForm.coordinates[1]})` : 
-          null
+        // Send coordinates as array - backend will convert to POINT format
+        coordinates: addressForm.coordinates || null
       };
       
       // Debug: Log the address data being sent
@@ -605,7 +633,12 @@ const CustomerDetail = () => {
                         <button 
                           onClick={() => handleDeleteAddress(address.id)}
                           className="delete-btn"
-                          title="Delete address"
+                          title={address.is_default ? "Primary address cannot be deleted" : "Delete address"}
+                          disabled={address.is_default}
+                          style={{ 
+                            cursor: address.is_default ? 'not-allowed' : 'pointer',
+                            opacity: address.is_default ? 0.5 : 1 
+                          }}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -628,7 +661,12 @@ const CustomerDetail = () => {
                         </div>
                       )}
                       
-                      {address.coordinates && (
+                      {address.coordinates && 
+                       address.coordinates !== 'null' && 
+                       address.coordinates !== 'undefined' && 
+                       address.coordinates !== '' &&
+                       address.coordinates !== 'POINT()' &&
+                       address.coordinates !== 'POINT( )' && (
                         <AddressMap 
                           coordinates={address.coordinates}
                           address={`${address.street}, ${address.city}`}

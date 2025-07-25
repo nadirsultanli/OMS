@@ -101,9 +101,12 @@ async def delete_address(
     address_service: AddressService = Depends(get_address_service),
     current_user: User = Depends(get_current_user)
 ):
-    success = await address_service.delete_address(address_id, deleted_by=current_user.id)
-    if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Address with ID {address_id} not found")
+    try:
+        success = await address_service.delete_address(address_id, deleted_by=current_user.id)
+        if not success:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Address with ID {address_id} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return None
 
 @router.post("/{address_id}/set_default", status_code=status.HTTP_200_OK)
