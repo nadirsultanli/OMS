@@ -6,6 +6,7 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from datetime import datetime
+from sqlalchemy import func
 
 class CustomerRepository(CustomerRepositoryInterface):
     def __init__(self, session: AsyncSession):
@@ -40,6 +41,48 @@ class CustomerRepository(CustomerRepositoryInterface):
         result = await self._session.execute(select(CustomerORM).where(CustomerORM.status == status.value, CustomerORM.deleted_at == None))
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
+
+    async def get_with_filters(
+        self, 
+        limit: int = 100, 
+        offset: int = 0,
+        status: Optional[str] = None,
+        customer_type: Optional[str] = None,
+        search: Optional[str] = None
+    ) -> tuple[List[Customer], int]:
+        """Get customers with optional filters"""
+        query = select(CustomerORM).where(CustomerORM.deleted_at == None)
+        
+        # Apply status filter
+        if status:
+            query = query.where(CustomerORM.status == status)
+        
+        # Apply customer_type filter
+        if customer_type:
+            query = query.where(CustomerORM.customer_type == customer_type)
+        
+        # Apply search filter (searches in name, email, phone_number)
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                (CustomerORM.name.ilike(search_pattern)) |
+                (CustomerORM.email.ilike(search_pattern)) |
+                (CustomerORM.phone_number.ilike(search_pattern))
+            )
+        
+        # Get total count before pagination
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await self._session.execute(count_query)
+        total = total_result.scalar() or 0
+        
+        # Apply pagination
+        query = query.offset(offset).limit(limit)
+        
+        # Execute query
+        result = await self._session.execute(query)
+        objs = result.scalars().all()
+        
+        return [self._to_entity(obj) for obj in objs], total
 
     async def create_customer(self, customer: Customer) -> Customer:
         obj = CustomerORM(
