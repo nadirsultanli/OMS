@@ -113,7 +113,17 @@ class ProductPricingService:
             tax_code = 'TX_STD'  # Taxable
             tax_rate = Decimal('23.00')
             
-        # DEP variants (deposit) → use deposit price for OUT scenarios
+        # KIT variants (bundle) → use gas_price + deposit_price for OUT scenarios
+        elif variant.sku_type == 'BUNDLE' or sku_upper.startswith('KIT'):
+            if scenario in ['OUT', 'BOTH']:
+                # KIT price = Gas Price + Deposit Price
+                price = gas_price + deposit_price
+                tax_code = 'TX_STD'  # Taxable (includes both gas and deposit)
+                tax_rate = Decimal('23.00')
+            else:
+                return None  # Skip KIT for XCH-only scenarios
+                
+        # DEP variants (deposit) → use deposit price for OUT scenarios (fallback)
         elif variant.sku_type == 'DEPOSIT' or sku_upper.startswith('DEP'):
             if scenario in ['OUT', 'BOTH']:
                 price = deposit_price
@@ -131,7 +141,7 @@ class ProductPricingService:
             else:
                 return None  # Skip empties for OUT-only scenarios
                 
-        # FULL/BUNDLE variants → skip for now (could be handled later)
+        # FULL variants → skip for now (could be handled later)
         else:
             return None  # Skip variants we don't know how to price
             

@@ -60,7 +60,11 @@ const PriceListDetail = () => {
       // Fetch price lines
       const linesResult = await priceListService.getPriceListLines(priceListId);
       if (linesResult.success) {
-        setPriceLines(linesResult.data || []);
+        const allLines = linesResult.data || [];
+        
+        // Filter and prioritize KIT variants over separate GAS+DEP variants
+        const filteredLines = filterPriceLinesForKITPriority(allLines);
+        setPriceLines(filteredLines);
       } else {
         setError(linesResult.error);
       }
@@ -339,6 +343,13 @@ const PriceListDetail = () => {
       if (variant.sku_type) {
         name += ` (${variant.sku_type})`;
       }
+      
+      // For KIT variants, show component breakdown
+      if (variant.sku.startsWith('KIT') && variant.bundle_components) {
+        const components = variant.bundle_components.map(comp => comp.sku).join(' + ');
+        name += ` = ${components}`;
+      }
+      
       return name;
     }
     return '-';
@@ -353,6 +364,55 @@ const PriceListDetail = () => {
   const getProductName = (productId) => {
     const product = products.find(p => p.id === productId);
     return product ? product.name : '-';
+  };
+
+  // Filter price lines to show KIT + GAS, but hide DEP when KIT exists
+  const filterPriceLinesForKITPriority = (lines) => {
+    const linesWithVariants = lines.filter(line => line.variant_id);
+    
+    // Group lines by product (extract size from SKU)
+    const productGroups = {};
+    
+    linesWithVariants.forEach(line => {
+      const variant = variants.find(v => v.id === line.variant_id);
+      if (!variant) return;
+      
+      // Extract size from SKU (e.g., GAS18, DEP18, KIT18-OUTRIGHT -> 18)
+      const sizeMatch = variant.sku.match(/(?:GAS|DEP|KIT)(\d+)/);
+      if (!sizeMatch) return;
+      
+      const size = sizeMatch[1];
+      if (!productGroups[size]) {
+        productGroups[size] = [];
+      }
+      productGroups[size].push({ ...line, variant });
+    });
+    
+    // For each product group, show KIT + GAS, but hide DEP when KIT exists
+    const filteredLines = [];
+    
+    Object.values(productGroups).forEach(group => {
+      const kitLine = group.find(line => line.variant.sku.startsWith('KIT'));
+      const gasLine = group.find(line => line.variant.sku.startsWith('GAS'));
+      const depLine = group.find(line => line.variant.sku.startsWith('DEP'));
+      
+      if (kitLine) {
+        // If KIT exists, show KIT and GAS, but hide DEP
+        filteredLines.push(kitLine);
+        if (gasLine) filteredLines.push(gasLine);
+        // Don't add depLine - hide it when KIT exists
+      } else {
+        // If no KIT, show GAS and DEP separately
+        if (gasLine) filteredLines.push(gasLine);
+        if (depLine) filteredLines.push(depLine);
+      }
+    });
+    
+    // Add lines without variants (bulk gas, etc.)
+    const linesWithoutVariants = lines.filter(line => !line.variant_id);
+    filteredLines.push(...linesWithoutVariants);
+    
+    return filteredLines;
   };
 
   if (loading && !priceList) {
@@ -556,7 +616,7 @@ const PriceListDetail = () => {
             <p className="form-description">
               Select a product and set gas and deposit prices. The system will automatically create price lines for all relevant variants (SKUs) of this product:
               <br/>• <strong>GAS variants</strong> → Get gas price (taxable)
-              <br/>• <strong>DEP variants</strong> → Get deposit price (zero-rated)  
+              <br/>• <strong>KIT variants</strong> → Get gas price + deposit price (taxable bundle)
               <br/>• <strong>EMPTY variants</strong> → Get negative deposit for exchanges (zero-rated)
             </p>
             <form onSubmit={handleCreateProductPricing} className="line-form">
