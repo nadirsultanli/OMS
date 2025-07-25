@@ -117,8 +117,7 @@ const Variants = () => {
       size: '',
       tare_weight_kg: '',
       capacity_kg: '',
-      gross_weight_kg: '',
-      deposit_amount: '',
+      gross_weight_kg: '', // Will be auto-calculated
       gas_price: '',
       bundle_price: '',
       inspection_date: '',
@@ -129,7 +128,19 @@ const Variants = () => {
   };
   
   const handleFormChange = (name, value) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [name]: value };
+      
+      // Auto-calculate gross weight when tare weight or capacity changes
+      if ((name === 'tare_weight_kg' || name === 'capacity_kg') && modalType !== 'edit') {
+        const tare = parseFloat(name === 'tare_weight_kg' ? value : newData.tare_weight_kg) || 0;
+        const capacity = parseFloat(name === 'capacity_kg' ? value : newData.capacity_kg) || 0;
+        newData.gross_weight_kg = (tare + capacity).toString();
+      }
+      
+      return newData;
+    });
+    
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -159,16 +170,10 @@ const Variants = () => {
       if (!formData.capacity_kg) {
         newErrors.capacity_kg = 'Capacity is required';
       }
-      if (!formData.gross_weight_kg) {
-        newErrors.gross_weight_kg = 'Gross weight is required';
-      }
+      // Gross weight is auto-calculated, no validation needed
     }
     
-    if (modalType === 'complete') {
-      if (!formData.deposit_amount) {
-        newErrors.deposit_amount = 'Deposit amount is required';
-      }
-    }
+    // Deposit amount is handled in price lists, not here
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -233,7 +238,7 @@ const Variants = () => {
           tare_weight_kg: parseFloat(formData.tare_weight_kg),
           capacity_kg: parseFloat(formData.capacity_kg),
           gross_weight_kg: parseFloat(formData.gross_weight_kg),
-          deposit_amount: parseFloat(formData.deposit_amount),
+          // deposit_amount: removed - handled in price lists
           gas_price: formData.gas_price ? parseFloat(formData.gas_price) : null,
           bundle_price: formData.bundle_price ? parseFloat(formData.bundle_price) : null,
           inspection_date: formData.inspection_date || null,
@@ -553,17 +558,17 @@ const Variants = () => {
                     </div>
                     
                     <div className="form-group">
-                      <label htmlFor="gross_weight_kg">Gross Weight (kg) *</label>
+                      <label htmlFor="gross_weight_kg">Gross Weight (kg) <span className="auto-calc">Auto-calculated</span></label>
                       <input
                         type="number"
                         id="gross_weight_kg"
                         value={formData.gross_weight_kg}
-                        onChange={(e) => handleFormChange('gross_weight_kg', e.target.value)}
-                        className={errors.gross_weight_kg ? 'error' : ''}
+                        className="auto-calculated"
                         step="0.01"
-                        required
+                        disabled
+                        placeholder="Will be calculated automatically"
                       />
-                      {errors.gross_weight_kg && <span className="error-text">{errors.gross_weight_kg}</span>}
+                      <small className="help-text">Gross Weight = Tare Weight + Capacity</small>
                     </div>
                     
                     <div className="form-group">
@@ -580,20 +585,6 @@ const Variants = () => {
                 
                 {modalType === 'complete' && (
                   <>
-                    <div className="form-group">
-                      <label htmlFor="deposit_amount">Deposit Amount *</label>
-                      <input
-                        type="number"
-                        id="deposit_amount"
-                        value={formData.deposit_amount}
-                        onChange={(e) => handleFormChange('deposit_amount', e.target.value)}
-                        className={errors.deposit_amount ? 'error' : ''}
-                        step="0.01"
-                        required
-                      />
-                      {errors.deposit_amount && <span className="error-text">{errors.deposit_amount}</span>}
-                    </div>
-                    
                     <div className="form-group">
                       <label htmlFor="gas_price">Gas Price (Optional)</label>
                       <input

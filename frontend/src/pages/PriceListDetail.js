@@ -29,6 +29,17 @@ const PriceListDetail = () => {
   });
   const [errors, setErrors] = useState({});
   
+  // Product pricing state
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [productFormData, setProductFormData] = useState({
+    product_id: '',
+    gas_price: '',
+    deposit_price: '',
+    pricing_unit: 'per_cylinder',
+    scenario: 'OUT'
+  });
+  const [productErrors, setProductErrors] = useState({});
+  
   useEffect(() => {
     fetchPriceListDetails();
     fetchProductsAndVariants();
@@ -76,6 +87,12 @@ const PriceListDetail = () => {
     } catch (error) {
       console.error('Failed to fetch products and variants:', error);
     }
+  };
+
+  // Helper function to get variant SKUs for a product
+  const getProductVariantSKUs = (productId) => {
+    const productVariants = variants.filter(variant => variant.product_id === productId);
+    return productVariants.map(variant => variant.sku).filter(sku => sku).sort();
   };
 
   const handleInputChange = (e) => {
@@ -220,6 +237,85 @@ const PriceListDetail = () => {
     setErrors({});
   };
 
+  // Product pricing handlers
+  const handleProductInputChange = (e) => {
+    const { name, value } = e.target;
+    setProductFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear errors when user starts typing
+    if (productErrors[name]) {
+      setProductErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const validateProductForm = () => {
+    const newErrors = {};
+
+    if (!productFormData.product_id) {
+      newErrors.product_id = 'Product is required';
+    }
+    if (!productFormData.gas_price || parseFloat(productFormData.gas_price) <= 0) {
+      newErrors.gas_price = 'Valid gas price is required';
+    }
+    if (!productFormData.deposit_price || parseFloat(productFormData.deposit_price) <= 0) {
+      newErrors.deposit_price = 'Valid deposit price is required';
+    }
+
+    setProductErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleCreateProductPricing = async (e) => {
+    e.preventDefault();
+    setSuccess('');
+
+    if (!validateProductForm()) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const productData = {
+        product_id: productFormData.product_id,
+        gas_price: parseFloat(productFormData.gas_price),
+        deposit_price: parseFloat(productFormData.deposit_price),
+        pricing_unit: productFormData.pricing_unit,
+        scenario: productFormData.scenario
+      };
+
+      const result = await priceListService.createProductPricing(priceListId, productData);
+      
+      if (result.success) {
+        setSuccess(`Product pricing created successfully! Generated ${result.data.total_lines_created} price lines.`);
+        resetProductForm();
+        setShowProductForm(false);
+        fetchPriceListDetails();
+      } else {
+        setProductErrors({ general: result.error });
+      }
+    } catch (error) {
+      setProductErrors({ general: 'Failed to create product pricing.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetProductForm = () => {
+    setProductFormData({
+      product_id: '',
+      gas_price: '',
+      deposit_price: '',
+      pricing_unit: 'per_cylinder',
+      scenario: 'OUT'
+    });
+    setProductErrors({});
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
@@ -238,17 +334,25 @@ const PriceListDetail = () => {
   const getVariantName = (variantId) => {
     const variant = variants.find(v => v.id === variantId);
     if (variant) {
-      // Build a descriptive name with SKU and state
+      // Build a descriptive name with SKU prominently displayed
       let name = variant.sku;
-      if (variant.state_attr) {
-        name += ` (${variant.state_attr})`;
-      }
       if (variant.sku_type) {
-        name += ` - ${variantService.getSkuTypeLabel(variant.sku_type)}`;
+        name += ` (${variant.sku_type})`;
       }
       return name;
     }
     return '-';
+  };
+
+  const getVariantDisplayWithTax = (line) => {
+    const variantName = line.variant_id ? getVariantName(line.variant_id) : line.gas_type;
+    const taxInfo = line.tax_code ? ` • ${line.tax_code}` : '';
+    return variantName + taxInfo;
+  };
+
+  const getProductName = (productId) => {
+    const product = products.find(p => p.id === productId);
+    return product ? product.name : '-';
   };
 
   if (loading && !priceList) {
@@ -327,19 +431,32 @@ const PriceListDetail = () => {
       <div className="price-lines-section">
         <div className="section-header">
           <h2>Price Lines</h2>
-                      <button
+          <div className="section-actions">
+            <button
               onClick={() => {
                 setShowForm(true);
                 setIsEditing(false);
                 setEditingLineId(null);
                 resetLineForm();
               }}
-            className="add-line-btn"
-            disabled={loading}
-          >
-            <Plus size={20} />
-            Add Price Line
-          </button>
+              className="add-line-btn"
+              disabled={loading}
+            >
+              <Plus size={20} />
+              Add Price Line
+            </button>
+            <button
+              onClick={() => {
+                setShowProductForm(true);
+                resetProductForm();
+              }}
+              className="add-product-btn"
+              disabled={loading}
+            >
+              <DollarSign size={20} />
+              Add Product Pricing
+            </button>
+          </div>
         </div>
 
         {/* Add/Edit Line Form */}
@@ -432,6 +549,129 @@ const PriceListDetail = () => {
           </div>
         )}
 
+        {/* Product Pricing Form */}
+        {showProductForm && (
+          <div className="line-form-card product-form-card">
+            <h3>Add Product-Based Pricing</h3>
+            <p className="form-description">
+              Select a product and set gas and deposit prices. The system will automatically create price lines for all relevant variants (SKUs) of this product:
+              <br/>• <strong>GAS variants</strong> → Get gas price (taxable)
+              <br/>• <strong>DEP variants</strong> → Get deposit price (zero-rated)  
+              <br/>• <strong>EMPTY variants</strong> → Get negative deposit for exchanges (zero-rated)
+            </p>
+            <form onSubmit={handleCreateProductPricing} className="line-form">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="product_id">Product *</label>
+                  <select
+                    id="product_id"
+                    name="product_id"
+                    value={productFormData.product_id}
+                    onChange={handleProductInputChange}
+                    className={productErrors.product_id ? 'error' : ''}
+                  >
+                    <option value="">Select Product</option>
+                    {products.map(product => {
+                      const variantSKUs = getProductVariantSKUs(product.id);
+                      const skuDisplay = variantSKUs.length > 0 ? ` → ${variantSKUs.join(', ')}` : '';
+                      return (
+                        <option key={product.id} value={product.id}>
+                          {product.name} ({product.category}){skuDisplay}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {productErrors.product_id && <span className="error-text">{productErrors.product_id}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="gas_price">Gas Price *</label>
+                  <input
+                    type="number"
+                    id="gas_price"
+                    name="gas_price"
+                    value={productFormData.gas_price}
+                    onChange={handleProductInputChange}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    className={productErrors.gas_price ? 'error' : ''}
+                  />
+                  {productErrors.gas_price && <span className="error-text">{productErrors.gas_price}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="deposit_price">Deposit Price *</label>
+                  <input
+                    type="number"
+                    id="deposit_price"
+                    name="deposit_price"
+                    value={productFormData.deposit_price}
+                    onChange={handleProductInputChange}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    className={productErrors.deposit_price ? 'error' : ''}
+                  />
+                  {productErrors.deposit_price && <span className="error-text">{productErrors.deposit_price}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="pricing_unit">Pricing Unit</label>
+                  <select
+                    id="pricing_unit"
+                    name="pricing_unit"
+                    value={productFormData.pricing_unit}
+                    onChange={handleProductInputChange}
+                  >
+                    <option value="per_cylinder">Per Cylinder</option>
+                    <option value="per_kg">Per Kg</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="scenario">Scenario</label>
+                  <select
+                    id="scenario"
+                    name="scenario"
+                    value={productFormData.scenario}
+                    onChange={handleProductInputChange}
+                  >
+                    <option value="OUT">Outright Sale (OUT)</option>
+                    <option value="XCH">Exchange (XCH)</option>
+                    <option value="BOTH">Both OUT & XCH</option>
+                  </select>
+                </div>
+              </div>
+
+              {productErrors.general && (
+                <div className="error-message">{productErrors.general}</div>
+              )}
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProductForm(false);
+                    resetProductForm();
+                  }}
+                  className="cancel-btn"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="submit-btn"
+                  disabled={loading}
+                >
+                  {loading ? 'Creating...' : 'Create Product Pricing'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Price Lines Table */}
         <div className="table-container">
           {priceLines.length === 0 ? (
@@ -444,9 +684,9 @@ const PriceListDetail = () => {
             <table className="price-lines-table">
               <thead>
                 <tr>
-                  <th>Product/Gas Type</th>
+                  <th>SKU / Gas Type</th>
                   <th>Type</th>
-                  <th>Min. Unit Price</th>
+                  <th>Price & Tax</th>
                   <th>Created</th>
                   <th>Actions</th>
                 </tr>
@@ -455,14 +695,30 @@ const PriceListDetail = () => {
                 {priceLines.map((line) => (
                   <tr key={line.id}>
                     <td className="product-cell">
-                      {line.variant_id ? getVariantName(line.variant_id) : line.gas_type}
+                      <div className="sku-display">
+                        {line.variant_id ? getVariantName(line.variant_id) : line.gas_type}
+                      </div>
+                      {line.tax_code && (
+                        <div className="tax-info">
+                          Tax: {line.tax_code} @ {line.tax_rate || 0}%
+                        </div>
+                      )}
                     </td>
                     <td>
                       <span className={`type-badge ${line.variant_id ? 'variant' : 'bulk'}`}>
                         {line.variant_id ? 'Variant' : 'Bulk Gas'}
                       </span>
                     </td>
-                    <td className="price-cell">{formatCurrency(line.min_unit_price)}</td>
+                    <td className="price-cell">
+                      <div className="price-with-tax">
+                        {formatCurrency(line.min_unit_price)}
+                      </div>
+                      {line.tax_rate > 0 && (
+                        <div className="tax-amount">
+                          +{formatCurrency((line.min_unit_price * line.tax_rate) / 100)} tax
+                        </div>
+                      )}
+                    </td>
                     <td className="date-cell">{formatDate(line.created_at)}</td>
                     <td className="actions-cell">
                       <button

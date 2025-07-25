@@ -126,6 +126,17 @@ const priceListService = {
       console.error('Error calculating pricing:', error);
       return { success: false, error: error.response?.data?.detail || 'Failed to calculate pricing' };
     }
+  },
+
+  // Create product-based pricing (generates gas + deposit lines automatically)
+  createProductPricing: async (priceListId, productData) => {
+    try {
+      const response = await api.post(`/price-lists/${priceListId}/product-pricing`, productData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error creating product pricing:', error);
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to create product pricing' };
+    }
   }
 };
 
