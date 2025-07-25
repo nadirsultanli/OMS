@@ -368,12 +368,15 @@ const CreateOrder = () => {
           return lines.some(line => line.variant_id === variant.id);
         });
         
+        // Apply KIT priority filtering (show KIT instead of separate GAS+DEP)
+        const prioritizedVariants = prioritizeKITVariants(variantsWithPrices, lines);
+        
         // Apply stock filter if enabled
-        const filteredVariants = filterVariantsByStock(variantsWithPrices, !hideOutOfStock);
+        const filteredVariants = filterVariantsByStock(prioritizedVariants, !hideOutOfStock);
         setAvailableVariants(filteredVariants);
         
         console.log(`Price list loaded: ${lines.length} price lines`);
-        console.log(`Filtered variants: ${variantsWithPrices.length} out of ${variants.length} total variants`);
+        console.log(`Filtered variants: ${prioritizedVariants.length} out of ${variantsWithPrices.length} total variants`);
       } else {
         console.error('Failed to load price list lines:', result.error);
         // Fallback to all variants if price list loading fails
@@ -491,6 +494,51 @@ const CreateOrder = () => {
       const stockLevel = stockLevels[variant.id];
       return stockLevel && stockLevel.available_quantity > 0;
     });
+  };
+
+  // Prioritize KIT variants over separate GAS+DEP variants
+  const prioritizeKITVariants = (variants, priceLines) => {
+    // Group variants by product size
+    const productGroups = {};
+    
+    variants.forEach(variant => {
+      // Extract size from SKU (e.g., GAS18, DEP18, KIT18-OUTRIGHT -> 18)
+      const sizeMatch = variant.sku.match(/(?:GAS|DEP|KIT)(\d+)/);
+      if (!sizeMatch) {
+        // If no size match, add to a separate group
+        if (!productGroups['other']) {
+          productGroups['other'] = [];
+        }
+        productGroups['other'].push(variant);
+        return;
+      }
+      
+      const size = sizeMatch[1];
+      if (!productGroups[size]) {
+        productGroups[size] = [];
+      }
+      productGroups[size].push(variant);
+    });
+    
+    // For each product group, prioritize KIT over separate GAS+DEP
+    const prioritizedVariants = [];
+    
+    Object.values(productGroups).forEach(group => {
+      const kitVariant = group.find(v => v.sku.startsWith('KIT'));
+      const gasVariant = group.find(v => v.sku.startsWith('GAS'));
+      const depVariant = group.find(v => v.sku.startsWith('DEP'));
+      
+      if (kitVariant) {
+        // If KIT exists, only show KIT (hide separate GAS and DEP)
+        prioritizedVariants.push(kitVariant);
+      } else {
+        // If no KIT, show GAS and DEP separately
+        if (gasVariant) prioritizedVariants.push(gasVariant);
+        if (depVariant) prioritizedVariants.push(depVariant);
+      }
+    });
+    
+    return prioritizedVariants;
   };
 
   const getVariantDisplayNameWithStock = (variant) => {
@@ -1212,6 +1260,12 @@ const CreateOrder = () => {
   };
 
   const getVariantDisplayName = (variant) => {
+    // For KIT variants, show component breakdown
+    if (variant.sku.startsWith('KIT') && variant.bundle_components) {
+      const components = variant.bundle_components.map(comp => comp.sku).join(' + ');
+      return `${variant.sku} = ${components} (${variant.sku_type})`;
+    }
+    
     return `${variant.sku} - ${variant.capacity_kg || 'N/A'}kg (${variant.product?.name || 'Unknown Product'})`;
   };
 
