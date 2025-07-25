@@ -15,8 +15,14 @@ const Variants = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   
-  // Filter state
-  const [filters, setFilters] = useState({
+  // Filter state - separate immediate search from dropdown filters
+  const [searchText, setSearchText] = useState('');
+  const [dropdownFilters, setDropdownFilters] = useState({
+    productId: '',
+    skuType: '',
+    isStockItem: ''
+  });
+  const [appliedFilters, setAppliedFilters] = useState({
     search: '',
     productId: '',
     skuType: '',
@@ -52,25 +58,35 @@ const Variants = () => {
   const [errors, setErrors] = useState({});
   
   useEffect(() => {
-    fetchVariants();
     fetchProducts();
-  }, [pagination.currentPage]);
+    fetchVariants();
+  }, []);
   
+  // Auto-search when text changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setAppliedFilters(prev => ({ ...prev, search: searchText }));
+    }, 300); // Debounce search
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchText]);
+  
+  // Fetch variants when applied filters change
   useEffect(() => {
     if (pagination.currentPage !== 1) {
       setPagination(prev => ({ ...prev, currentPage: 1 }));
     } else {
       fetchVariants();
     }
-  }, [filters]);
+  }, [appliedFilters, pagination.currentPage]);
   
   const fetchVariants = async () => {
     setLoading(true);
     try {
       const params = {
-        productId: filters.productId,
-        skuType: filters.skuType,
-        isStockItem: filters.isStockItem === '' ? undefined : filters.isStockItem === 'true',
+        productId: appliedFilters.productId,
+        skuType: appliedFilters.skuType,
+        isStockItem: appliedFilters.isStockItem === '' ? undefined : appliedFilters.isStockItem === 'true',
         limit: pagination.limit,
         offset: (pagination.currentPage - 1) * pagination.limit
       };
@@ -81,8 +97,8 @@ const Variants = () => {
         let filteredVariants = result.data.variants || [];
         let totalCount = result.data.count || filteredVariants.length;
         
-        if (filters.search) {
-          const search = filters.search.toLowerCase();
+        if (appliedFilters.search) {
+          const search = appliedFilters.search.toLowerCase();
           filteredVariants = filteredVariants.filter(v => 
             v.sku.toLowerCase().includes(search) ||
             (v.state_attr && v.state_attr.toLowerCase().includes(search))
@@ -117,22 +133,30 @@ const Variants = () => {
     }
   };
   
-  const handleFilterChange = (name, value) => {
-    setFilters(prev => ({ ...prev, [name]: value }));
+  const handleDropdownFilterChange = (name, value) => {
+    setDropdownFilters(prev => ({ ...prev, [name]: value }));
   };
   
   const handleSearch = () => {
-    fetchVariants();
+    setAppliedFilters(prev => ({
+      ...prev,
+      ...dropdownFilters
+    }));
   };
   
   const handleResetFilters = () => {
-    setFilters({
+    setSearchText('');
+    setDropdownFilters({
+      productId: '',
+      skuType: '',
+      isStockItem: ''
+    });
+    setAppliedFilters({
       search: '',
       productId: '',
       skuType: '',
       isStockItem: ''
     });
-    fetchVariants();
   };
   
   const handleCreateClick = (type) => {
@@ -387,15 +411,15 @@ const Variants = () => {
             <input
               type="text"
               placeholder="Search by SKU..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
               className="search-input"
             />
           </div>
           
           <select
-            value={filters.productId}
-            onChange={(e) => handleFilterChange('productId', e.target.value)}
+            value={dropdownFilters.productId}
+            onChange={(e) => handleDropdownFilterChange('productId', e.target.value)}
             className="filter-select"
           >
             <option value="">All Products</option>
@@ -407,8 +431,8 @@ const Variants = () => {
           </select>
           
           <select
-            value={filters.skuType}
-            onChange={(e) => handleFilterChange('skuType', e.target.value)}
+            value={dropdownFilters.skuType}
+            onChange={(e) => handleDropdownFilterChange('skuType', e.target.value)}
             className="filter-select"
           >
             <option value="">All Types</option>
@@ -419,8 +443,8 @@ const Variants = () => {
           </select>
           
           <select
-            value={filters.isStockItem}
-            onChange={(e) => handleFilterChange('isStockItem', e.target.value)}
+            value={dropdownFilters.isStockItem}
+            onChange={(e) => handleDropdownFilterChange('isStockItem', e.target.value)}
             className="filter-select"
           >
             <option value="">All Items</option>
