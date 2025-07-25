@@ -34,27 +34,56 @@ const AddressMap = ({ coordinates, address }) => {
 
     // Parse coordinates if they're in string format
     let lng, lat;
+    
+    // Check for null, undefined, or empty string
+    if (!coordinates || coordinates === '' || coordinates === 'null' || coordinates === 'undefined') {
+      console.log('Coordinates are empty or null:', coordinates);
+      setMapError('No coordinates available');
+      setIsLoading(false);
+      return;
+    }
+    
     if (typeof coordinates === 'string') {
       console.log('Parsing string coordinates:', coordinates);
-      // Handle PostgreSQL POINT format: "POINT(lng lat)"
-      const match = coordinates.match(/POINT\(([^ ]+) ([^ ]+)\)/);
-      if (match) {
-        lng = parseFloat(match[1]);
-        lat = parseFloat(match[2]);
-        console.log('Parsed coordinates:', { lng, lat });
+      
+      // First try to handle PostgreSQL POINT format: "POINT(lng lat)"
+      const pointMatch = coordinates.match(/POINT\s*\(\s*([+-]?\d*\.?\d+)\s+([+-]?\d*\.?\d+)\s*\)/i);
+      if (pointMatch) {
+        lng = parseFloat(pointMatch[1]);
+        lat = parseFloat(pointMatch[2]);
+        console.log('Parsed POINT coordinates:', { lng, lat });
       } else {
-        console.log('Failed to parse coordinates format:', coordinates);
-        setMapError('Invalid coordinates format');
-        setIsLoading(false);
-        return;
+        // Try to handle comma-separated format: "lng,lat" or "lat,lng"
+        const parts = coordinates.split(',').map(s => s.trim());
+        if (parts.length === 2) {
+          // Assume lng,lat format (standard for most mapping libraries)
+          lng = parseFloat(parts[0]);
+          lat = parseFloat(parts[1]);
+          
+          // If coordinates seem reversed (lat is > 90 or < -90), swap them
+          if (Math.abs(lat) > 90 && Math.abs(lng) <= 90) {
+            [lng, lat] = [lat, lng];
+            console.log('Swapped coordinates to correct order');
+          }
+          console.log('Parsed comma-separated coordinates:', { lng, lat });
+        } else {
+          console.log('Failed to parse coordinates format:', coordinates);
+          setMapError('Invalid coordinates format');
+          setIsLoading(false);
+          return;
+        }
       }
     } else if (Array.isArray(coordinates)) {
       [lng, lat] = coordinates;
       console.log('Array coordinates:', { lng, lat });
-    } else if (coordinates.lng && coordinates.lat) {
+    } else if (coordinates.lng !== undefined && coordinates.lat !== undefined) {
       lng = coordinates.lng;
       lat = coordinates.lat;
       console.log('Object coordinates:', { lng, lat });
+    } else if (coordinates.longitude !== undefined && coordinates.latitude !== undefined) {
+      lng = coordinates.longitude;
+      lat = coordinates.latitude;
+      console.log('Object coordinates (longitude/latitude):', { lng, lat });
     } else {
       console.log('Unrecognized coordinates format:', coordinates);
       setMapError('Unrecognized coordinates format');

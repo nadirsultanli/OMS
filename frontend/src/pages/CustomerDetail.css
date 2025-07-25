@@ -376,6 +376,9 @@
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.2s ease;
+  overflow-y: auto; /* Allow overlay to scroll */
+  padding: 20px; /* Add padding for mobile */
+  touch-action: none; /* Prevent touch scrolling on the overlay */
 }
 
 .modal-content {
@@ -383,10 +386,15 @@
   border-radius: 12px;
   width: 90%;
   max-width: 800px;
-  max-height: 90vh;
-  overflow: auto;
+  max-height: calc(100vh - 40px); /* Account for padding */
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden; /* Hide horizontal scrollbar */
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.3s ease;
+  margin: auto; /* Center in the available space */
+  position: relative; /* Ensure proper positioning */
+  touch-action: pan-y; /* Allow vertical touch scrolling */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 .modal-header {
@@ -426,6 +434,9 @@
 /* Address Form */
 .address-form {
   padding: 24px;
+  max-height: calc(90vh - 100px); /* Account for modal header */
+  overflow-y: auto; /* Enable scrolling within form */
+  overflow-x: hidden;
 }
 
 .form-grid {
