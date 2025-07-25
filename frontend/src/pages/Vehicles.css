@@ -262,6 +262,12 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Center align the Actions header */
+.vehicles-table th:last-child {
+  text-align: center;
 }
 
 .vehicles-table td {
@@ -273,9 +279,19 @@
   max-width: 200px;
 }
 
+/* Ensure actions column cells have same alignment */
+.vehicles-table td.actions {
+  padding: 16px;
+  vertical-align: middle;
+  text-align: center;
+  white-space: nowrap;
+  max-width: none;
+}
+
 .vehicles-table tbody tr {
   transition: background-color 0.15s ease;
   cursor: pointer;
+  min-height: 64px;
 }
 
 .vehicles-table tbody tr:hover {
@@ -514,13 +530,11 @@
   align-items: center;
   justify-content: center;
   min-width: 140px;
-  flex-wrap: wrap;
-  vertical-align: middle;
-  height: 100%;
+  flex-wrap: nowrap;
 }
 
 .action-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 32px;
@@ -531,6 +545,16 @@
   transition: all 0.2s ease;
   font-size: 14px;
   font-weight: 500;
+  vertical-align: middle;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.action-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
 .action-btn:hover:not(:disabled) {
