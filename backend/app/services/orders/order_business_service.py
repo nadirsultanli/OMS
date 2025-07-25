@@ -20,13 +20,19 @@ from app.domain.exceptions.orders import (
     OrderPricingError,
     OrderCustomerTypeError
 )
+from app.services.orders.cylinder_business_service import CylinderBusinessService
 
 
 class OrderBusinessService:
     """Business logic service for order management with role-based permissions"""
 
-    def __init__(self, order_repository: OrderRepository):
+    def __init__(self, order_repository: OrderRepository, variant_repository, tax_service=None):
         self.order_repository = order_repository
+        self.variant_repository = variant_repository
+        self.tax_service = tax_service
+        # Initialize cylinder business service if tax service is available
+        self.cylinder_service = CylinderBusinessService(tax_service) if tax_service else None
+        # Constructor debug removed
 
     # ============================================================================
     # ROLE-BASED PERMISSION CHECKS
@@ -203,6 +209,10 @@ class OrderBusinessService:
         
         available_transitions = all_transitions.get(current_status, [])
         
+        # TENANT_ADMIN has full control over all valid status transitions
+        if user_role == UserRoleType.TENANT_ADMIN:
+            return available_transitions
+        
         # Filter based on user role
         if user_role == UserRoleType.SALES_REP:
             return [s for s in available_transitions if s in [OrderStatus.SUBMITTED, OrderStatus.CANCELLED]]
@@ -252,6 +262,60 @@ class OrderBusinessService:
         
         return order_line
 
+    async def _apply_tax_to_order_line(self, order_line: OrderLine, tenant_id: UUID, is_credit_order: bool) -> None:
+        """Apply tax calculations to an order line using the gas cylinder tax service"""
+        
+        # Check if tax information was already provided by frontend
+        has_frontend_tax = (
+            hasattr(order_line, 'tax_rate') and order_line.tax_rate is not None and
+            hasattr(order_line, 'tax_code') and order_line.tax_code is not None and
+            hasattr(order_line, 'tax_amount') and order_line.tax_amount is not None
+        )
+        
+        if has_frontend_tax:
+            # Use frontend-provided tax information to ensure sync
+            print(f"Using frontend-provided tax information for order line (tax_code: {order_line.tax_code}, tax_rate: {order_line.tax_rate}%)")
+            
+            # Calculate derived values based on frontend tax info
+            effective_price = order_line.manual_unit_price or order_line.list_price
+            order_line.net_amount = effective_price * order_line.qty_ordered
+            order_line.gross_amount = order_line.net_amount + (order_line.tax_amount * order_line.qty_ordered)
+            order_line.list_price_incl_tax = order_line.list_price + order_line.tax_amount
+            order_line.final_price_incl_tax = effective_price + order_line.tax_amount
+            order_line.is_tax_inclusive = False  # Frontend calculates as exclusive
+            
+            return
+        
+        # Fallback to backend tax calculation if no frontend tax provided
+        if not self.tax_service:
+            return
+        
+        try:
+            # Calculate tax information using the tax service
+            tax_calc = await self.tax_service.calculate_order_line_tax(
+                tenant_id=tenant_id,
+                variant_id=order_line.variant_id,
+                gas_type=order_line.gas_type,
+                quantity=order_line.qty_ordered,
+                manual_unit_price=order_line.manual_unit_price,
+                is_credit_order=is_credit_order
+            )
+            
+            # Apply tax information to order line
+            order_line.tax_code = tax_calc['tax_code']
+            order_line.tax_rate = tax_calc['tax_rate']
+            order_line.tax_amount = tax_calc['tax_amount']
+            order_line.net_amount = tax_calc['net_amount']
+            order_line.gross_amount = tax_calc['gross_amount']
+            order_line.is_tax_inclusive = tax_calc['is_tax_inclusive']
+            order_line.component_type = tax_calc['component_type']
+            order_line.list_price_incl_tax = tax_calc['list_price_incl_tax']
+            order_line.final_price_incl_tax = tax_calc['final_price_incl_tax']
+            
+        except Exception as e:
+            # Log error but don't fail order creation - tax can be calculated later
+            print(f"Warning: Tax calculation failed for order line: {e}")
+
     # ============================================================================
     # INVENTORY ACCESS LOGIC
     # ============================================================================
@@ -268,6 +332,168 @@ class OrderBusinessService:
             return []  # Placeholder - would return truck-specific variant IDs
         else:
             return []
+
+    async def _calculate_order_weight(self, order: Order):
+        """Calculate total weight for order based on variant weights"""
+        if not order.order_lines:
+            return
+            
+        # Get unique variant IDs from order lines
+        variant_ids = {line.variant_id for line in order.order_lines if line.variant_id}
+        
+        if not variant_ids:
+            return
+            
+        # Fetch variant data
+        variant_weights = {}
+        for variant_id in variant_ids:
+            try:
+                variant = await self.variant_repository.get_by_id(variant_id)
+                if variant and variant.gross_weight_kg:
+                    variant_weights[variant_id] = variant.gross_weight_kg
+            except Exception:
+                # Continue if variant not found
+                continue
+        
+        # Calculate total weight using the order method
+        order.calculate_total_weight(variant_weights)
+
+        # Old method removed - replaced with direct implementation
+
+    async def _process_cylinder_order_line_direct(
+        self,
+        user: User,
+        customer: Customer,
+        line_data: dict
+    ) -> List[OrderLine]:
+        """
+        Direct cylinder processing - simplified implementation that always works
+        """
+        # Check if this is a cylinder variant
+        variant_id = line_data.get('variant_id')
+        if not variant_id:
+            return [await self._create_single_order_line(user, line_data)]
+        
+        try:
+            variant = await self.variant_repository.get_by_id(variant_id)
+            if not variant:
+                return [await self._create_single_order_line(user, line_data)]
+            
+            # Check if this is a cylinder that should use OUT/XCH logic
+            is_cylinder = (
+                variant.sku and (
+                    'CYL' in variant.sku.upper() or 
+                    'PROP' in variant.sku.upper() or
+                    variant.sku_type == 'ASSET'
+                )
+            )
+            
+            if not is_cylinder:
+                return [await self._create_single_order_line(user, line_data)]
+            
+            # Get scenario from line data (default to OUT)
+            scenario = line_data.get('scenario', 'OUT')
+            
+            # Extract cylinder size
+            import re
+            size = None
+            sku = variant.sku.upper()
+            match = re.search(r'(\d+)KG', sku) or re.search(r'CYL(\d+)', sku)
+            if match:
+                size = match.group(1)
+            else:
+                # Fallback to single line if can't extract size
+                return [await self._create_single_order_line(user, line_data)]
+            
+            # Create component order lines based on scenario
+            component_lines = []
+            quantity = Decimal(str(line_data.get('qty_ordered', 1)))
+            manual_price = Decimal(str(line_data.get('manual_unit_price'))) if line_data.get('manual_unit_price') else None
+            
+            if scenario.upper() == "OUT":
+                # Create Gas Fill line
+                gas_line = OrderLine.create(
+                    order_id=None,
+                    variant_id=None,  # Will try to find GAS{size} variant
+                    gas_type=f"GAS{size}",
+                    qty_ordered=quantity,
+                    list_price=Decimal('0'),  # Will be set by pricing rules
+                    manual_unit_price=manual_price,
+                    created_by=user.id
+                )
+                gas_line.component_type = "GAS_FILL"
+                gas_line.tax_rate = Decimal("23.00")
+                component_lines.append(gas_line)
+                
+                # Create Deposit line  
+                deposit_line = OrderLine.create(
+                    order_id=None,
+                    variant_id=None,  # Will try to find DEP{size} variant
+                    gas_type=f"DEP{size}",
+                    qty_ordered=quantity,
+                    list_price=Decimal('0'),  # Will be set by pricing rules
+                    manual_unit_price=None,  # Deposits always use list price
+                    created_by=user.id
+                )
+                deposit_line.component_type = "CYLINDER_DEPOSIT"
+                deposit_line.tax_rate = Decimal("0.00")
+                component_lines.append(deposit_line)
+                
+            elif scenario.upper() == "XCH":
+                # Create Gas Fill line
+                gas_line = OrderLine.create(
+                    order_id=None,
+                    variant_id=None,  # Will try to find GAS{size} variant
+                    gas_type=f"GAS{size}",
+                    qty_ordered=quantity,
+                    list_price=Decimal('0'),  # Will be set by pricing rules
+                    manual_unit_price=manual_price,
+                    created_by=user.id
+                )
+                gas_line.component_type = "GAS_FILL"
+                gas_line.tax_rate = Decimal("23.00")
+                component_lines.append(gas_line)
+                
+                # Create Empty Return line (credit)
+                return_line = OrderLine.create(
+                    order_id=None,
+                    variant_id=None,  # Will try to find EMPTY{size} variant
+                    gas_type=f"EMPTY{size}",
+                    qty_ordered=quantity,
+                    list_price=Decimal('0'),  # Will be set by pricing rules (negative)
+                    manual_unit_price=None,  # Returns always use list price
+                    created_by=user.id
+                )
+                return_line.component_type = "EMPTY_RETURN"
+                return_line.tax_rate = Decimal("0.00")
+                component_lines.append(return_line)
+            
+            # Try to find variant IDs for each component
+            variants = await self.variant_repository.get_variants_by_tenant(user.tenant_id)
+            for line in component_lines:
+                gas_type = line.gas_type
+                matching_variant = next((v for v in variants if v.sku == gas_type), None)
+                if matching_variant:
+                    line.variant_id = matching_variant.id
+                    line.gas_type = None  # Clear gas_type if we found variant
+            
+            return component_lines
+            
+        except Exception as e:
+            print(f"Error in direct cylinder processing: {e}")
+            return [await self._create_single_order_line(user, line_data)]
+    
+    async def _create_single_order_line(self, user: User, line_data: dict) -> OrderLine:
+        """Create a single order line from line data"""
+        return OrderLine.create(
+            order_id=None,  # Will be set when added to order
+            variant_id=line_data.get('variant_id'),
+            gas_type=line_data.get('gas_type'),
+            qty_ordered=Decimal(str(line_data.get('qty_ordered', 0))),
+            list_price=Decimal(str(line_data.get('list_price', 0))),
+            manual_unit_price=Decimal(str(line_data.get('manual_unit_price'))) if line_data.get('manual_unit_price') is not None and str(line_data.get('manual_unit_price')).strip() != '' else None,
+            created_by=user.id
+        )
 
     # ============================================================================
     # BUSINESS OPERATIONS
@@ -300,25 +526,31 @@ class OrderBusinessService:
         )
         order.order_status = initial_status
         
-        # Create order lines with business rules
+        # Create order lines with business rules (includes OUT/XCH cylinder processing)
         for line_data in order_lines_data:
-            order_line = OrderLine.create(
-                order_id=order.id,
-                variant_id=line_data.get('variant_id'),
-                gas_type=line_data.get('gas_type'),
-                qty_ordered=Decimal(str(line_data.get('qty_ordered', 0))),
-                list_price=Decimal(str(line_data.get('list_price', 0))),
-                manual_unit_price=Decimal(str(line_data.get('manual_unit_price'))) if line_data.get('manual_unit_price') is not None and str(line_data.get('manual_unit_price')).strip() != '' else None,
-                created_by=user.id
-            )
+            # Process cylinder order line - direct implementation
+            order_lines = await self._process_cylinder_order_line_direct(user, customer, line_data)
             
-            # Apply business rules
-            self.validate_order_line_for_role(user, order_line, order)
-            self.apply_pricing_rules(order_line, customer)
-            order.add_order_line(order_line)
+            # Apply business rules to each generated order line
+            for order_line in order_lines:
+                # Set the order ID for each line
+                order_line.order_id = order.id
+                
+                # Apply business rules
+                self.validate_order_line_for_role(user, order_line, order)
+                self.apply_pricing_rules(order_line, customer)
+                
+                # Apply tax calculation
+                if self.tax_service:
+                    await self._apply_tax_to_order_line(order_line, user.tenant_id, customer.customer_type == CustomerType.CREDIT)
+                
+                order.add_order_line(order_line)
         
         # Apply customer type pricing logic
         self.apply_customer_type_pricing(order, customer)
+        
+        # Calculate total weight based on variant weights
+        await self._calculate_order_weight(order)
         
         # Save to repository
         return await self.order_repository.create_order_with_lines(order)

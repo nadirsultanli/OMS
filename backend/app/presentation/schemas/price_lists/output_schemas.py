@@ -56,5 +56,27 @@ class PriceResponse(BaseModel):
     currency: str = Field(..., description="Currency code")
 
 
+class ProductPricingLineResponse(BaseModel):
+    """Individual price list line created from product pricing"""
+    variant_id: Optional[str] = Field(None, description="Variant ID (if found)")
+    gas_type: Optional[str] = Field(None, description="Gas type (if variant not found)")
+    price: float = Field(..., description="Line price")
+    tax_code: str = Field(..., description="Tax code applied")
+    tax_rate: float = Field(..., description="Tax rate percentage")
+
+
+class ProductPricingResponse(BaseModel):
+    """Response for product-based pricing creation"""
+    product_id: str = Field(..., description="Product ID that was priced")
+    scenario: str = Field(..., description="Pricing scenario used")
+    pricing_unit: str = Field(..., description="Pricing unit used")
+    input_gas_price: float = Field(..., description="Input gas price")
+    input_deposit_price: float = Field(..., description="Input deposit price")
+    calculated_gas_total: float = Field(..., description="Total gas pricing created")
+    calculated_deposit_total: float = Field(..., description="Total deposit pricing created")
+    total_lines_created: int = Field(..., description="Number of price list lines created")
+    lines: List[ProductPricingLineResponse] = Field(..., description="Created price list lines")
+
+
 class MessageResponse(BaseModel):
     message: str = Field(..., description="Response message") 

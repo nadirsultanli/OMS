@@ -9,21 +9,22 @@ from app.domain.entities.orders import OrderStatus
 
 class OrderLineResponse(BaseModel):
     """
-    Schema for order line response
+    Schema for order line response with comprehensive tax information
     
     **Response Context:**
     - Returned when retrieving order details
-    - Contains complete line information including quantities and pricing
+    - Contains complete line information including quantities, pricing, and taxes
     - Includes audit fields (created_by, updated_by, timestamps)
     
     **Key Fields:**
-    - final_price: Calculated price after manual overrides
-    - qty_allocated/qty_delivered: Updated during fulfillment process
-    - manual_unit_price: Override for list_price if provided
+    - final_price: Unit price after manual overrides (before tax)
+    - component_type: Business component (GAS_FILL, CYLINDER_DEPOSIT, EMPTY_RETURN)
+    - tax fields: Complete tax breakdown for compliance
+    - net_amount/gross_amount: Line totals before/after tax
     
     **Test Results:**
     - Successfully retrieved in order details
-    - Contains 2 order lines in test order with proper pricing
+    - Contains complete tax breakdown for gas cylinder business
     """
     id: UUID = Field(..., description="Order line ID (UUID)")
     order_id: UUID = Field(..., description="Parent order ID (UUID)")
@@ -32,9 +33,28 @@ class OrderLineResponse(BaseModel):
     qty_ordered: float = Field(..., description="Original quantity ordered")
     qty_allocated: float = Field(..., description="Quantity allocated for delivery (fulfillment)")
     qty_delivered: float = Field(..., description="Quantity delivered to customer (fulfillment)")
-    list_price: float = Field(..., description="Standard list price per unit")
+    
+    # Pricing fields
+    list_price: float = Field(..., description="Standard list price per unit (before tax)")
     manual_unit_price: Optional[float] = Field(None, description="Manual price override (if provided)")
-    final_price: float = Field(..., description="Final calculated price for this line")
+    final_price: float = Field(..., description="Final unit price used (before tax)")
+    list_price_incl_tax: Optional[float] = Field(None, description="List price including tax")
+    final_price_incl_tax: Optional[float] = Field(None, description="Final price including tax")
+    
+    # Tax fields for gas cylinder business compliance
+    tax_code: Optional[str] = Field(None, description="Tax code (TX_STD, TX_DEP, TX_EXE, TX_RED)")
+    tax_rate: Optional[float] = Field(None, description="Tax rate percentage (e.g., 23.00 for 23%)")
+    tax_amount: Optional[float] = Field(None, description="Tax amount for this line")
+    is_tax_inclusive: Optional[bool] = Field(None, description="Whether prices include tax")
+    
+    # Line totals
+    net_amount: Optional[float] = Field(None, description="Line total before tax (quantity × unit_price)")
+    gross_amount: Optional[float] = Field(None, description="Line total after tax (net_amount + tax_amount)")
+    
+    # Business component type for gas cylinder taxation
+    component_type: Optional[str] = Field(None, description="Business component: GAS_FILL (taxable), CYLINDER_DEPOSIT (zero-rated), EMPTY_RETURN (refund)")
+    
+    # Audit fields
     created_at: datetime = Field(..., description="Line creation timestamp")
     created_by: Optional[UUID] = Field(None, description="User who created the line (UUID)")
     updated_at: datetime = Field(..., description="Last update timestamp")

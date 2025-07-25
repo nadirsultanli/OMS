@@ -50,6 +50,31 @@ class OrderLineCreateRequest(BaseModel):
         ge=0, 
         description="Manual unit price override. If provided, overrides list_price."
     )
+    scenario: Optional[str] = Field(
+        None,
+        description="Cylinder sale scenario: 'OUT' (outright sale with deposit) or 'XCH' (exchange with return credit)"
+    )
+    
+    # Tax information (optional - frontend can provide calculated values)
+    tax_rate: Optional[Decimal] = Field(
+        None,
+        ge=0,
+        le=100,
+        description="Tax rate percentage. If provided, used instead of recalculating."
+    )
+    tax_code: Optional[str] = Field(
+        None,
+        max_length=20,
+        description="Tax code (e.g., TX_STD, TX_DEP). If provided, used instead of recalculating."
+    )
+    tax_amount: Optional[Decimal] = Field(
+        None,
+        description="Pre-calculated tax amount. If provided, used instead of recalculating."
+    )
+    gross_price: Optional[Decimal] = Field(
+        None,
+        description="Pre-calculated gross price (list_price + tax). If provided, used instead of recalculating."
+    )
 
     @model_validator(mode='after')
     def validate_variant_or_gas_type(self):

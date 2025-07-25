@@ -111,7 +111,8 @@ async def create_order(
                     'gas_type': line.gas_type,
                     'qty_ordered': line.qty_ordered,
                     'list_price': line.list_price,
-                    'manual_unit_price': line.manual_unit_price
+                    'manual_unit_price': line.manual_unit_price,
+                    'scenario': line.scenario  # Include scenario for OUT/XCH cylinder logic
                 })
         
         order = await order_service.create_order(

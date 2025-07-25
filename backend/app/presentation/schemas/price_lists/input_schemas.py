@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, Field
 
 
@@ -30,6 +31,15 @@ class UpdatePriceListLineRequest(BaseModel):
     variant_id: Optional[str] = Field(None, description="Variant ID")
     gas_type: Optional[str] = Field(None, description="Gas type")
     min_unit_price: Optional[Decimal] = Field(None, ge=0, description="Minimum unit price")
+
+
+class CreateProductPricingRequest(BaseModel):
+    """Request to create product-based pricing (automatically generates gas + deposit lines)"""
+    product_id: UUID = Field(..., description="Product ID to create pricing for")
+    gas_price: Decimal = Field(..., ge=0, description="Price for gas fill component")
+    deposit_price: Decimal = Field(..., ge=0, description="Price for cylinder deposit component")
+    pricing_unit: str = Field("per_cylinder", description="Pricing unit: per_cylinder or per_kg")
+    scenario: str = Field("OUT", description="Pricing scenario: OUT, XCH, or BOTH")
 
 
 class GetPriceRequest(BaseModel):

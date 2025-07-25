@@ -63,6 +63,23 @@ class SQLAlchemyOrderRepository(OrderRepository):
             list_price=model.list_price,
             manual_unit_price=model.manual_unit_price,
             final_price=model.final_price,
+            
+            # Tax fields
+            tax_code=getattr(model, 'tax_code', 'TX_STD'),
+            tax_rate=getattr(model, 'tax_rate', Decimal('0.00')),
+            tax_amount=getattr(model, 'tax_amount', Decimal('0.00')),
+            list_price_incl_tax=getattr(model, 'list_price_incl_tax', Decimal('0.00')),
+            final_price_incl_tax=getattr(model, 'final_price_incl_tax', Decimal('0.00')),
+            
+            # New tax fields
+            net_amount=getattr(model, 'net_amount', Decimal('0.00')),
+            gross_amount=getattr(model, 'gross_amount', Decimal('0.00')),
+            is_tax_inclusive=getattr(model, 'is_tax_inclusive', False),
+            
+            # Component type for business logic
+            component_type=getattr(model, 'component_type', 'STANDARD'),
+            
+            # Audit fields
             created_at=getattr(model, 'created_at', datetime.utcnow()),  # Use default if missing
             created_by=model.created_by,
             updated_at=getattr(model, 'updated_at', datetime.utcnow()),  # Use default if missing
@@ -101,6 +118,23 @@ class SQLAlchemyOrderRepository(OrderRepository):
             list_price=entity.list_price,
             manual_unit_price=entity.manual_unit_price,
             final_price=entity.final_price,
+            
+            # Tax fields
+            tax_code=getattr(entity, 'tax_code', 'TX_STD'),
+            tax_rate=getattr(entity, 'tax_rate', Decimal('0.00')),
+            tax_amount=getattr(entity, 'tax_amount', Decimal('0.00')),
+            list_price_incl_tax=getattr(entity, 'list_price_incl_tax', Decimal('0.00')),
+            final_price_incl_tax=getattr(entity, 'final_price_incl_tax', Decimal('0.00')),
+            
+            # New tax fields
+            net_amount=getattr(entity, 'net_amount', Decimal('0.00')),
+            gross_amount=getattr(entity, 'gross_amount', Decimal('0.00')),
+            is_tax_inclusive=getattr(entity, 'is_tax_inclusive', False),
+            
+            # Component type for business logic
+            component_type=getattr(entity, 'component_type', 'STANDARD'),
+            
+            # Audit fields
             created_by=entity.created_by,
             updated_by=entity.updated_by
         )

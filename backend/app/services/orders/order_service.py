@@ -25,14 +25,17 @@ from app.domain.exceptions.orders import (
     OrderCustomerTypeError
 )
 from app.services.orders.order_business_service import OrderBusinessService
+from app.services.price_lists.gas_cylinder_tax_service import GasCylinderTaxService
 
 
 class OrderService:
     """Service for order business logic with role-based permissions"""
 
-    def __init__(self, order_repository: OrderRepository):
+    def __init__(self, order_repository: OrderRepository, variant_repository, tax_service: GasCylinderTaxService = None):
         self.order_repository = order_repository
-        self.business_service = OrderBusinessService(order_repository)
+        self.variant_repository = variant_repository
+        self.tax_service = tax_service
+        self.business_service = OrderBusinessService(order_repository, variant_repository, tax_service)
 
     # ============================================================================
     # ORDER CRUD OPERATIONS WITH BUSINESS LOGIC
@@ -228,7 +231,7 @@ class OrderService:
         order = await self.get_order_by_id(order_id, user.tenant_id)
         
         # Check if status transition is allowed
-        allowed_transitions = self.get_allowed_status_transitions(order.order_status, user.role_type)
+        allowed_transitions = self.get_allowed_status_transitions(order.order_status, user.role)
         if new_status not in allowed_transitions:
             raise OrderStatusTransitionError(
                 f"Cannot transition from {order.order_status} to {new_status}"

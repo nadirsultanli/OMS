@@ -100,8 +100,8 @@ class CreateCompleteSetRequest(BaseModel):
     size: str  # e.g., "13" for 13kg
     tare_weight_kg: Decimal
     capacity_kg: Decimal
-    gross_weight_kg: Decimal  # Will be recalculated
-    deposit_amount: Decimal
+    gross_weight_kg: Decimal  # Will be recalculated automatically
+    deposit_amount: Optional[Decimal] = None  # Optional - handled in price lists
     gas_price: Optional[Decimal] = None
     bundle_price: Optional[Decimal] = None
     inspection_date: Optional[date] = None
