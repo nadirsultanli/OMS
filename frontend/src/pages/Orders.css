@@ -237,7 +237,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
-  min-width: 1000px;
+  min-width: 1200px;
   position: relative;
   table-layout: fixed; /* Ensures equal column spacing */
 }
@@ -262,14 +262,14 @@
 }
 
 /* Column width distribution for equal spacing */
-.orders-table th:nth-child(1) { width: 12%; } /* Order No. */
-.orders-table th:nth-child(2) { width: 15%; } /* Customer */
-.orders-table th:nth-child(3) { width: 12%; } /* Status */
-.orders-table th:nth-child(4) { width: 12%; } /* Total */
-.orders-table th:nth-child(5) { width: 10%; } /* Weight */
-.orders-table th:nth-child(6) { width: 14%; } /* Requested Date */
-.orders-table th:nth-child(7) { width: 14%; } /* Created */
-.orders-table th:nth-child(8) { width: 11%; } /* Actions */
+.orders-table th:nth-child(1) { width: 15%; min-width: 140px; } /* Order No. */
+.orders-table th:nth-child(2) { width: 20%; min-width: 180px; } /* Customer */
+.orders-table th:nth-child(3) { width: 12%; min-width: 120px; } /* Status */
+.orders-table th:nth-child(4) { width: 10%; min-width: 100px; text-align: right; } /* Total */
+.orders-table th:nth-child(5) { width: 8%; min-width: 80px; text-align: right; } /* Weight */
+.orders-table th:nth-child(6) { width: 12%; min-width: 120px; } /* Requested Date */
+.orders-table th:nth-child(7) { width: 12%; min-width: 120px; } /* Created */
+.orders-table th:nth-child(8) { width: 11%; min-width: 140px; text-align: center; } /* Actions */
 
 .orders-table td {
   padding: 16px;
@@ -277,9 +277,18 @@
   color: #374151;
   vertical-align: middle;
   position: relative;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+/* Apply same width to td elements */
+.orders-table td:nth-child(1) { width: 15%; min-width: 140px; } /* Order No. */
+.orders-table td:nth-child(2) { width: 20%; min-width: 180px; white-space: normal; } /* Customer */
+.orders-table td:nth-child(3) { width: 12%; min-width: 120px; } /* Status */
+.orders-table td:nth-child(4) { width: 10%; min-width: 100px; text-align: right; } /* Total */
+.orders-table td:nth-child(5) { width: 8%; min-width: 80px; text-align: right; } /* Weight */
+.orders-table td:nth-child(6) { width: 12%; min-width: 120px; } /* Requested Date */
+.orders-table td:nth-child(7) { width: 12%; min-width: 120px; } /* Created */
+.orders-table td:nth-child(8) { width: 11%; min-width: 140px; } /* Actions */
 
 .orders-table tbody tr {
   transition: background-color 0.15s ease;
@@ -298,12 +307,16 @@
 .order-no-cell {
   font-weight: 600;
   color: #1f2937;
-  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .order-no-cell strong {
   color: #2563eb;
   font-size: 14px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .amount-cell {
@@ -401,6 +414,94 @@
 
 .status-icon {
   flex-shrink: 0;
+}
+
+/* ============================================
+   CUSTOM FILTER DROPDOWN
+   ============================================ */
+.custom-filter-dropdown {
+  position: relative;
+  min-width: 200px;
+}
+
+.custom-filter-dropdown .filter-select {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  background: white;
+  height: 44px;
+  border-radius: 8px;
+  background-image: none;
+  padding-right: 16px;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  margin-left: 8px;
+  transition: transform 0.2s ease;
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 300px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-search-container {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.dropdown-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.dropdown-search-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.dropdown-options {
+  overflow-y: auto;
+  max-height: 250px;
+}
+
+.dropdown-option {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+  color: #374151;
+}
+
+.dropdown-option:hover {
+  background-color: #f3f4f6;
+}
+
+.dropdown-option.selected {
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-weight: 500;
 }
 
 /* ============================================
