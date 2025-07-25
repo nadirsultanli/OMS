@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Search, ChevronDown, X } from 'lucide-react';
 import './CreateOrder.css';
 import customerService from '../services/customerService';
 import variantService from '../services/variantService';
@@ -40,9 +41,16 @@ const CreateOrder = () => {
   const [products, setProducts] = useState([]);
   const [priceLists, setPriceLists] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [selectedPriceList, setSelectedPriceList] = useState('');
+  const [activePriceList, setActivePriceList] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [availableVariants, setAvailableVariants] = useState([]);
   const [priceListLines, setPriceListLines] = useState([]);
+  
+  // Searchable dropdown states
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
   
   // Product-based addition state (cleaned up - removing unused showProductForm)
   const [productFormData, setProductFormData] = useState({
@@ -84,6 +92,98 @@ const CreateOrder = () => {
   useEffect(() => {
     loadInitialData();
   }, []);
+  
+  // Helper function to check if price list is currently effective
+  const isCurrentlyEffective = (priceList) => {
+    const today = new Date();
+    const effectiveFrom = new Date(priceList.effective_from);
+    const effectiveTo = priceList.effective_to ? new Date(priceList.effective_to) : null;
+    
+    return effectiveFrom <= today && (!effectiveTo || effectiveTo >= today);
+  };
+
+  // Get the active price list automatically
+  const getActivePriceList = (priceLists) => {
+    return priceLists.find(priceList => priceList.active && isCurrentlyEffective(priceList)) || null;
+  };
+  
+  // Searchable dropdown component
+  const SearchableDropdown = ({ 
+    placeholder, 
+    value, 
+    searchValue, 
+    onSearchChange, 
+    options, 
+    onSelect, 
+    displayKey, 
+    isOpen, 
+    onToggle, 
+    renderOption 
+  }) => {
+    const filteredOptions = options.filter(option => 
+      option[displayKey].toLowerCase().includes(searchValue.toLowerCase())
+    );
+
+    return (
+      <div className="searchable-dropdown">
+        <div className="dropdown-trigger" onClick={onToggle}>
+          <input
+            type="text"
+            placeholder={placeholder}
+            value={value ? value[displayKey] : searchValue}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="dropdown-input"
+            readOnly={!!value}
+          />
+          <ChevronDown size={20} className="dropdown-icon" />
+          {value && (
+            <X 
+              size={16} 
+              className="clear-icon" 
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(null);
+                onSearchChange('');
+              }}
+            />
+          )}
+        </div>
+        
+        {isOpen && (
+          <div className="dropdown-menu">
+            <div className="dropdown-search">
+              <Search size={16} />
+              <input
+                type="text"
+                placeholder={`Search ${placeholder.toLowerCase()}...`}
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="dropdown-options">
+              {filteredOptions.length > 0 ? (
+                filteredOptions.map((option, index) => (
+                  <div
+                    key={option.id || index}
+                    className="dropdown-option"
+                    onClick={() => {
+                      onSelect(option);
+                      onToggle();
+                    }}
+                  >
+                    {renderOption ? renderOption(option) : option[displayKey]}
+                  </div>
+                ))
+              ) : (
+                <div className="dropdown-no-results">No results found</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const loadInitialData = async () => {
     setLoading(true);
@@ -143,7 +243,17 @@ const CreateOrder = () => {
       }
 
       if (priceListsResult.success) {
-        setPriceLists(priceListsResult.data.price_lists || []);
+        const priceLists = priceListsResult.data.price_lists || [];
+        setPriceLists(priceLists);
+        
+        // Automatically select the active price list
+        const activeList = getActivePriceList(priceLists);
+        if (activeList) {
+          setActivePriceList(activeList);
+          setSelectedPriceList(activeList.id);
+          await loadPriceListAndFilterVariants(activeList.id);
+          await getProductsFromPriceList(activeList.id);
+        }
       } else {
         console.error('Failed to fetch price lists:', priceListsResult.error);
       }
@@ -203,7 +313,7 @@ const CreateOrder = () => {
 
   // Price list integration functions with tax calculation
   const getPriceForVariant = (variantId, gasType = null) => {
-    if (!selectedPriceList || !priceListLines.length) return null;
+    if (!activePriceList || !priceListLines.length) return null;
     
     // First try to find by variant_id
     let priceLine = priceListLines.find(line => line.variant_id === variantId);
@@ -245,31 +355,6 @@ const CreateOrder = () => {
     };
   };
 
-  const handlePriceListChange = async (priceListId) => {
-    setSelectedPriceList(priceListId);
-    setFormData(prev => ({ ...prev, order_lines: [] })); // Clear existing lines
-    setSelectedProducts([]); // Clear selected products
-    setAvailableProducts([]);
-    
-    if (priceListId) {
-      // Load price list lines and filter available variants
-      await loadPriceListAndFilterVariants(priceListId);
-      
-      // Get products from price list
-      await getProductsFromPriceList(priceListId);
-      
-      // Update all order lines with new prices
-      if (formData.order_lines.length > 0) {
-        updateAllOrderLinePrices();
-      }
-    } else {
-      // No price list selected - show all variants (with stock filter if enabled)
-      const filteredVariants = filterVariantsByStock(variants, !hideOutOfStock);
-      setAvailableVariants(filteredVariants);
-      setPriceListLines([]);
-      setAvailableProducts([]);
-    }
-  };
 
   const loadPriceListAndFilterVariants = async (priceListId) => {
     try {
@@ -427,15 +512,15 @@ const CreateOrder = () => {
     setHideOutOfStock(newHideOutOfStock);
     
     // Re-filter available variants based on new setting
-    if (selectedPriceList) {
-      // If price list is selected, re-apply price list filtering with stock filter
+    if (activePriceList) {
+      // If active price list exists, re-apply price list filtering with stock filter
       const variantsWithPrices = variants.filter(variant => {
         return priceListLines.some(line => line.variant_id === variant.id);
       });
       const filteredVariants = filterVariantsByStock(variantsWithPrices, !newHideOutOfStock);
       setAvailableVariants(filteredVariants);
     } else {
-      // No price list selected, just filter all variants by stock
+      // No active price list, just filter all variants by stock
       const filteredVariants = filterVariantsByStock(variants, !newHideOutOfStock);
       setAvailableVariants(filteredVariants);
     }
@@ -476,8 +561,8 @@ const CreateOrder = () => {
 
   // Product-based order line addition
   const addProductOrderLines = () => {
-    if (!productFormData.product_id || !selectedPriceList) {
-      setMessage('Please select both a product and a price list before adding.');
+    if (!productFormData.product_id || !activePriceList) {
+      setMessage('Please select a product. Active price list is required.');
       return;
     }
 
@@ -588,7 +673,7 @@ const CreateOrder = () => {
 
   // New function to handle product selection and generate preview
   const handleProductSelection = (productId) => {
-    if (!productId || !selectedPriceList) {
+    if (!productId || !activePriceList) {
       setSelectedProduct(null);
       setPreviewLines([]);
       setShowPreview(false);
@@ -748,7 +833,7 @@ const CreateOrder = () => {
 
   // Function to handle product selection (Step 2 - just adds to selection)
   const handleProductSelectionFromPriceList = (productId) => {
-    if (!productId || !selectedPriceList) return;
+    if (!productId || !activePriceList) return;
 
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -866,8 +951,8 @@ const CreateOrder = () => {
       updateStockLevelsForVariant(value);
     }
 
-    // Auto-populate price when variant is selected and we have a price list
-    if (field === 'variant_id' && value && selectedPriceList) {
+    // Auto-populate price when variant is selected and we have an active price list
+    if (field === 'variant_id' && value && activePriceList) {
       const priceInfo = getPriceForVariant(value);
       if (priceInfo !== null) {
         setFormData(prev => ({
@@ -904,16 +989,15 @@ const CreateOrder = () => {
         }));
         // Set error for missing price
         const selectedVariant = variants.find(v => v.id === value);
-        const priceListName = priceLists.find(p => p.id === selectedPriceList)?.name;
         setErrors(prev => ({ 
           ...prev, 
-          [`line_${lineId}_no_price`]: `Product "${selectedVariant?.sku}" has no price in "${priceListName}" price list. Please select a different product or price list.`
+          [`line_${lineId}_no_price`]: `Product "${selectedVariant?.sku}" has no price in "${activePriceList.name}" price list. Please select a different product.`
         }));
       }
     }
 
-    // Auto-populate price when gas type is selected and we have a variant + price list
-    if (field === 'gas_type' && value && selectedPriceList) {
+    // Auto-populate price when gas type is selected and we have a variant + active price list
+    if (field === 'gas_type' && value && activePriceList) {
       const currentLine = formData.order_lines.find(line => line.id === lineId);
       if (currentLine?.variant_id) {
         const price = getPriceForVariant(currentLine.variant_id, value);
@@ -933,10 +1017,9 @@ const CreateOrder = () => {
             )
           }));
           const selectedVariant = variants.find(v => v.id === currentLine.variant_id);
-          const priceListName = priceLists.find(p => p.id === selectedPriceList)?.name;
           setErrors(prev => ({ 
             ...prev, 
-            [`line_${lineId}_no_price`]: `Product "${selectedVariant?.sku}" with gas type "${value}" has no price in "${priceListName}" price list.`
+            [`line_${lineId}_no_price`]: `Product "${selectedVariant?.sku}" with gas type "${value}" has no price in "${activePriceList.name}" price list.`
           }));
         }
       }
@@ -985,11 +1068,10 @@ const CreateOrder = () => {
         newErrors[`${linePrefix}_gas_type`] = 'Gas type is required';
       }
 
-      // Price list validation - if price list is selected, product must have price
-      if (selectedPriceList && line.variant_id && line.priceFound === false) {
+      // Price list validation - if active price list exists, product must have price
+      if (activePriceList && line.variant_id && line.priceFound === false) {
         const selectedVariant = variants.find(v => v.id === line.variant_id);
-        const priceListName = priceLists.find(p => p.id === selectedPriceList)?.name;
-        newErrors[`${linePrefix}_no_price`] = `Product "${selectedVariant?.sku}" has no price in "${priceListName}" price list. Please select a different product or add pricing to the price list.`;
+        newErrors[`${linePrefix}_no_price`] = `Product "${selectedVariant?.sku}" has no price in "${activePriceList.name}" price list. Please select a different product or add pricing to the price list.`;
       }
 
       // Quantity validation
@@ -1006,9 +1088,9 @@ const CreateOrder = () => {
       }
 
       // Price validation - require positive price
-      if (selectedPriceList && (!line.list_price || line.list_price <= 0)) {
-        newErrors[`${linePrefix}_list_price`] = 'Valid price is required. Please ensure the product has pricing in the selected price list.';
-      } else if (!selectedPriceList && (!line.list_price || line.list_price < 0)) {
+      if (activePriceList && (!line.list_price || line.list_price <= 0)) {
+        newErrors[`${linePrefix}_list_price`] = 'Valid price is required. Please ensure the product has pricing in the active price list.';
+      } else if (!activePriceList && (!line.list_price || line.list_price < 0)) {
         newErrors[`${linePrefix}_list_price`] = 'List price must be greater than or equal to 0';
       }
 
@@ -1170,98 +1252,76 @@ const CreateOrder = () => {
           
           <div className="form-group">
             <label htmlFor="customer">Customer *</label>
-            <select
-              id="customer"
-              ref={customerSelectRef}
-              value={formData.customer_id}
-              onChange={(e) => handleCustomerChange(e.target.value)}
-              className={errors.customer_id ? 'error' : ''}
-              required
-            >
-              <option value="">Select a customer...</option>
-              {customers.map(customer => (
-                <option key={customer.id} value={customer.id}>
-                  {getCustomerDisplayName(customer)}
-                </option>
-              ))}
-            </select>
+            <SearchableDropdown
+              placeholder="Select a customer..."
+              value={selectedCustomer}
+              searchValue={customerSearch}
+              onSearchChange={setCustomerSearch}
+              options={customers}
+              onSelect={(customer) => {
+                handleCustomerChange(customer?.id || '');
+                setCustomerSearch('');
+              }}
+              displayKey="name"
+              isOpen={showCustomerDropdown}
+              onToggle={() => setShowCustomerDropdown(!showCustomerDropdown)}
+              renderOption={(customer) => getCustomerDisplayName(customer)}
+            />
             {errors.customer_id && <span className="error-text">{errors.customer_id}</span>}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="priceList">Step 1: Choose Price List</label>
-            <select
-              id="priceList"
-              value={selectedPriceList}
-              onChange={(e) => handlePriceListChange(e.target.value)}
-              className="form-select"
-            >
-              <option value="">Select a price list to auto-populate prices</option>
-              {priceLists.map(priceList => (
-                <option key={priceList.id} value={priceList.id}>
-                  {priceList.name} ({priceList.currency})
-                </option>
-              ))}
-            </select>
-            {selectedPriceList ? (
+          {activePriceList && (
+            <div className="active-price-list-info">
+              ✅ <strong>Active Price List:</strong> {activePriceList.name} ({activePriceList.currency})
               <div className="product-filtering-info">
-                🎯 Filtering products: Showing only {availableVariants.length} products with prices in "{priceLists.find(p => p.id === selectedPriceList)?.name}"
+                🎯 Showing {availableVariants.length} products with pricing from active price list
               </div>
-            ) : (
-              <small className="form-help">Select a price list to automatically populate prices and filter available products</small>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Step 2: Product Selection - Clean workflow */}
-          {selectedPriceList && (
+          {/* Step 2: Product Selection with SearchableDropdown */}
+          {activePriceList && (
             <div className="product-search-section">
               <h4>Step 2: Choose Product</h4>
               <p className="form-description">
                 Search and select a product to auto-generate Gas & Deposit variants.
               </p>
-              <div className="product-search-container">
-                <div className="form-group">
-                  <label htmlFor="product_search">Search Products</label>
-                  <input
-                    type="text"
-                    id="product_search"
-                    value={productSearchTerm}
-                    onChange={(e) => setProductSearchTerm(e.target.value)}
-                    placeholder="Type to search products..."
-                    className="product-search-input"
-                  />
-                </div>
-                <div className="available-products-list">
-                  {availableProducts
-                    .filter(product => product.name.toLowerCase().includes(productSearchTerm.toLowerCase()))
-                    .map(product => (
-                      <div key={product.id} className="available-product-item">
-                        <div className="product-info">
-                          <span className="product-name">{product.name}</span>
-                          <span className="product-category">({product.category})</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleProductSelectionFromPriceList(product.id)}
-                          className="add-product-btn"
-                        >
-                          ➕ Add
-                        </button>
-                      </div>
-                    ))}
-                  {availableProducts.length === 0 && (
-                    <div className="no-products-message">No products available for this price list.</div>
+              <div className="form-group">
+                <label htmlFor="product_search">Search Products</label>
+                <SearchableDropdown
+                  placeholder="Search and select a product..."
+                  value={selectedProduct}
+                  searchValue={productSearch}
+                  onSearchChange={setProductSearch}
+                  options={availableProducts}
+                  onSelect={(product) => {
+                    if (product) {
+                      handleProductSelectionFromPriceList(product.id);
+                      setProductSearch('');
+                    }
+                  }}
+                  displayKey="name"
+                  isOpen={showProductDropdown}
+                  onToggle={() => setShowProductDropdown(!showProductDropdown)}
+                  renderOption={(product) => (
+                    <div className="product-option">
+                      <span className="product-name">{product.name}</span>
+                      <span className="product-category">({product.category})</span>
+                    </div>
                   )}
-                </div>
+                />
+                {availableProducts.length === 0 && (
+                  <div className="no-products-message">No products available for this price list.</div>
+                )}
               </div>
             </div>
           )}
 
           {/* No products available message */}
-          {selectedPriceList && availableProducts.length === 0 && (
+          {activePriceList && availableProducts.length === 0 && (
             <div className="no-products-warning">
-              ⚠️ No products found for the selected price list "{priceLists.find(p => p.id === selectedPriceList)?.name}". 
-              Please add product variants to this price list or select a different price list.
+              ⚠️ No products found for the active price list "{activePriceList.name}". 
+              Please add product variants to this price list.
             </div>
           )}
 
@@ -1448,7 +1508,7 @@ const CreateOrder = () => {
                         required
                       >
                         <option value="">
-                          {selectedPriceList ? 
+                          {activePriceList ? 
                             `Select a product (${availableVariants.length} products with prices)...` :
                             'Select a product variant...'
                           }
@@ -1459,15 +1519,15 @@ const CreateOrder = () => {
                           </option>
                         ))}
                       </select>
-                      {selectedPriceList && availableVariants.length === 0 && (
+                      {activePriceList && availableVariants.length === 0 && (
                         <small className="form-help error-text">
-                          ⚠️ No products found with prices in "{priceLists.find(p => p.id === selectedPriceList)?.name}". 
-                          Please add products to this price list or select a different price list.
+                          ⚠️ No products found with prices in "{activePriceList.name}". 
+                          Please add products to this price list.
                         </small>
                       )}
-                      {!selectedPriceList && (
+                      {!activePriceList && (
                         <small className="form-help">
-                          💡 Select a price list above to filter products and auto-populate prices
+                          💡 No active price list found. Please activate a price list to auto-populate prices.
                         </small>
                       )}
                       {errors[`line_${line.id}_variant_id`] && 
