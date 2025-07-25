@@ -275,8 +275,19 @@ input[type="number"].form-control::-webkit-inner-spin-button {
 .filter-actions {
   display: flex;
   gap: 12px;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   padding-top: 8px;
+}
+
+.filter-actions .checkbox-group {
+  padding-top: 0;
+  margin: 0;
+}
+
+.filter-actions .action-buttons {
+  display: flex;
+  gap: 12px;
 }
 
 /* Table Section */
@@ -300,6 +311,8 @@ input[type="number"].form-control::-webkit-inner-spin-button {
   margin: 0;
   font-size: 14px;
   border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 1000px;
 }
 
 .table thead {
@@ -318,17 +331,17 @@ input[type="number"].form-control::-webkit-inner-spin-button {
   position: relative;
 }
 
-/* Ensure proper column widths */
-.table th:nth-child(1) { min-width: 180px; } /* Warehouse */
-.table th:nth-child(2) { min-width: 120px; } /* Variant */
-.table th:nth-child(3) { min-width: 120px; } /* Status */
-.table th:nth-child(4) { min-width: 100px; } /* Total Qty */
-.table th:nth-child(5) { min-width: 100px; } /* Reserved */
-.table th:nth-child(6) { min-width: 100px; } /* Available */
-.table th:nth-child(7) { min-width: 100px; } /* Unit Cost */
-.table th:nth-child(8) { min-width: 120px; } /* Total Value */
-.table th:nth-child(9) { min-width: 140px; } /* Last Transaction */
-.table th:nth-child(10) { min-width: 200px; } /* Actions */
+/* Optimized responsive column widths */
+.table th:nth-child(1) { width: 15%; min-width: 120px; } /* Warehouse */
+.table th:nth-child(2) { width: 12%; min-width: 100px; } /* Variant */
+.table th:nth-child(3) { width: 10%; min-width: 80px; } /* Status */
+.table th:nth-child(4) { width: 8%; min-width: 70px; } /* Total Qty */
+.table th:nth-child(5) { width: 8%; min-width: 70px; } /* Reserved */
+.table th:nth-child(6) { width: 8%; min-width: 70px; } /* Available */
+.table th:nth-child(7) { width: 10%; min-width: 80px; } /* Unit Cost */
+.table th:nth-child(8) { width: 10%; min-width: 90px; } /* Total Value */
+.table th:nth-child(9) { width: 12%; min-width: 100px; } /* Last Transaction */
+.table th:nth-child(10) { width: 7%; min-width: 80px; } /* Actions */
 
 .table tbody tr {
   border-bottom: 1px solid #e5e7eb;
@@ -379,6 +392,39 @@ input[type="number"].form-control::-webkit-inner-spin-button {
   font-weight: 600;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
+  padding-right: 16px !important;
+}
+
+/* Apply right alignment to numeric columns */
+.table th:nth-child(4),
+.table th:nth-child(5),
+.table th:nth-child(6),
+.table th:nth-child(7),
+.table th:nth-child(8) {
+  text-align: right;
+}
+
+.table td:nth-child(4),
+.table td:nth-child(5),
+.table td:nth-child(6),
+.table td:nth-child(7),
+.table td:nth-child(8) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Center align the Actions column */
+.table th:nth-child(10),
+.table td:nth-child(10) {
+  text-align: center;
+}
+
+/* Handle empty/zero values better */
+.quantity-cell:empty::after,
+.table td:nth-child(5):empty::after {
+  content: '-';
+  color: #9ca3af;
+  font-weight: normal;
 }
 
 /* Stock Status Badges */
@@ -496,23 +542,18 @@ input[type="number"].form-control::-webkit-inner-spin-button {
 }
 
 /* Loading States */
-.loading-container {
+.loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  margin: 24px auto;
-  max-width: 600px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #6b7280;
 }
 
-.spinner {
-  width: 48px;
-  height: 48px;
+.loading-spinner {
+  width: 40px;
+  height: 40px;
   border: 4px solid #e5e7eb;
   border-top: 4px solid #2563eb;
   border-radius: 50%;
@@ -631,6 +672,11 @@ input[type="number"].form-control::-webkit-inner-spin-button {
   text-align: center;
 }
 
+.text-muted {
+  color: #9ca3af;
+  font-weight: normal;
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .stock-levels-page {
@@ -675,6 +721,17 @@ input[type="number"].form-control::-webkit-inner-spin-button {
   
   .filter-actions {
     flex-direction: column;
+    gap: 16px;
+    justify-content: flex-start;
+    align-items: stretch;
+  }
+  
+  .filter-actions .checkbox-group {
+    justify-content: center;
+  }
+  
+  .filter-actions .action-buttons {
+    flex-direction: column;
     gap: 8px;
   }
   
@@ -688,7 +745,13 @@ input[type="number"].form-control::-webkit-inner-spin-button {
   }
   
   .table {
-    min-width: 900px;
+    min-width: 1000px;
+    font-size: 13px;
+  }
+  
+  .table th,
+  .table td {
+    padding: 12px 8px;
   }
   
   .btn {
