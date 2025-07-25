@@ -34,7 +34,14 @@ class AddressRepository(AddressRepositoryInterface):
     async def create_address(self, address: Address) -> Address:
         coordinates = None
         if address.coordinates is not None:
-            coordinates = WKTElement(address.coordinates, srid=4326)
+            # Validate coordinates before creating WKTElement
+            coord_str = str(address.coordinates).strip()
+            if coord_str and coord_str not in ['', 'null', 'undefined', 'POINT()', 'POINT( )', 'POINT(0 0)']:
+                try:
+                    coordinates = WKTElement(coord_str, srid=4326)
+                except Exception as e:
+                    print(f"Warning: Invalid coordinates format '{coord_str}': {e}")
+                    coordinates = None
         
         # ENFORCE SINGLE DEFAULT ADDRESS PER CUSTOMER
         # If this address is being set as default, unset ALL other default addresses for this customer
@@ -99,7 +106,16 @@ class AddressRepository(AddressRepositoryInterface):
             "tenant_id", "customer_id", "address_type", "coordinates", "is_default", "street", "city", "state", "zip_code", "country", "access_instructions", "updated_at", "updated_by", "deleted_at", "deleted_by"
         ]:
             if field == "coordinates" and getattr(address, field) is not None:
-                setattr(obj, field, WKTElement(getattr(address, field), srid=4326))
+                # Validate coordinates before creating WKTElement
+                coord_str = str(getattr(address, field)).strip()
+                if coord_str and coord_str not in ['', 'null', 'undefined', 'POINT()', 'POINT( )', 'POINT(0 0)']:
+                    try:
+                        setattr(obj, field, WKTElement(coord_str, srid=4326))
+                    except Exception as e:
+                        print(f"Warning: Invalid coordinates format '{coord_str}': {e}")
+                        setattr(obj, field, None)
+                else:
+                    setattr(obj, field, None)
             else:
                 setattr(obj, field, getattr(address, field))
         obj.updated_at = datetime.now()
@@ -139,7 +155,14 @@ class AddressRepository(AddressRepositoryInterface):
     def _to_entity(self, obj: AddressORM) -> Address:
         coordinates = None
         if obj.coordinates is not None:
-            coordinates = to_shape(obj.coordinates).wkt
+            try:
+                wkt_str = to_shape(obj.coordinates).wkt
+                # Validate the WKT string before returning
+                if wkt_str and wkt_str not in ['POINT EMPTY', 'POINT ()', 'POINT ( )', 'POINT (0 0)']:
+                    coordinates = wkt_str
+            except Exception as e:
+                print(f"Warning: Failed to convert coordinates to WKT: {e}")
+                coordinates = None
         return Address(
             id=obj.id,
             tenant_id=obj.tenant_id,
