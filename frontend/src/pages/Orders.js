@@ -6,6 +6,7 @@ import priceListService from '../services/priceListService';
 import productService from '../services/productService';
 import { extractErrorMessage } from '../utils/errorUtils';
 import { Search, Plus, Edit2, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Truck, X } from 'lucide-react';
+import SearchableDropdown from '../components/SearchableDropdown';
 import './Orders.css';
 
 const Orders = () => {
@@ -1106,23 +1107,24 @@ const Orders = () => {
           </div>
 
           <div className="filter-group">
-            <select
-              name="customer"
+            <SearchableDropdown
+              options={[
+                { value: '', label: 'All Customers' },
+                ...customers.map(customer => ({ value: customer.id, label: customer.name }))
+              ]}
               value={filters.customer}
               onChange={handleFilterChange}
+              placeholder="Select Customer"
+              searchPlaceholder="Search customers..."
+              name="customer"
               className="filter-select"
-            >
-              <option value="">All Customers</option>
-              {customers.map(customer => (
-                <option key={customer.id} value={customer.id}>{customer.name}</option>
-              ))}
-            </select>
+            />
           </div>
         </div>
       </div>
 
       {/* Orders Table */}
-      <div className="table-container">
+      <div className="orders-table-wrapper">
         {loading ? (
           <div className="loading-state">
             <div className="loading-spinner"></div>
