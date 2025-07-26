@@ -247,10 +247,9 @@
 .trips-table {
   width: 100%;
   table-layout: fixed;
-  border-collapse: separate;
-  border-spacing: 0;
+  border-collapse: collapse;
   font-size: 14px;
-  min-width: 1200px;
+  min-width: 1100px;
   position: relative;
 }
 
@@ -262,7 +261,7 @@
 }
 
 .trips-table th {
-  padding: 20px 16px;
+  padding: 16px;
   text-align: left;
   font-weight: 600;
   color: #1f2937;
@@ -321,7 +320,7 @@
 }
 
 .trips-table td {
-  padding: 20px 16px;
+  padding: 16px;
   border-bottom: 1px solid #f3f4f6;
   color: #374151;
   vertical-align: middle;
@@ -363,17 +362,17 @@
 }
 
 .trips-table td:nth-child(8) { /* Actions */
-  padding-right: 24px;
+  padding-right: 16px;
   width: 150px;
-  text-align: center;
 }
 
 /* Actions Column Specific */
 .trips-table .actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   justify-content: center;
   align-items: center;
+  white-space: nowrap;
 }
 
 .trips-table tbody tr {
@@ -417,6 +416,7 @@
   align-items: center;
   gap: 10px;
   font-weight: 500;
+  height: 100%;
 }
 
 .trip-info svg,
@@ -484,10 +484,11 @@
 
 .actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   justify-content: center;
   min-width: 150px;
+  white-space: nowrap;
 }
 
 /* Text Overflow Handling */
@@ -1165,6 +1166,95 @@
   min-width: 120px;
   justify-content: center;
   height: 44px;
+}
+
+/* ============================================
+   CUSTOM FILTER DROPDOWN
+   ============================================ */
+.custom-filter-dropdown {
+  position: relative;
+  min-width: 200px;
+}
+
+.custom-filter-dropdown .filter-select {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  background: white;
+  height: 44px;
+  border-radius: 8px;
+  background-image: none;
+  padding-right: 16px;
+  cursor: pointer;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  margin-left: 8px;
+  transition: transform 0.2s ease;
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 300px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-search-container {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.dropdown-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.dropdown-search-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.dropdown-options {
+  overflow-y: auto;
+  max-height: 250px;
+}
+
+.dropdown-option {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+  color: #374151;
+}
+
+.dropdown-option:hover {
+  background-color: #f3f4f6;
+}
+
+.dropdown-option.selected {
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-weight: 500;
 }
 
 /* ============================================
