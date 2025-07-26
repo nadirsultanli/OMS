@@ -237,7 +237,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
-  min-width: 1200px;
+  min-width: 1100px; /* Reduced from 1200px to prevent unnecessary scrolling */
   position: relative;
   table-layout: fixed; /* Ensures equal column spacing */
 }
@@ -250,7 +250,7 @@
 }
 
 .orders-table th {
-  padding: 16px;
+  padding: 12px 10px; /* Reduced padding to optimize space */
   text-align: left;
   font-weight: 600;
   color: #374151;
@@ -262,17 +262,17 @@
 }
 
 /* Column width distribution for equal spacing */
-.orders-table th:nth-child(1) { width: 15%; min-width: 140px; } /* Order No. */
-.orders-table th:nth-child(2) { width: 20%; min-width: 180px; } /* Customer */
-.orders-table th:nth-child(3) { width: 12%; min-width: 120px; } /* Status */
+.orders-table th:nth-child(1) { width: 16%; min-width: 160px; } /* Order No. - Increased for full number display */
+.orders-table th:nth-child(2) { width: 18%; min-width: 170px; } /* Customer */
+.orders-table th:nth-child(3) { width: 11%; min-width: 110px; } /* Status */
 .orders-table th:nth-child(4) { width: 10%; min-width: 100px; text-align: right; } /* Total */
 .orders-table th:nth-child(5) { width: 8%; min-width: 80px; text-align: right; } /* Weight */
-.orders-table th:nth-child(6) { width: 12%; min-width: 120px; } /* Requested Date */
-.orders-table th:nth-child(7) { width: 12%; min-width: 120px; } /* Created */
-.orders-table th:nth-child(8) { width: 11%; min-width: 140px; text-align: center; } /* Actions */
+.orders-table th:nth-child(6) { width: 13%; min-width: 120px; } /* Requested Date */
+.orders-table th:nth-child(7) { width: 13%; min-width: 120px; } /* Created */
+.orders-table th:nth-child(8) { width: 11%; min-width: 120px; text-align: center; } /* Actions - Reduced min-width */
 
 .orders-table td {
-  padding: 16px;
+  padding: 12px 10px; /* Reduced padding to optimize space */
   border-bottom: 1px solid #e5e7eb;
   color: #374151;
   vertical-align: middle;
@@ -281,14 +281,14 @@
 }
 
 /* Apply same width to td elements */
-.orders-table td:nth-child(1) { width: 15%; min-width: 140px; } /* Order No. */
-.orders-table td:nth-child(2) { width: 20%; min-width: 180px; white-space: normal; } /* Customer */
-.orders-table td:nth-child(3) { width: 12%; min-width: 120px; } /* Status */
+.orders-table td:nth-child(1) { width: 16%; min-width: 160px; } /* Order No. - Increased for full number display */
+.orders-table td:nth-child(2) { width: 18%; min-width: 170px; white-space: normal; } /* Customer */
+.orders-table td:nth-child(3) { width: 11%; min-width: 110px; } /* Status */
 .orders-table td:nth-child(4) { width: 10%; min-width: 100px; text-align: right; } /* Total */
 .orders-table td:nth-child(5) { width: 8%; min-width: 80px; text-align: right; } /* Weight */
-.orders-table td:nth-child(6) { width: 12%; min-width: 120px; } /* Requested Date */
-.orders-table td:nth-child(7) { width: 12%; min-width: 120px; } /* Created */
-.orders-table td:nth-child(8) { width: 11%; min-width: 140px; } /* Actions */
+.orders-table td:nth-child(6) { width: 13%; min-width: 120px; } /* Requested Date */
+.orders-table td:nth-child(7) { width: 13%; min-width: 120px; } /* Created */
+.orders-table td:nth-child(8) { width: 11%; min-width: 120px; } /* Actions - Reduced min-width */
 
 .orders-table tbody tr {
   transition: background-color 0.15s ease;
@@ -307,16 +307,14 @@
 .order-no-cell {
   font-weight: 600;
   color: #1f2937;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: nowrap; /* Prevent wrapping */
 }
 
 .order-no-cell strong {
   color: #2563eb;
   font-size: 14px;
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: nowrap; /* Prevent wrapping */
 }
 
 .amount-cell {
@@ -334,12 +332,13 @@
 }
 
 .actions-cell {
-  width: 120px;
   text-align: center;
   display: flex;
-  gap: 8px;
+  gap: 6px; /* Reduced gap to optimize space */
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+  padding: 12px 8px !important; /* Ensure padding is consistent */
 }
 
 /* Text Overflow Handling */
@@ -347,6 +346,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Order Number Specific Optimization */
+.orders-table td:nth-child(1) strong {
+  min-width: 150px; /* Ensures order numbers like ORD-2024-00100 don't truncate */
+  display: inline-block;
 }
 
 /* ============================================
@@ -1078,7 +1083,7 @@
   }
   
   .orders-table {
-    min-width: 800px;
+    min-width: 900px; /* Adjusted to prevent column compression */
   }
 }
 
