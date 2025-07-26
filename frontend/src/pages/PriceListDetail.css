@@ -515,12 +515,38 @@
 
 .price-with-tax {
   font-weight: bold;
-  color: #111827;
+  color: #059669;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.tax-breakdown {
+  font-size: 0.75em;
+  color: #6b7280;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #059669;
+}
+
+.base-price {
+  color: #374151;
+  font-weight: 500;
 }
 
 .tax-amount {
-  font-size: 0.8em;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.tax-formula-note {
+  font-size: 0.7em;
   color: #6b7280;
+  font-style: italic;
   margin-top: 2px;
 }
 
@@ -528,6 +554,22 @@
   font-family: 'Courier New', monospace;
   font-weight: bold;
   color: #059669;
+}
+
+/* KIT Price Warning */
+.kit-warning {
+  background-color: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #92400e;
+  line-height: 1.4;
+}
+
+.kit-warning strong {
+  color: #78350f;
 }
 
 /* Mobile responsiveness for section actions */

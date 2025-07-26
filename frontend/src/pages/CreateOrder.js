@@ -1727,9 +1727,23 @@ const CreateOrder = () => {
                 <div className="form-row">
                   {/* List Price */}
                   <div className="form-group">
-                    <label>List Price *</label>
+                    <label>List Price (with Tax) *</label>
                     <input
                       type="number"
-                      value={line.list_price}
-                      onChange={(e) => updateOrderLine(line.id, 'list_price', parseFloat(e.target.value) || 0)}
-                      className={errors[`line_${line.id}_list_price`] || errors[`line_${line.id}_no_price`
+                      value={line.gross_price || (line.list_price + (line.list_price * (line.tax_rate || 0) / 100))}
+                      onChange={(e) => {
+                        const totalPrice = parseFloat(e.target.value) || 0;
+                        const taxRate = line.tax_rate || 0;
+                        const basePrice = totalPrice / (1 + (taxRate / 100));
+                        updateOrderLine(line.id, 'list_price', basePrice);
+                      }}
+                      className={errors[`line_${line.id}_list_price`] || errors[`line_${line.id}_no_price`] ? 'error' : ''}
+                      min="0"
+                      step="0.01"
+                      required
+                    />
+                    {errors[`line_${line.id}_list_price`] && 
+                      <span className="error-text">{errors[`line_${line.id}_list_price`]}</span>}
+                    {errors[`line_${line.id}_no_price`] && 
+                      <span className="error-text">{errors[`line_${line.id}_no_price`]}</span>}
+                  </div>
