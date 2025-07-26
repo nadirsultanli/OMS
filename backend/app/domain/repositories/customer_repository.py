@@ -38,6 +38,18 @@ class CustomerRepository(ABC):
         pass
     
     @abstractmethod
+    async def get_with_filters(
+        self, 
+        limit: int = 100, 
+        offset: int = 0,
+        status: Optional[str] = None,
+        customer_type: Optional[str] = None,
+        search: Optional[str] = None
+    ) -> tuple[List[Customer], int]:
+        """Get customers with optional filters"""
+        pass
+    
+    @abstractmethod
     async def create_customer(self, customer: Customer) -> Customer:
         """Create a new customer"""
         pass
