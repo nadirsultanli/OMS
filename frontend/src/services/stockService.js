@@ -3,18 +3,26 @@ import api from './api';
 class StockService {
   // Stock Levels API
   async getStockLevels(filters = {}) {
-    const params = new URLSearchParams();
-    
-    if (filters.warehouseId) params.append('warehouse_id', filters.warehouseId);
-    if (filters.variantId) params.append('variant_id', filters.variantId);
-    if (filters.stockStatus) params.append('stock_status', filters.stockStatus);
-    if (filters.minQuantity) params.append('min_quantity', filters.minQuantity);
-    if (filters.includeZeroStock !== undefined) params.append('include_zero_stock', filters.includeZeroStock);
-    if (filters.limit) params.append('limit', filters.limit);
-    if (filters.offset) params.append('offset', filters.offset);
+    try {
+      const params = new URLSearchParams();
+      
+      if (filters.warehouseId) params.append('warehouse_id', filters.warehouseId);
+      if (filters.variantId) params.append('variant_id', filters.variantId);
+      if (filters.stockStatus) params.append('stock_status', filters.stockStatus);
+      if (filters.minQuantity) params.append('min_quantity', filters.minQuantity);
+      if (filters.includeZeroStock !== undefined) params.append('include_zero_stock', filters.includeZeroStock);
+      if (filters.limit) params.append('limit', filters.limit);
+      if (filters.offset) params.append('offset', filters.offset);
 
-    const response = await api.get(`/stock-levels/?${params.toString()}`);
-    return response.data;
+      console.log('Stock levels API call:', `/stock-levels/?${params.toString()}`);
+      const response = await api.get(`/stock-levels/?${params.toString()}`);
+      console.log('Stock levels API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching stock levels:', error);
+      console.error('Error response:', error.response?.data);
+      throw error;
+    }
   }
 
   async getAvailableStock(warehouseId, variantId, stockStatus = 'ON_HAND', requestedQuantity = null) {
@@ -41,12 +49,17 @@ class StockService {
   }
 
   async getWarehouseStockSummaries(warehouseId, limit = 100, offset = 0) {
-    const params = new URLSearchParams();
-    params.append('limit', limit);
-    params.append('offset', offset);
+    try {
+      const params = new URLSearchParams();
+      params.append('limit', limit);
+      params.append('offset', offset);
 
-    const response = await api.get(`/stock-levels/summaries/${warehouseId}?${params.toString()}`);
-    return response.data;
+      const response = await api.get(`/stock-levels/summaries/${warehouseId}?${params.toString()}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error fetching warehouse stock summaries:', error);
+      return { success: false, error: error.response?.data?.detail || error.message || 'Failed to fetch warehouse stock summaries' };
+    }
   }
 
   // Stock Operations

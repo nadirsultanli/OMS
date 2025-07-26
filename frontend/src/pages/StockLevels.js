@@ -7,6 +7,7 @@ import StockReserveModal from '../components/StockReserveModal';
 import StockTransferModal from '../components/StockTransferModal';
 import StockPhysicalCountModal from '../components/StockPhysicalCountModal';
 import StockReleaseModal from '../components/StockReleaseModal';
+import LoadVehicleModal from '../components/LoadVehicleModal';
 import { extractErrorMessage } from '../utils/errorUtils';
 import './StockLevels.css';
 
@@ -43,6 +44,7 @@ const StockLevels = () => {
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showPhysicalCountModal, setShowPhysicalCountModal] = useState(false);
   const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [showLoadVehicleModal, setShowLoadVehicleModal] = useState(false);
   const [selectedStockLevel, setSelectedStockLevel] = useState(null);
 
   // Load initial data
@@ -204,6 +206,12 @@ const StockLevels = () => {
     setTimeout(() => setSuccess(null), 5000);
   };
 
+  const handleLoadVehicleSuccess = (response) => {
+    setSuccess('Vehicle loaded successfully! Stock levels updated.');
+    loadStockLevels(filters); // Refresh the data
+    setTimeout(() => setSuccess(null), 5000);
+  };
+
   // Pagination handlers
   const handlePageChange = (newPage) => {
     const newOffset = (newPage - 1) * filters.limit;
@@ -259,6 +267,12 @@ const StockLevels = () => {
           <p className="page-subtitle">Manage inventory across all warehouses</p>
         </div>
         <div className="header-actions">
+          <button 
+            className="btn btn-secondary" 
+            onClick={() => setShowLoadVehicleModal(true)}
+          >
+            Load Vehicle
+          </button>
           <button 
             className="btn btn-secondary" 
             onClick={() => {
@@ -353,6 +367,26 @@ const StockLevels = () => {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="filter-group">
+            <label>Quick Filters</label>
+            <div className="quick-filters">
+              <button
+                type="button"
+                className={`btn btn-sm ${filters.stockStatus === 'truck_stock' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => handleFilterChange('stockStatus', filters.stockStatus === 'truck_stock' ? '' : 'truck_stock')}
+              >
+                Vehicle Stock
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${filters.stockStatus === 'on_hand' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => handleFilterChange('stockStatus', filters.stockStatus === 'on_hand' ? '' : 'on_hand')}
+              >
+                Warehouse Stock
+              </button>
+            </div>
           </div>
 
           <div className="filter-group">
@@ -485,6 +519,16 @@ const StockLevels = () => {
                           }}
                         >
                           Reserve
+                        </button>
+                        <button 
+                          className="btn btn-sm btn-outline-info"
+                          onClick={() => {
+                            setSelectedStockLevel(level);
+                            setShowLoadVehicleModal(true);
+                          }}
+                          title="Load to Vehicle"
+                        >
+                          Load
                         </button>
                         {level.reserved_qty > 0 && (
                           <button 
@@ -640,6 +684,13 @@ const StockLevels = () => {
           setSelectedStockLevel(null);
         }}
         onSuccess={handleReleaseSuccess}
+        selectedStockLevel={selectedStockLevel}
+      />
+
+      <LoadVehicleModal
+        isOpen={showLoadVehicleModal}
+        onClose={() => setShowLoadVehicleModal(false)}
+        onSuccess={handleLoadVehicleSuccess}
         selectedStockLevel={selectedStockLevel}
       />
     </div>
