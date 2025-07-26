@@ -22,7 +22,7 @@ import authService from '../services/authService';
 import TripDetailView from './TripDetailView';
 import TripsTable from '../components/TripsTable';
 import './Trips.css';
-import '../components/TripsTable.css';
+import '../components/Table.css';
 
 const tripStatuses = [
   { value: 'draft', label: 'Draft', color: '#6b7280' },

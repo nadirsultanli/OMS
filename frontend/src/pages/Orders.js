@@ -5,9 +5,11 @@ import variantService from '../services/variantService';
 import priceListService from '../services/priceListService';
 import productService from '../services/productService';
 import OrderStatusManager from '../components/OrderStatusManager';
+import OrdersTable from '../components/OrdersTable';
 import { extractErrorMessage } from '../utils/errorUtils';
 import { Search, Plus, Edit2, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Truck, X } from 'lucide-react';
 import './Orders.css';
+import '../components/Table.css';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -1210,94 +1212,38 @@ const Orders = () => {
       </div>
 
       {/* Orders Table */}
-      <div className="orders-table-wrapper">
-        {loading ? (
+      {loading ? (
+        <div className="orders-table-wrapper">
           <div className="loading-state">
             <div className="loading-spinner"></div>
             <p>Loading orders...</p>
           </div>
-        ) : filteredOrders.length === 0 ? (
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <div className="orders-table-wrapper">
           <div className="empty-state">
             <FileText size={48} className="empty-icon" />
             <h3>No orders found</h3>
             <p>Start by creating your first order</p>
           </div>
-        ) : (
-          <table className="orders-table">
-            <thead>
-              <tr>
-                <th>Order No.</th>
-                <th>Customer</th>
-                <th>Status</th>
-                <th>Total</th>
-                <th>Weight</th>
-                <th>Requested Date</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map((order) => (
-                <tr key={order.id}>
-                  <td className="order-no-cell">
-                    <strong>{order.order_no}</strong>
-                  </td>
-                  <td>{getCustomerName(order.customer_id)}</td>
-                  <td>
-                    <button
-                      onClick={() => {
-                        setSelectedOrder(order);
-                        setShowStatusModal(true);
-                      }}
-                      className={`order-status-badge clickable ${orderService.getOrderStatusClass(order.order_status)}`}
-                      title="Click to change status"
-                    >
-                      {getStatusIcon(order.order_status)}
-                      {orderService.getOrderStatusLabel(order.order_status)}
-                    </button>
-                  </td>
-                  <td className="amount-cell">{formatCurrency(order.total_amount)}</td>
-                  <td className="weight-cell">
-                    {order.total_weight_kg ? `${order.total_weight_kg} kg` : '-'}
-                  </td>
-                  <td>{formatDate(order.requested_date)}</td>
-                  <td className="date-cell">{formatDate(order.created_at)}</td>
-                  <td className="actions-cell">
-                    <button
-                      onClick={() => handleViewOrder(order)}
-                      className="action-icon-btn"
-                      title="View order details"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    {orderService.canModifyOrder(order.order_status) && (
-                      <button
-                        onClick={() => handleEditClick(order)}
-                        className="action-icon-btn"
-                        title="Edit order"
-                        disabled={loading}
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    )}
-                                      {/* Only show cancel button for cancellable orders */}
-                  {['draft', 'submitted', 'approved'].includes(order.order_status) && (
-                    <button
-                      onClick={() => handleCancelOrder(order.id)}
-                      className="action-icon-btn cancel"
-                      title="Cancel order"
-                      disabled={loading}
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+        </div>
+      ) : (
+        <OrdersTable 
+          orders={filteredOrders}
+          customers={customers}
+          onViewOrder={handleViewOrder}
+          onEditOrder={handleEditClick}
+          onCancelOrder={handleCancelOrder}
+          onStatusClick={(order) => {
+            setSelectedOrder(order);
+            setShowStatusModal(true);
+          }}
+          formatCurrency={formatCurrency}
+          formatDate={formatDate}
+          orderService={orderService}
+          loading={loading}
+        />
+      )}
 
       {/* Create/Edit Order Modal */}
       {(showCreateForm || showEditForm) && (

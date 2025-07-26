@@ -1,0 +1,427 @@
+/* Shared Table Styles - Orders & Trips Tables */
+
+/* ============================================
+   TABLE CONTAINER & WRAPPER
+   ============================================ */
+.orders-table-wrapper,
+.trips-table-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ============================================
+   BASE TABLE STYLES
+   ============================================ */
+.orders-table,
+.trips-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: white;
+}
+
+/* ============================================
+   TABLE HEADER
+   ============================================ */
+.orders-table thead,
+.trips-table thead {
+  background: #f8f9fb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.orders-table thead th,
+.trips-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #1f2937;
+  border-bottom: 2px solid #e5e7eb;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  background: #f8f9fb;
+}
+
+/* ============================================
+   TABLE BODY
+   ============================================ */
+.orders-table tbody,
+.trips-table tbody {
+  background: white;
+}
+
+.orders-table tbody tr,
+.trips-table tbody tr {
+  transition: background-color 0.15s ease;
+  cursor: default;
+  max-height: 56px;
+}
+
+.orders-table tbody tr:hover,
+.trips-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.orders-table tbody tr:not(:last-child),
+.trips-table tbody tr:not(:last-child) {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+/* ============================================
+   TABLE CELLS
+   ============================================ */
+.orders-table tbody td,
+.trips-table tbody td {
+  padding: 12px 16px;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-size: 14px;
+  color: #374151;
+  max-height: 56px;
+}
+
+/* Remove all margins from child elements */
+.orders-table td *,
+.trips-table td * {
+  margin: 0 !important;
+}
+
+/* ============================================
+   STATUS BADGES - SHARED STYLING
+   ============================================ */
+.order-status-badge,
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  line-height: 1;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.order-status-badge.clickable:hover,
+.status-badge.clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.order-status-badge svg,
+.status-badge svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Status variants - Orders */
+.order-status-badge.draft {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+.order-status-badge.submitted {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.order-status-badge.approved {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.order-status-badge.allocated {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+
+.order-status-badge.loaded {
+  background: #e0e7ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+
+.order-status-badge.in-transit {
+  background: #fde68a;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.order-status-badge.delivered {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.order-status-badge.closed {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+.order-status-badge.cancelled {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* Status variants - Trips */
+.status-badge.draft {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+.status-badge.planned {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #dbeafe;
+}
+
+.status-badge.loaded {
+  background: #fef3c7;
+  color: #d97706;
+  border-color: #fde68a;
+}
+
+.status-badge.in_progress {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+
+.status-badge.completed {
+  background: #d1fae5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+
+.status-badge.cancelled {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* ============================================
+   ACTION BUTTONS - SHARED STYLING
+   ============================================ */
+.action-icon-btn,
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  position: relative;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+.action-icon-btn:hover:not(:disabled),
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.action-icon-btn:disabled,
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-icon-btn svg,
+.action-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Default action button style */
+.action-icon-btn,
+.action-btn.view {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #dbeafe;
+}
+
+.action-icon-btn:hover:not(:disabled),
+.action-btn.view:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #bfdbfe;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+}
+
+/* Edit action button */
+.action-btn.edit {
+  background: #fffbeb;
+  color: #d97706;
+  border-color: #fef3c7;
+}
+
+.action-btn.edit:hover:not(:disabled) {
+  background: #fef3c7;
+  border-color: #fde68a;
+  box-shadow: 0 1px 3px rgba(217, 119, 6, 0.2);
+}
+
+/* Cancel/Delete action button */
+.action-icon-btn.cancel,
+.action-btn.delete {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fee2e2;
+}
+
+.action-icon-btn.cancel:hover:not(:disabled),
+.action-btn.delete:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fecaca;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.2);
+}
+
+/* Start action button */
+.action-btn.start {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #d1fae5;
+}
+
+.action-btn.start:hover:not(:disabled) {
+  background: #d1fae5;
+  border-color: #a7f3d0;
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.2);
+}
+
+/* Complete action button */
+.action-btn.complete {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+.action-btn.complete:hover:not(:disabled) {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+  box-shadow: 0 1px 3px rgba(107, 114, 128, 0.2);
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+@media (max-width: 1280px) {
+  .orders-table,
+  .trips-table {
+    min-width: 900px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .orders-table,
+  .trips-table {
+    min-width: 800px;
+  }
+}
+
+@media (max-width: 768px) {
+  .orders-table,
+  .trips-table {
+    font-size: 12px;
+    min-width: 700px;
+  }
+  
+  .orders-table th,
+  .orders-table td,
+  .trips-table th,
+  .trips-table td {
+    padding: 8px 12px;
+  }
+  
+  .action-icon-btn,
+  .action-btn {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .action-icon-btn svg,
+  .action-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* ============================================
+   LOADING & EMPTY STATES
+   ============================================ */
+.loading-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.empty-icon {
+  color: #d1d5db;
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+  max-width: 400px;
+  line-height: 1.5;
+}
