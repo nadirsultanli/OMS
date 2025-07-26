@@ -264,12 +264,12 @@
 /* Column width distribution for equal spacing */
 .orders-table th:nth-child(1) { width: 16%; min-width: 160px; } /* Order No. - Increased for full number display */
 .orders-table th:nth-child(2) { width: 18%; min-width: 170px; } /* Customer */
-.orders-table th:nth-child(3) { width: 11%; min-width: 110px; } /* Status */
+.orders-table th:nth-child(3) { width: 11%; min-width: 110px; text-align: center; } /* Status - Centered */
 .orders-table th:nth-child(4) { width: 10%; min-width: 100px; text-align: right; } /* Total */
 .orders-table th:nth-child(5) { width: 8%; min-width: 80px; text-align: right; } /* Weight */
-.orders-table th:nth-child(6) { width: 13%; min-width: 120px; } /* Requested Date */
-.orders-table th:nth-child(7) { width: 13%; min-width: 120px; } /* Created */
-.orders-table th:nth-child(8) { width: 11%; min-width: 120px; text-align: center; } /* Actions - Reduced min-width */
+.orders-table th:nth-child(6) { width: 13%; min-width: 120px; text-align: center; } /* Requested Date - Centered */
+.orders-table th:nth-child(7) { width: 13%; min-width: 120px; text-align: center; } /* Created Date - Centered */
+.orders-table th:nth-child(8) { width: 11%; min-width: 120px; text-align: center; } /* Actions - Centered */
 
 .orders-table td {
   padding: 12px 10px; /* Reduced padding to optimize space */
@@ -283,12 +283,12 @@
 /* Apply same width to td elements */
 .orders-table td:nth-child(1) { width: 16%; min-width: 160px; } /* Order No. - Increased for full number display */
 .orders-table td:nth-child(2) { width: 18%; min-width: 170px; white-space: normal; } /* Customer */
-.orders-table td:nth-child(3) { width: 11%; min-width: 110px; } /* Status */
+.orders-table td:nth-child(3) { width: 11%; min-width: 110px; text-align: center; } /* Status - Centered */
 .orders-table td:nth-child(4) { width: 10%; min-width: 100px; text-align: right; } /* Total */
 .orders-table td:nth-child(5) { width: 8%; min-width: 80px; text-align: right; } /* Weight */
-.orders-table td:nth-child(6) { width: 13%; min-width: 120px; } /* Requested Date */
-.orders-table td:nth-child(7) { width: 13%; min-width: 120px; } /* Created */
-.orders-table td:nth-child(8) { width: 11%; min-width: 120px; } /* Actions - Reduced min-width */
+.orders-table td:nth-child(6) { width: 13%; min-width: 120px; text-align: center; } /* Requested Date - Centered */
+.orders-table td:nth-child(7) { width: 13%; min-width: 120px; text-align: center; } /* Created Date - Centered */
+.orders-table td:nth-child(8) { width: 11%; min-width: 120px; text-align: center; } /* Actions - Centered */
 
 .orders-table tbody tr {
   transition: background-color 0.15s ease;
@@ -341,6 +341,11 @@
   padding: 12px 8px !important; /* Ensure padding is consistent */
 }
 
+/* Ensure action buttons are centered in their container */
+.orders-table td:nth-child(8) .flex {
+  justify-content: center;
+}
+
 /* Text Overflow Handling */
 .text-truncate {
   overflow: hidden;
@@ -352,6 +357,17 @@
 .orders-table td:nth-child(1) strong {
   min-width: 150px; /* Ensures order numbers like ORD-2024-00100 don't truncate */
   display: inline-block;
+}
+
+/* Ensure order numbers are bold */
+.orders-table td:nth-child(1) .font-bold {
+  font-weight: 700 !important;
+}
+
+/* Ensure status badges are properly centered */
+.orders-table td:nth-child(3) .flex {
+  justify-content: center;
+  width: 100%;
 }
 
 /* ============================================
