@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Trash2
 } from 'lucide-react';
+import './Table.css';
 
 const TripsTable = ({ 
   trips = [], 
