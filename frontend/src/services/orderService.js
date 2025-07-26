@@ -113,7 +113,40 @@ const orderService = {
     } catch (error) {
       console.error('Error updating order status:', error);
       console.error('Error response:', error.response?.data);
-      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to update order status' };
+      
+      // Extract detailed error message from backend
+      let errorMessage = 'Failed to update order status';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Handle different error response formats
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.detail) {
+          // FastAPI error format
+          errorMessage = typeof errorData.detail === 'string' 
+            ? errorData.detail 
+            : JSON.stringify(errorData.detail);
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        
+        // Handle status transition errors specifically
+        if (error.response.status === 400 && errorMessage.includes('transition')) {
+          errorMessage = `❌ Invalid status transition: ${errorMessage}`;
+        } else if (error.response.status === 403) {
+          errorMessage = `🚫 Permission denied: You don't have permission to change this order status`;
+        } else if (error.response.status === 404) {
+          errorMessage = `📋 Order not found: The order may have been deleted or doesn't exist`;
+        } else if (error.response.status === 422) {
+          errorMessage = `⚠️ Validation error: ${errorMessage}`;
+        }
+      }
+      
+      return { success: false, error: errorMessage };
     }
   },
 
