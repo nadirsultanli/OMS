@@ -20,7 +20,9 @@ import vehicleService from '../services/vehicleService';
 import userService from '../services/userService';
 import authService from '../services/authService';
 import TripDetailView from './TripDetailView';
+import TripsTable from '../components/TripsTable';
 import './Trips.css';
+import '../components/TripsTable.css';
 
 const tripStatuses = [
   { value: 'draft', label: 'Draft', color: '#6b7280' },
@@ -299,62 +301,7 @@ const Trips = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusConfig = tripStatuses.find(s => s.value === status);
-    const statusClass = status?.toLowerCase().replace(' ', '_');
-    return (
-      <span className={`status-badge ${statusClass}`}>
-        {getStatusIcon(status)}
-        {statusConfig?.label || status}
-      </span>
-    );
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'draft':
-        return <Edit2 size={14} />;
-      case 'planned':
-        return <Calendar size={14} />;
-      case 'loaded':
-        return <Package size={14} />;
-      case 'in_progress':
-        return <Navigation size={14} />;
-      case 'completed':
-        return <CheckCircle size={14} />;
-      default:
-        return <AlertCircle size={14} />;
-    }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const formatTime = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getVehicleName = (vehicleId) => {
-    const vehicle = vehicles.find(v => v.id === vehicleId);
-    return vehicle ? vehicle.plate_number : 'Not assigned';
-  };
-
-  const getDriverName = (driverId) => {
-    const driver = drivers.find(d => d.id === driverId);
-    return driver ? (driver.name || driver.full_name) : 'Not assigned';
-  };
+  // Helper functions moved to TripsTable component
 
   return (
     <div className="trips-container">
@@ -539,122 +486,37 @@ const Trips = () => {
         </div>
       </div>
 
-      <div className="trips-table-container">
-        {loading ? (
+      {loading ? (
+        <div className="trips-table-container">
           <div className="loading-state">
             <div className="loading-spinner"></div>
             <p>Loading trips...</p>
           </div>
-        ) : filteredTrips.length === 0 ? (
+        </div>
+      ) : filteredTrips.length === 0 ? (
+        <div className="trips-table-container">
           <div className="empty-state">
             <Truck className="empty-icon" size={48} />
             <h3>No trips found</h3>
             <p>Create your first trip to get started</p>
           </div>
-        ) : (
-          <table className="trips-table">
-            <thead>
-              <tr>
-                <th>Trip Number</th>
-                <th>Date</th>
-                <th>Vehicle</th>
-                <th>Driver</th>
-                <th>Status</th>
-                <th>Orders</th>
-                <th>Load (kg)</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTrips.map(trip => (
-                <tr key={trip.id}>
-                  <td className="trip-number">
-                    <div className="trip-info">
-                      <MapPin size={16} />
-                      <span>{trip.trip_number || `TRIP-${trip.id.slice(0, 8)}`}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="date-info">
-                      <div>{formatDate(trip.planned_date)}</div>
-                      <div className="time-text">{formatTime(trip.planned_date)}</div>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="vehicle-info">
-                      <Truck size={16} />
-                      <span>{getVehicleName(trip.vehicle_id)}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="driver-info">
-                      <User size={16} />
-                      <span>{getDriverName(trip.driver_id)}</span>
-                    </div>
-                  </td>
-                  <td>{getStatusBadge(trip.status)}</td>
-                  <td className="orders-count">
-                    <span className="count-badge">
-                      {trip.order_count || 0}
-                    </span>
-                  </td>
-                  <td className="load-info">
-                    {trip.gross_loaded_kg || 0} kg
-                  </td>
-                  <td className="actions">
-                    <button 
-                      className="action-btn view"
-                      onClick={() => handleViewTrip(trip)}
-                      title="Manage Trip Orders"
-                    >
-                      <Package size={16} />
-                    </button>
-                    {(trip.status?.toLowerCase() === 'draft' || trip.status?.toLowerCase() === 'planned') && (
-                      <button 
-                        className="action-btn edit"
-                        onClick={() => {
-                          setSelectedTrip(trip);
-                          setShowEditForm(true);
-                        }}
-                        title="Edit Trip"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    )}
-                    {trip.status?.toLowerCase() === 'loaded' && (
-                      <button 
-                        className="action-btn start"
-                        onClick={() => handleStartTrip(trip.id)}
-                        title="Start Trip"
-                      >
-                        <Play size={16} />
-                      </button>
-                    )}
-                    {trip.status?.toLowerCase() === 'in_progress' && (
-                      <button 
-                        className="action-btn complete"
-                        onClick={() => handleCompleteTrip(trip.id)}
-                        title="Complete Trip"
-                      >
-                        <CheckCircle size={16} />
-                      </button>
-                    )}
-                    {trip.status?.toLowerCase() === 'draft' && (
-                      <button 
-                        className="action-btn delete"
-                        onClick={() => handleDeleteTrip(trip.id)}
-                        title="Delete Trip"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+        </div>
+      ) : (
+        <TripsTable 
+          trips={filteredTrips}
+          vehicles={vehicles}
+          drivers={drivers}
+          tripStatuses={tripStatuses}
+          onViewTrip={handleViewTrip}
+          onEditTrip={(trip) => {
+            setSelectedTrip(trip);
+            setShowEditForm(true);
+          }}
+          onStartTrip={handleStartTrip}
+          onCompleteTrip={handleCompleteTrip}
+          onDeleteTrip={handleDeleteTrip}
+        />
+      )}
 
       {filteredTrips.length > 0 && (
         <div className="pagination-container">
