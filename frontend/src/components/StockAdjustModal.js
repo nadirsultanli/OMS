@@ -26,24 +26,35 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [usePreselected, setUsePreselected] = useState(true);
 
   // Load data when modal opens
   useEffect(() => {
     if (isOpen) {
       loadData();
       
-      // Pre-fill form if selectedStockLevel is provided
-      if (selectedStockLevel) {
+      // Pre-fill form if selectedStockLevel is provided and user wants to use preselected
+      if (selectedStockLevel && usePreselected) {
         setFormData(prev => ({
           ...prev,
           warehouseId: selectedStockLevel.warehouse_id,
           variantId: selectedStockLevel.variant_id,
-          stockStatus: selectedStockLevel.stock_status,
+          stockStatus: selectedStockLevel.stock_status?.toLowerCase() || 'on_hand',
           unitCost: selectedStockLevel.unit_cost || ''
         }));
+      } else if (!selectedStockLevel) {
+        // Reset form if no selectedStockLevel
+        setFormData({
+          warehouseId: '',
+          variantId: '',
+          quantityChange: '',
+          reason: '',
+          unitCost: '',
+          stockStatus: 'on_hand'
+        });
       }
     }
-  }, [isOpen, selectedStockLevel]);
+  }, [isOpen, selectedStockLevel, usePreselected]);
 
   const loadData = async () => {
     try {
@@ -153,6 +164,29 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
           <div className="modal-body">
             {error && <div className="alert alert-danger">{typeof error === 'string' ? error : 'An error occurred'}</div>}
 
+            {/* Show selected stock level info and option to change */}
+            {selectedStockLevel && (
+              <div className="selected-stock-info">
+                <h4>Selected Stock Level</h4>
+                <div className="stock-info-display">
+                  <span>Warehouse: {getWarehouseName(selectedStockLevel.warehouse_id)}</span>
+                  <span>Variant: {getVariantName(selectedStockLevel.variant_id)}</span>
+                  <span>Current Qty: {selectedStockLevel.quantity || 0}</span>
+                  <span>Available: {selectedStockLevel.available_qty || 0}</span>
+                </div>
+                <div className="use-preselected-option">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={usePreselected}
+                      onChange={(e) => setUsePreselected(e.target.checked)}
+                    />
+                    Use selected warehouse and variant (uncheck to change)
+                  </label>
+                </div>
+              </div>
+            )}
+
             <div className="form-grid">
               <div className="form-group">
                 <label htmlFor="warehouse">Warehouse *</label>
@@ -162,7 +196,7 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
                   onChange={(e) => handleInputChange('warehouseId', e.target.value)}
                   className="form-control"
                   required
-                  disabled={selectedStockLevel}
+                  disabled={selectedStockLevel && usePreselected}
                 >
                   <option value="">Select Warehouse</option>
                   {Array.isArray(warehouses) && warehouses.map(warehouse => (
@@ -181,7 +215,7 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
                   onChange={(e) => handleInputChange('variantId', e.target.value)}
                   className="form-control"
                   required
-                  disabled={selectedStockLevel}
+                  disabled={selectedStockLevel && usePreselected}
                 >
                   <option value="">Select Variant</option>
                   {Array.isArray(variants) && variants.map(variant => (

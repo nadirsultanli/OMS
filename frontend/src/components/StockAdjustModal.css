@@ -1,5 +1,58 @@
 /* Stock Adjust Modal - Professional Design System */
 
+/* Selected Stock Info */
+.selected-stock-info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.selected-stock-info h4 {
+  margin: 0 0 12px 0;
+  color: #1e40af;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.stock-info-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stock-info-display span {
+  background: white;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.use-preselected-option {
+  margin-top: 12px;
+}
+
+.use-preselected-option label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.use-preselected-option input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
 /* Modal Backdrop */
 .modal-backdrop {
   position: fixed;
