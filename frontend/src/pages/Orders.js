@@ -4,6 +4,7 @@ import customerService from '../services/customerService';
 import variantService from '../services/variantService';
 import priceListService from '../services/priceListService';
 import productService from '../services/productService';
+import OrderStatusManager from '../components/OrderStatusManager';
 import { extractErrorMessage } from '../utils/errorUtils';
 import { Search, Plus, Edit2, Trash2, Eye, FileText, CheckCircle, XCircle, Clock, Truck, X } from 'lucide-react';
 import './Orders.css';
@@ -20,6 +21,7 @@ const Orders = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
@@ -650,6 +652,26 @@ const Orders = () => {
     }
   };
 
+  const handleStatusManagerChange = (updatedOrder) => {
+    // Update the order in the local state
+    setOrders(prevOrders => 
+      prevOrders.map(order => 
+        order.id === updatedOrder.id ? updatedOrder : order
+      )
+    );
+    setFilteredOrders(prevOrders => 
+      prevOrders.map(order => 
+        order.id === updatedOrder.id ? updatedOrder : order
+      )
+    );
+    setMessage('Order status updated successfully!');
+    setShowStatusModal(false);
+  };
+
+  const handleStatusManagerError = (error) => {
+    setErrors({ general: error });
+  };
+
   const handleViewOrder = async (order) => {
     try {
       setLoading(true);
@@ -1222,10 +1244,17 @@ const Orders = () => {
                   </td>
                   <td>{getCustomerName(order.customer_id)}</td>
                   <td>
-                    <span className={`order-status-badge ${orderService.getOrderStatusClass(order.order_status)}`}>
+                    <button
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setShowStatusModal(true);
+                      }}
+                      className={`order-status-badge clickable ${orderService.getOrderStatusClass(order.order_status)}`}
+                      title="Click to change status"
+                    >
                       {getStatusIcon(order.order_status)}
                       {orderService.getOrderStatusLabel(order.order_status)}
-                    </span>
+                    </button>
                   </td>
                   <td className="amount-cell">{formatCurrency(order.total_amount)}</td>
                   <td className="weight-cell">
@@ -1903,6 +1932,30 @@ const Orders = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status Management Modal */}
+      {showStatusModal && selectedOrder && (
+        <div className="modal-overlay" onClick={() => setShowStatusModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Manage Order Status</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowStatusModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <OrderStatusManager
+                order={selectedOrder}
+                onStatusChange={handleStatusManagerChange}
+                onError={handleStatusManagerError}
+              />
             </div>
           </div>
         </div>

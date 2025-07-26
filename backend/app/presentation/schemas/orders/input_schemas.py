@@ -79,7 +79,11 @@ class OrderLineCreateRequest(BaseModel):
     @model_validator(mode='after')
     def validate_variant_or_gas_type(self):
         """Ensure either variant_id or gas_type is provided"""
-        if self.variant_id is None and self.gas_type is None:
+        # Consider empty strings as None for validation purposes
+        has_variant = self.variant_id is not None
+        has_gas_type = self.gas_type is not None and self.gas_type.strip() != ''
+        
+        if not has_variant and not has_gas_type:
             raise ValueError("Either variant_id or gas_type must be specified")
         return self
 
@@ -448,6 +452,10 @@ class AddOrderLineRequest(BaseModel):
     @model_validator(mode='after')
     def validate_variant_or_gas_type(self):
         """Ensure either variant_id or gas_type is provided"""
-        if self.variant_id is None and self.gas_type is None:
+        # Consider empty strings as None for validation purposes
+        has_variant = self.variant_id is not None
+        has_gas_type = self.gas_type is not None and self.gas_type.strip() != ''
+        
+        if not has_variant and not has_gas_type:
             raise ValueError("Either variant_id or gas_type must be specified")
         return self 

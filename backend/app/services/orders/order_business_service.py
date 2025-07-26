@@ -81,14 +81,14 @@ class OrderBusinessService:
         if not order.can_be_submitted():
             return False
         
-        return user.role in [UserRoleType.SALES_REP, UserRoleType.ACCOUNTS]
+        return user.role in [UserRoleType.SALES_REP, UserRoleType.ACCOUNTS, UserRoleType.TENANT_ADMIN]
 
     def can_approve_order(self, user: User, order: Order) -> bool:
         """Check if user can approve an order"""
         if not order.can_be_approved():
             return False
         
-        return user.role == UserRoleType.ACCOUNTS
+        return user.role in [UserRoleType.ACCOUNTS, UserRoleType.TENANT_ADMIN]
 
     def can_reject_order(self, user: User, order: Order) -> bool:
         """Check if user can reject an order"""
