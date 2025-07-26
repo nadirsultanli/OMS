@@ -117,6 +117,40 @@
   border-radius: 8px;
 }
 
+/* Currency cells styling */
+.currency-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #059669;
+}
+
+/* Date cell styling */
+.date-cell {
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.date-cell.never {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Add subtle column separators */
+.table th:not(:last-child)::after,
+.table td:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 1px;
+  background: #f3f4f6;
+  opacity: 0.7;
+}
+
 .btn-outline-primary {
   background: transparent;
   color: #2563eb;
@@ -334,13 +368,15 @@ input[type="number"].form-control::-webkit-inner-spin-button {
 
 .table th {
   padding: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: #1f2937;
   text-align: left;
-  letter-spacing: 0.5px;
-  font-size: 14px;
+  letter-spacing: 0.025em;
+  font-size: 13px;
+  text-transform: uppercase;
   white-space: nowrap;
   position: relative;
+  background: #f8fafc;
 }
 
 /* Optimized responsive column widths */
@@ -358,6 +394,14 @@ input[type="number"].form-control::-webkit-inner-spin-button {
 .table tbody tr {
   border-bottom: 1px solid #e5e7eb;
   transition: background-color 0.2s ease-in-out;
+}
+
+.table tbody tr:nth-child(even) {
+  background-color: #fbfcfd;
+}
+
+.table tbody tr:nth-child(even):hover {
+  background-color: #f1f5f9;
 }
 
 .table tbody tr:last-child {
@@ -423,6 +467,12 @@ input[type="number"].form-control::-webkit-inner-spin-button {
 .table td:nth-child(8) {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Center align the Date column (Last Transaction) */
+.table th:nth-child(9),
+.table td:nth-child(9) {
+  text-align: center;
 }
 
 /* Center align the Actions column */
@@ -522,10 +572,19 @@ input[type="number"].form-control::-webkit-inner-spin-button {
 /* Action Buttons */
 .action-buttons {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-wrap: nowrap;
+  justify-content: center;
+  min-width: 160px;
+}
+
+/* Make action buttons more compact */
+.action-buttons .btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  min-height: 32px;
+  white-space: nowrap;
 }
 
 /* Alerts */

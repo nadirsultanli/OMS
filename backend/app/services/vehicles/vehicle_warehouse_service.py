@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from app.domain.entities.vehicles import Vehicle
 from app.domain.entities.truck_inventory import TruckInventory
-from app.domain.entities.stock_docs import StockDoc, StockDocType, StockStatus
+from app.domain.entities.stock_docs import StockDoc, StockDocLine, StockDocType, StockStatus
 from app.domain.entities.stock_levels import StockLevel
 from app.services.stock_docs.stock_doc_service import StockDocService
 from app.services.stock_levels.stock_level_service import StockLevelService

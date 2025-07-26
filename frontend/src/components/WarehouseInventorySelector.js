@@ -554,9 +554,9 @@ const WarehouseInventorySelector = ({
                     ))}
                   </div>
                   <div className="cart-totals">
-                    <span>Total Items: {cartItems.length}</span>
-                    <span>Total Quantity: {cartItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)}</span>
-                    <span>Total Value: ${cartItems.reduce((sum, item) => sum + (item.total_cost || 0), 0).toFixed(2)}</span>
+                    <span data-label="Items">{cartItems.length}</span>
+                    <span data-label="Quantity">{cartItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)}</span>
+                    <span data-label="Value">${cartItems.reduce((sum, item) => sum + (item.total_cost || 0), 0).toFixed(2)}</span>
                   </div>
                 </div>
               )}
@@ -574,7 +574,7 @@ const WarehouseInventorySelector = ({
                     const remainingQty = item.available_qty - cartQty;
                     
                     return (
-                      <div key={`${item.product_id}-${item.variant_id}`} className="inventory-item">
+                      <div key={`${item.product_id}-${item.variant_id}`} className={`inventory-item ${cartQty > 0 ? 'has-cart-items' : ''}`}>
                         <div className="item-info">
                           <div className="item-name">
                             <strong>
@@ -594,17 +594,17 @@ const WarehouseInventorySelector = ({
                             )}
                           </div>
                           <div className="item-details">
-                            <span>SKU: {variant?.sku || product?.sku || `VAR-${item.variant_id}`}</span>
-                            <span>Available: {item.available_qty}</span>
+                            <span>📦 SKU: {variant?.sku || product?.sku || `VAR-${item.variant_id}`}</span>
+                            <span className="available-stock">✅ Available: {item.available_qty}</span>
                             {cartQty > 0 && (
-                              <span className="cart-quantity">In Cart: {cartQty}</span>
+                              <span className="cart-quantity">🛒 In Cart: {cartQty}</span>
                             )}
-                            <span>Unit Cost: ${(parseFloat(item.unit_cost) || 0).toFixed(2)}</span>
+                            <span className="unit-cost">💰 ${(parseFloat(item.unit_cost) || 0).toFixed(2)}</span>
                             {variant?.unit_weight_kg && (
-                              <span>Weight: {variant.unit_weight_kg}kg</span>
+                              <span>⚖️ {variant.unit_weight_kg}kg</span>
                             )}
                             {variant?.weight_kg && !variant?.unit_weight_kg && (
-                              <span>Weight: {variant.weight_kg}kg</span>
+                              <span>⚖️ {variant.weight_kg}kg</span>
                             )}
                           </div>
                         </div>
