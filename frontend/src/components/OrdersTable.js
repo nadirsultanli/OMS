@@ -53,19 +53,23 @@ const OrdersTable = ({
           }}
         >
           <colgroup>
-            <col style={{ width: '240px' }} />
-            <col style={{ width: '160px' }} />
+            <col style={{ width: '180px' }} />
+            <col style={{ width: '200px' }} />
             <col style={{ width: '140px' }} />
+            <col style={{ width: '120px' }} />
             <col style={{ width: '100px' }} />
-            <col style={{ width: '160px' }} />
-            <col style={{ width: '160px' }} />
-            <col style={{ width: '100px' }} />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '120px' }} />
           </colgroup>
           
           <thead>
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                Order / Customer
+                Order Number
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                Customer
               </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider break-words">
                 Status
@@ -77,10 +81,10 @@ const OrdersTable = ({
                 Weight
               </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider break-words">
-                Requested<wbr /> Date
+                Requested Date
               </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider break-words">
-                Created<wbr /> Date
+                Created Date
               </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                 Actions
@@ -95,29 +99,45 @@ const OrdersTable = ({
                 className="hover:bg-slate-50 transition-colors duration-150"
                 style={{ maxHeight: '56px' }}
               >
-                {/* Order/Customer Combined Cell */}
+                {/* Order Number Cell */}
                 <td className="px-4 py-3 whitespace-nowrap align-middle">
-                  <div className="flex flex-col" style={{ margin: 0 }}>
-                    <span className="font-bold text-blue-600" style={{ margin: 0 }}>
-                      {order.order_no}
-                    </span>
-                    <span className="text-gray-500 text-sm" style={{ margin: 0 }}>
-                      {getCustomerName(order.customer_id)}
-                    </span>
-                  </div>
+                  <span className="font-bold text-blue-600">
+                    {order.order_no}
+                  </span>
                 </td>
                 
-                {/* Status - Centered */}
-                <td className="px-4 py-3 whitespace-nowrap align-middle text-center">
-                  <div className="flex justify-center">
+                {/* Customer Cell */}
+                <td className="px-4 py-3 whitespace-nowrap align-middle">
+                  <span className="text-gray-700">
+                    {getCustomerName(order.customer_id)}
+                  </span>
+                </td>
+                
+                {/* Status - Properly Centered */}
+                <td className="px-4 py-3 whitespace-nowrap align-middle">
+                  <div className="flex justify-center items-center">
                     <button
                       onClick={() => onStatusClick && onStatusClick(order)}
                       className={`order-status-badge clickable ${orderService?.getOrderStatusClass(order.order_status) || ''}`}
-                      title="Click to change status"
-                      style={{ margin: 0 }}
+                      title="Click to manage order status"
+                      style={{ 
+                        margin: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '16px',
+                        border: 'none',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        textAlign: 'center',
+                        minWidth: 'fit-content'
+                      }}
                     >
                       {getStatusIcon(order.order_status)}
-                      {orderService?.getOrderStatusLabel(order.order_status) || order.order_status}
+                      <span>{orderService?.getOrderStatusLabel(order.order_status) || order.order_status}</span>
                     </button>
                   </div>
                 </td>
