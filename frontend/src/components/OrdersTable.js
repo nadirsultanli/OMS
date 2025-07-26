@@ -67,7 +67,7 @@ const OrdersTable = ({
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                 Order / Customer
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider text-center break-words">
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider break-words">
                 Status
               </th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
@@ -79,8 +79,8 @@ const OrdersTable = ({
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider break-words">
                 Requested<wbr /> Date
               </th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                Created
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider break-words">
+                Created<wbr /> Date
               </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                 Actions
@@ -98,7 +98,7 @@ const OrdersTable = ({
                 {/* Order/Customer Combined Cell */}
                 <td className="px-4 py-3 whitespace-nowrap align-middle">
                   <div className="flex flex-col" style={{ margin: 0 }}>
-                    <span className="font-medium text-blue-600" style={{ margin: 0 }}>
+                    <span className="font-bold text-blue-600" style={{ margin: 0 }}>
                       {order.order_no}
                     </span>
                     <span className="text-gray-500 text-sm" style={{ margin: 0 }}>
@@ -107,17 +107,19 @@ const OrdersTable = ({
                   </div>
                 </td>
                 
-                {/* Status */}
+                {/* Status - Centered */}
                 <td className="px-4 py-3 whitespace-nowrap align-middle text-center">
-                  <button
-                    onClick={() => onStatusClick && onStatusClick(order)}
-                    className={`order-status-badge clickable ${orderService?.getOrderStatusClass(order.order_status) || ''}`}
-                    title="Click to change status"
-                    style={{ margin: 0 }}
-                  >
-                    {getStatusIcon(order.order_status)}
-                    {orderService?.getOrderStatusLabel(order.order_status) || order.order_status}
-                  </button>
+                  <div className="flex justify-center">
+                    <button
+                      onClick={() => onStatusClick && onStatusClick(order)}
+                      className={`order-status-badge clickable ${orderService?.getOrderStatusClass(order.order_status) || ''}`}
+                      title="Click to change status"
+                      style={{ margin: 0 }}
+                    >
+                      {getStatusIcon(order.order_status)}
+                      {orderService?.getOrderStatusLabel(order.order_status) || order.order_status}
+                    </button>
+                  </div>
                 </td>
                 
                 {/* Total */}
@@ -140,9 +142,9 @@ const OrdersTable = ({
                   {formatDate ? formatDate(order.created_at) : (order.created_at || '-')}
                 </td>
                 
-                {/* Actions */}
+                {/* Actions - Centered */}
                 <td className="px-4 py-3 whitespace-nowrap align-middle text-sm">
-                  <div className="flex gap-1 justify-end" style={{ margin: 0 }}>
+                  <div className="flex gap-1 justify-center" style={{ margin: 0 }}>
                     {/* View button */}
                     <button
                       onClick={() => onViewOrder && onViewOrder(order)}
