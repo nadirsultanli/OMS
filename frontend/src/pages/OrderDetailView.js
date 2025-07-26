@@ -4,7 +4,8 @@ import './OrderDetailView.css';
 import orderService from '../services/orderService';
 import customerService from '../services/customerService';
 import variantService from '../services/variantService';
-import { authService } from '../services/authService';
+import authService from '../services/authService';
+import OrderStatusManager from '../components/OrderStatusManager';
 
 const OrderDetailView = () => {
   const { orderId } = useParams();
@@ -303,6 +304,19 @@ const OrderDetailView = () => {
           )}
         </div>
       </div>
+
+      {/* Order Status Management */}
+      <OrderStatusManager 
+        order={{...order, customer_name: customer?.name}}
+        onStatusChange={(updatedOrder) => {
+          setOrder(updatedOrder);
+          // Reload order details to get fresh data
+          loadOrderDetails();
+        }}
+        onError={(errorMessage) => {
+          setError(errorMessage);
+        }}
+      />
 
       {/* Order Information */}
       <div className="order-info-grid">

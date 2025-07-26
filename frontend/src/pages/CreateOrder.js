@@ -43,7 +43,7 @@ const CreateOrder = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [activePriceList, setActivePriceList] = useState(null);
   const [selectedPriceList, setSelectedPriceList] = useState(null);
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState([]);
   const [availableVariants, setAvailableVariants] = useState([]);
   const [priceListLines, setPriceListLines] = useState([]);
   
@@ -512,14 +512,10 @@ const CreateOrder = () => {
       const gasVariant = group.find(v => v.sku.startsWith('GAS'));
       const depVariant = group.find(v => v.sku.startsWith('DEP'));
       
-      if (kitVariant) {
-        // If KIT exists, only show KIT (hide separate GAS and DEP)
-        prioritizedVariants.push(kitVariant);
-      } else {
-        // If no KIT, show GAS and DEP separately
-        if (gasVariant) prioritizedVariants.push(gasVariant);
-        if (depVariant) prioritizedVariants.push(depVariant);
-      }
+      // Always show all variants - KIT, GAS, and DEP
+      if (kitVariant) prioritizedVariants.push(kitVariant);
+      if (gasVariant) prioritizedVariants.push(gasVariant);
+      if (depVariant) prioritizedVariants.push(depVariant);
     });
     
     return prioritizedVariants;
@@ -539,17 +535,14 @@ const CreateOrder = () => {
     return baseDisplayName;
   };
 
-  // Get variants filtered by selected product and active price list
+  // Get variants filtered by active price list (exclude DEP variants from order lines)
   const getFilteredVariantsForOrderLine = () => {
     if (!activePriceList) return [];
     
-    // If a product is selected, show only variants of that product
-    if (selectedProduct) {
-      return availableVariants.filter(variant => variant.product_id === selectedProduct.id);
-    }
-    
-    // Otherwise show all variants from active price list
-    return availableVariants;
+    // Show all variants except DEP variants (deposits should be handled automatically by KIT)
+    return availableVariants.filter(variant => 
+      !variant.sku.includes('DEP') && variant.sku_type !== 'DEPOSIT'
+    );
   };
 
   const handleStockFilterToggle = () => {
@@ -927,51 +920,68 @@ const CreateOrder = () => {
     setMessage('Cleared all selected products');
   };
 
-  // Function to auto-generate Gas & Deposit lines from selected product
-  const handleCreateOrderLinesFromSelectedProduct = () => {
-    if (!selectedProduct || !activePriceList) return;
+  // Function to auto-generate Gas & Deposit lines from all selected products
+  const handleCreateOrderLinesFromSelectedProducts = () => {
+    if (selectedProducts.length === 0 || !activePriceList) return;
 
-    // Get all variants for this product that are in the price list
-    const productVariants = variants.filter(v => v.product_id === selectedProduct.id);
-    const relevantPriceListLines = priceListLines.filter(line => 
-      productVariants.some(v => v.id === line.variant_id)
-    );
+    let totalNewLines = [];
 
-    if (relevantPriceListLines.length === 0) {
-      setMessage(`No variants found for ${selectedProduct.name} in the active price list.`);
+    selectedProducts.forEach(product => {
+      // Get all variants for this product that are in the price list
+      const productVariants = variants.filter(v => v.product_id === product.id);
+      const relevantPriceListLines = priceListLines.filter(line => 
+        productVariants.some(v => v.id === line.variant_id)
+      );
+
+      if (relevantPriceListLines.length > 0) {
+        // Create order lines for all variants of this product (excluding DEP)
+        const productLines = relevantPriceListLines
+          .filter(line => {
+            const variant = variants.find(v => v.id === line.variant_id);
+            return variant && !variant.sku.includes('DEP') && variant.sku_type !== 'DEPOSIT';
+          })
+          .map(line => {
+            const variant = variants.find(v => v.id === line.variant_id);
+            return {
+              id: Date.now() + Math.random(), // Unique temporary ID
+              variant_id: line.variant_id,
+              gas_type: '',
+              qty_ordered: 1,
+              list_price: line.min_unit_price || 0,
+              manual_unit_price: line.min_unit_price || 0,
+              product_type: 'variant',
+              scenario: 'OUT',
+              component_type: variant.sku_type === 'CONSUMABLE' ? 'GAS_FILL' : 'STANDARD',
+              tax_rate: line.tax_rate || 0,
+              tax_code: line.tax_code || 'TX_STD',
+              tax_amount: (line.min_unit_price || 0) * (line.tax_rate || 0) / 100,
+              gross_price: (line.min_unit_price || 0) * (1 + (line.tax_rate || 0) / 100),
+              priceFound: true
+            };
+          });
+        
+        totalNewLines = [...totalNewLines, ...productLines];
+      }
+    });
+
+    if (totalNewLines.length === 0) {
+      setMessage('No valid variants found for selected products.');
       return;
     }
 
-    // Create order lines for all variants of this product
-    const newLines = relevantPriceListLines.map(line => {
-      const variant = productVariants.find(v => v.id === line.variant_id);
-      if (!variant) return null;
-
-      return {
-        id: Date.now() + Math.random(),
-        product_type: 'variant',
-        variant_id: variant.id,
-        qty_ordered: 1,
-        list_price: line.min_unit_price || 0,
-        manual_unit_price: line.min_unit_price || 0,
-        scenario: 'OUT',
-        component_type: variant.sku_type === 'CONSUMABLE' ? 'GAS_FILL' : 
-                       variant.sku_type === 'DEPOSIT' ? 'CYLINDER_DEPOSIT' : 'STANDARD',
-        tax_rate: line.tax_rate || 0,
-        tax_code: line.tax_code || 'TX_STD',
-        tax_amount: (line.min_unit_price || 0) * (line.tax_rate || 0) / 100,
-        gross_price: (line.min_unit_price || 0) * (1 + (line.tax_rate || 0) / 100),
-        priceFound: true
-      };
-    }).filter(Boolean);
-
-    // Add lines to order
+    // Add all new lines to form data
     setFormData(prev => ({
       ...prev,
-      order_lines: [...prev.order_lines, ...newLines]
+      order_lines: [...prev.order_lines, ...totalNewLines]
     }));
 
-    setMessage(`✅ Generated ${newLines.length} order lines for ${selectedProduct.name}`);
+    setMessage(`✅ Generated ${totalNewLines.length} order lines for ${selectedProducts.length} products`);
+  };
+
+  // Legacy function for single product (kept for backward compatibility) 
+  const handleCreateOrderLinesFromSelectedProduct = () => {
+    // Just call the multiple products function
+    handleCreateOrderLinesFromSelectedProducts();
   };
 
   const updateOrderLine = (lineId, field, value) => {
@@ -1187,7 +1197,11 @@ const CreateOrder = () => {
 
           if (line.product_type === 'variant') {
             apiLine.variant_id = line.variant_id;
+            // Ensure gas_type is null for variant orders
+            apiLine.gas_type = null;
           } else {
+            // For bulk gas orders, ensure variant_id is null and gas_type is set
+            apiLine.variant_id = null;
             apiLine.gas_type = line.gas_type;
           }
 
@@ -1334,17 +1348,14 @@ const CreateOrder = () => {
                 <label htmlFor="product_search">Search Products</label>
                 <SearchableDropdown
                   placeholder="Search and select a product..."
-                  value={selectedProduct}
+                  value={null}
                   searchValue={productSearch}
                   onSearchChange={setProductSearch}
                   options={availableProducts}
                   onSelect={(product) => {
                     if (product) {
-                      setSelectedProduct(product);
                       handleProductSelectionFromPriceList(product.id);
                       setProductSearch('');
-                    } else {
-                      setSelectedProduct(null);
                     }
                   }}
                   displayKey="name"
@@ -1362,27 +1373,39 @@ const CreateOrder = () => {
                 )}
               </div>
 
-              {/* Show selected product and generate order lines */}
-              {selectedProduct && (
-                <div className="selected-product-section">
-                  <h4>Selected Product: {selectedProduct.name}</h4>
-                  <p className="form-description">
-                    Click "Generate Order Lines" to automatically create gas and deposit line items for this product.
-                  </p>
-                  <div className="selected-product-actions">
+              {/* Show selected products */}
+              {selectedProducts.length > 0 && (
+                <div className="selected-products-section">
+                  <h4>Selected Products ({selectedProducts.length})</h4>
+                  <div className="selected-products-list">
+                    {selectedProducts.map(product => (
+                      <div key={product.id} className="selected-product-item">
+                        <span className="product-name">{product.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeSelectedProduct(product.id)}
+                          className="btn btn-small btn-danger"
+                          title="Remove product"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="selected-products-actions">
                     <button
                       type="button"
-                      onClick={() => handleCreateOrderLinesFromSelectedProduct()}
+                      onClick={() => handleCreateOrderLinesFromSelectedProducts()}
                       className="btn btn-primary"
                     >
-                      ✨ Generate Order Lines
+                      ✨ Generate Order Lines for All Products
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSelectedProduct(null)}
+                      onClick={clearAllSelectedProducts}
                       className="btn btn-secondary"
                     >
-                      Clear Selection
+                      Clear All
                     </button>
                   </div>
                 </div>
@@ -1581,11 +1604,9 @@ const CreateOrder = () => {
                         required
                       >
                         <option value="">
-                          {selectedProduct ? 
-                            `Select variant of ${selectedProduct.name} (${getFilteredVariantsForOrderLine().length} available)...` :
-                            activePriceList ? 
-                              `Select a product (${availableVariants.length} products with prices)...` :
-                              'Select a product variant...'
+                          {activePriceList ? 
+                            `Select any product variant (${availableVariants.length} available with prices)...` :
+                            'Select a product variant...'
                           }
                         </option>
                         {getFilteredVariantsForOrderLine().map(variant => (
