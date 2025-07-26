@@ -148,9 +148,24 @@ const LoadVehicleModal = ({
         </div>
 
         <div className="modal-body">
+          {/* Step indicator */}
+          <div className="step-indicator">
+            <div className={`step-dot ${step === 1 ? 'active' : ''}`}></div>
+            <div className={`step-dot ${step === 2 ? 'active' : ''}`}></div>
+          </div>
+
           {step === 1 && (
             <div className="setup-step">
-              <h3>Setup Vehicle Loading</h3>
+              <div className="section-header">
+                <div className="section-title">
+                  <div className="icon">🚚</div>
+                  Setup Vehicle Loading
+                </div>
+                <div className="step-progress">
+                  Step <span>1</span> of <span>2</span>
+                </div>
+              </div>
+              <p>Select the vehicle, trip, and source warehouse for loading</p>
               
               {/* Selected Stock Level Info */}
               {selectedStockLevel && (
@@ -199,9 +214,20 @@ const LoadVehicleModal = ({
                 </div>
               ) : (
                 <div className="setup-form">
-                  {/* Vehicle Selection */}
-                  <div className="form-group">
-                    <label>Select Vehicle:</label>
+                  <div className="section-header">
+                    <div className="section-title">
+                      <div className="icon">🚚</div>
+                      <span>Vehicle & Trip Configuration</span>
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    {/* Vehicle Selection */}
+                    <div className="form-group">
+                      <label>
+                        Select Vehicle
+                        <span className="label-badge">Required</span>
+                      </label>
                     <select
                       value={selectedVehicle?.id || ''}
                       onChange={(e) => {
@@ -219,9 +245,12 @@ const LoadVehicleModal = ({
                     </select>
                   </div>
 
-                  {/* Trip Selection */}
-                  <div className="form-group">
-                    <label>Select Trip (Optional):</label>
+                    {/* Trip Selection */}
+                    <div className="form-group">
+                      <label>
+                        Select Trip
+                        <span className="label-badge">Optional</span>
+                      </label>
                     <select
                       value={selectedTrip?.id || ''}
                       onChange={(e) => {
@@ -237,11 +266,22 @@ const LoadVehicleModal = ({
                         </option>
                       ))}
                     </select>
+                    </div>
+                  </div>
+
+                  <div className="section-header">
+                    <div className="section-title">
+                      <div className="icon">🏭</div>
+                      <span>Source Location</span>
+                    </div>
                   </div>
 
                   {/* Source Warehouse */}
                   <div className="form-group">
-                    <label>Source Warehouse:</label>
+                    <label>
+                      Source Warehouse
+                      <span className="label-badge">Required</span>
+                    </label>
                     <select
                       value={sourceWarehouse?.id || ''}
                       onChange={(e) => {
@@ -262,13 +302,13 @@ const LoadVehicleModal = ({
                   {/* Selected Vehicle Info */}
                   {selectedVehicle && (
                     <div className="vehicle-info-display">
-                      <h4>Selected Vehicle Details:</h4>
+                      <h4>Selected Vehicle Details</h4>
                       <div className="vehicle-details">
-                        <span>Plate: {selectedVehicle.plate_number || selectedVehicle.plate}</span>
-                        <span>Type: {selectedVehicle.vehicle_type}</span>
-                        <span>Capacity: {selectedVehicle.capacity_kg}kg</span>
+                        <span data-label="Plate">{selectedVehicle.plate_number || selectedVehicle.plate}</span>
+                        <span data-label="Type">{selectedVehicle.vehicle_type}</span>
+                        <span data-label="Capacity">{selectedVehicle.capacity_kg}kg</span>
                         {selectedVehicle.capacity_m3 && (
-                          <span>Volume: {selectedVehicle.capacity_m3}m³</span>
+                          <span data-label="Volume">{selectedVehicle.capacity_m3}m³</span>
                         )}
                       </div>
                     </div>
@@ -280,6 +320,16 @@ const LoadVehicleModal = ({
 
           {step === 2 && (
             <div className="loading-step">
+              <div className="section-header">
+                <div className="section-title">
+                  <div className="icon">📦</div>
+                  Load Vehicle Inventory
+                </div>
+                <div className="step-progress">
+                  Step <span>2</span> of <span>2</span>
+                </div>
+              </div>
+              
               <VehicleLoader
                 tripId={selectedTrip?.id}
                 vehicle={selectedVehicle}
@@ -297,36 +347,48 @@ const LoadVehicleModal = ({
         <div className="modal-footer">
           {step === 1 && (
             <div className="step-1-actions">
-              <button 
-                className="btn btn-secondary" 
-                onClick={handleClose}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn btn-primary"
-                onClick={handleSetupComplete}
-                disabled={!selectedVehicle || !sourceWarehouse}
-              >
-                Next: Load Vehicle
-              </button>
+              <div className="step-progress">
+                Step <span>1</span> of 2
+              </div>
+              <div className="action-group">
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={handleClose}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="btn btn-primary"
+                  onClick={handleSetupComplete}
+                  disabled={!selectedVehicle || !sourceWarehouse}
+                >
+                  <span className="btn-icon">→</span>
+                  Next: Load Vehicle
+                </button>
+              </div>
             </div>
           )}
 
           {step === 2 && (
             <div className="step-2-actions">
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => setStep(1)}
-              >
-                Back to Setup
-              </button>
-              <button 
-                className="btn btn-secondary" 
-                onClick={handleClose}
-              >
-                Close
-              </button>
+              <div className="step-progress">
+                Step <span>2</span> of 2
+              </div>
+              <div className="action-group">
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setStep(1)}
+                >
+                  <span className="btn-icon">←</span>
+                  Back to Setup
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={handleClose}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           )}
         </div>

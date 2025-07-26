@@ -492,13 +492,20 @@ const StockLevels = () => {
                         {formatQuantity(level.available_qty)}
                       </span>
                     </td>
-                    <td>{formatCurrency(level.unit_cost)}</td>
-                    <td>{formatCurrency(level.total_cost)}</td>
-                    <td>
-                      {level.last_transaction_date ? 
-                        new Date(level.last_transaction_date).toLocaleDateString() : 
-                        'Never'
-                      }
+                    <td className="currency-cell">{formatCurrency(level.unit_cost)}</td>
+                    <td className="currency-cell">{formatCurrency(level.total_cost)}</td>
+                    <td className="date-cell">
+                      {level.last_transaction_date ? (
+                        <span>
+                          {new Date(level.last_transaction_date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      ) : (
+                        <span className="never">Never</span>
+                      )}
                     </td>
                     <td>
                       <div className="action-buttons">
