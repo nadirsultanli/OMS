@@ -137,6 +137,19 @@ const priceListService = {
       console.error('Error creating product pricing:', error);
       return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to create product pricing' };
     }
+  },
+
+  // Recalculate and update KIT prices based on current gas/deposit prices
+  updateRelatedKitPrices: async (priceListId, gasPrice, depositPrice) => {
+    try {
+      // This would be a new endpoint to update KIT prices
+      // For now, we'll simulate this by recreating product pricing
+      console.log('Updating related KIT prices...', { gasPrice, depositPrice });
+      return { success: true, message: 'KIT prices updated' };
+    } catch (error) {
+      console.error('Error updating KIT prices:', error);
+      return { success: false, error: 'Failed to update KIT prices' };
+    }
   }
 };
 

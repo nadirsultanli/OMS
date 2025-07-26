@@ -41,9 +41,13 @@ const PriceListDetail = () => {
   const [productErrors, setProductErrors] = useState({});
   
   useEffect(() => {
-    fetchPriceListDetails();
-    fetchProductsAndVariants();
+    const loadData = async () => {
+      await fetchProductsAndVariants();
+      await fetchPriceListDetails();
+    };
+    loadData();
   }, [priceListId]);
+
   
   const fetchPriceListDetails = async () => {
     try {
@@ -61,11 +65,14 @@ const PriceListDetail = () => {
       const linesResult = await priceListService.getPriceListLines(priceListId);
       if (linesResult.success) {
         const allLines = linesResult.data || [];
+        console.log('Fetched price lines:', allLines.length);
         
         // Filter and prioritize KIT variants over separate GAS+DEP variants
         const filteredLines = filterPriceLinesForKITPriority(allLines);
+        console.log('Filtered price lines:', filteredLines.length);
         setPriceLines(filteredLines);
       } else {
+        console.error('Error fetching price lines:', linesResult.error);
         setError(linesResult.error);
       }
     } catch (error) {
@@ -80,13 +87,21 @@ const PriceListDetail = () => {
       // Fetch products
       const productResult = await productService.getProducts(null, { limit: 1000 });
       if (productResult.success) {
-        setProducts(productResult.data.products || []);
+        const productsList = productResult.data.products || [];
+        console.log('Fetched products:', productsList.length);
+        setProducts(productsList);
+      } else {
+        console.error('Error fetching products:', productResult.error);
       }
       
       // Fetch actual variants
       const variantResult = await variantService.getVariants(null, { limit: 1000 });
       if (variantResult.success) {
-        setVariants(variantResult.data.variants || []);
+        const variantsList = variantResult.data.variants || [];
+        console.log('Fetched variants:', variantsList.length);
+        setVariants(variantsList);
+      } else {
+        console.error('Error fetching variants:', variantResult.error);
       }
     } catch (error) {
       console.error('Failed to fetch products and variants:', error);
@@ -180,14 +195,29 @@ const PriceListDetail = () => {
         min_unit_price: parseFloat(lineFormData.min_unit_price)
       };
 
-              const result = await priceListService.updatePriceListLine(editingLineId, lineData);
+      const result = await priceListService.updatePriceListLine(editingLineId, lineData);
       
-              if (result.success) {
-          setSuccess('Price list line updated successfully!');
-          resetLineForm();
-          setIsEditing(false);
-          setShowForm(false);
-          fetchPriceListDetails();
+      if (result.success) {
+        setSuccess('Price list line updated successfully!');
+        
+        // Check if this update affects KIT prices (gas or deposit price change)
+        const updatedLine = priceLines.find(line => line.id === editingLineId);
+        if (updatedLine) {
+          const variant = variants.find(v => v.id === updatedLine.variant_id);
+          if (variant && (variant.sku.startsWith('GAS') || variant.sku.startsWith('DEP'))) {
+            setSuccess('Price list line updated successfully! Related KIT prices may be automatically updated.');
+            
+            // Small delay to allow backend to process related updates
+            setTimeout(() => {
+              fetchPriceListDetails();
+            }, 1000);
+          }
+        }
+        
+        resetLineForm();
+        setIsEditing(false);
+        setShowForm(false);
+        fetchPriceListDetails();
       } else {
         setErrors({ general: result.error });
       }
@@ -321,10 +351,26 @@ const PriceListDetail = () => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: priceList?.currency || 'KES'
-    }).format(amount || 0);
+    try {
+      return new Intl.NumberFormat('en-KE', {
+        style: 'currency',
+        currency: priceList?.currency || 'KES'
+      }).format(amount || 0);
+    } catch (error) {
+      console.error('Error formatting currency:', error);
+      return `KES ${(amount || 0).toFixed(2)}`;
+    }
+  };
+
+  // Tax calculation functions to ensure consistency
+  const calculateTaxAmount = (basePrice, taxRate) => {
+    return (basePrice * taxRate) / 100;
+  };
+
+  const calculateFinalPrice = (basePrice, taxRate) => {
+    // Final price = base price + (base price * tax rate / 100)
+    // This matches your formula: gas_price + (tax * gas_price) / 100
+    return basePrice + calculateTaxAmount(basePrice, taxRate);
   };
 
   const formatDate = (dateString) => {
@@ -361,6 +407,35 @@ const PriceListDetail = () => {
     return variantName + taxInfo;
   };
 
+  const isKitVariant = (line) => {
+    if (!line.variant_id) return false;
+    const variant = variants.find(v => v.id === line.variant_id);
+    return variant && variant.sku && variant.sku.startsWith('KIT');
+  };
+
+  const isKitPriceAffected = (variantId) => {
+    if (!variantId) return false;
+    const variant = variants.find(v => v.id === variantId);
+    if (!variant) return false;
+    
+    // Check if this is a GAS or DEP variant that affects KIT pricing
+    return variant.sku.startsWith('GAS') || variant.sku.startsWith('DEP');
+  };
+
+  const getRelatedKitVariants = (variantId) => {
+    if (!variantId) return [];
+    const variant = variants.find(v => v.id === variantId);
+    if (!variant) return [];
+    
+    // Extract size from SKU (e.g., GAS18 -> 18)
+    const sizeMatch = variant.sku.match(/(?:GAS|DEP)(\d+)/);
+    if (!sizeMatch) return [];
+    
+    const size = sizeMatch[1];
+    // Find KIT variants with the same size
+    return variants.filter(v => v.sku.startsWith(`KIT${size}`));
+  };
+
   const getProductName = (productId) => {
     const product = products.find(p => p.id === productId);
     return product ? product.name : '-';
@@ -368,6 +443,11 @@ const PriceListDetail = () => {
 
   // Filter price lines to show KIT + GAS, but hide DEP when KIT exists
   const filterPriceLinesForKITPriority = (lines) => {
+    // If variants not loaded yet, return original lines
+    if (!variants || variants.length === 0) {
+      return lines;
+    }
+    
     const linesWithVariants = lines.filter(line => line.variant_id);
     
     // Group lines by product (extract size from SKU)
@@ -375,11 +455,17 @@ const PriceListDetail = () => {
     
     linesWithVariants.forEach(line => {
       const variant = variants.find(v => v.id === line.variant_id);
-      if (!variant) return;
+      if (!variant) {
+        console.warn(`Variant not found for line ${line.id} with variant_id ${line.variant_id}`);
+        return;
+      }
       
       // Extract size from SKU (e.g., GAS18, DEP18, KIT18-OUTRIGHT -> 18)
       const sizeMatch = variant.sku.match(/(?:GAS|DEP|KIT)(\d+)/);
-      if (!sizeMatch) return;
+      if (!sizeMatch) {
+        console.warn(`No size match found for SKU: ${variant.sku}`);
+        return;
+      }
       
       const size = sizeMatch[1];
       if (!productGroups[size]) {
@@ -523,6 +609,12 @@ const PriceListDetail = () => {
         {(showForm || isEditing) && (
           <div className="line-form-card">
             <h3>{isEditing ? 'Edit Price Line' : 'Add New Price Line'}</h3>
+            {isEditing && lineFormData.variant_id && isKitPriceAffected(lineFormData.variant_id) && (
+              <div className="kit-warning">
+                ⚠️ <strong>Note:</strong> Updating this {variants.find(v => v.id === lineFormData.variant_id)?.sku.startsWith('GAS') ? 'Gas' : 'Deposit'} price will affect related KIT prices. 
+                Related KIT variants: {getRelatedKitVariants(lineFormData.variant_id).map(v => v.sku).join(', ')}
+              </div>
+            )}
             <form onSubmit={isEditing ? handleUpdateLine : handleAddLine} className="line-form">
               <div className="form-grid">
                 <div className="form-group">
@@ -771,11 +863,15 @@ const PriceListDetail = () => {
                     </td>
                     <td className="price-cell">
                       <div className="price-with-tax">
-                        {formatCurrency(line.min_unit_price)}
+                        {formatCurrency(calculateFinalPrice(line.min_unit_price, line.tax_rate || 0))}
                       </div>
-                      {line.tax_rate > 0 && (
-                        <div className="tax-amount">
-                          +{formatCurrency((line.min_unit_price * line.tax_rate) / 100)} tax
+                      {line.tax_rate > 0 && !isKitVariant(line) && (
+                        <div className="tax-breakdown">
+                          <span className="base-price">Base: {formatCurrency(line.min_unit_price)}</span>
+                          <span className="tax-amount">Tax: +{formatCurrency(calculateTaxAmount(line.min_unit_price, line.tax_rate))} ({line.tax_rate}%)</span>
+                          <div className="tax-formula-note">
+                            Formula: {formatCurrency(line.min_unit_price)} + ({line.tax_rate}% × {formatCurrency(line.min_unit_price)}) ÷ 100
+                          </div>
                         </div>
                       )}
                     </td>

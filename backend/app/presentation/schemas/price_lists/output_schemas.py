@@ -10,6 +10,12 @@ class PriceListLineResponse(BaseModel):
     variant_id: Optional[str] = Field(None, description="Variant ID")
     gas_type: Optional[str] = Field(None, description="Gas type")
     min_unit_price: float = Field(..., description="Minimum unit price")
+    
+    # Tax fields
+    tax_code: Optional[str] = Field(None, description="Tax code (e.g., TX_STD, TX_DEP)")
+    tax_rate: Optional[float] = Field(None, description="Tax rate percentage")
+    is_tax_inclusive: Optional[bool] = Field(None, description="Whether price includes tax")
+    
     created_at: Optional[str] = Field(None, description="Created at timestamp")
     created_by: Optional[str] = Field(None, description="Created by user ID")
     updated_at: Optional[str] = Field(None, description="Updated at timestamp")

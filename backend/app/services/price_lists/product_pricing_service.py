@@ -116,10 +116,25 @@ class ProductPricingService:
         # KIT variants (bundle) → use gas_price + deposit_price for OUT scenarios
         elif variant.sku_type == 'BUNDLE' or sku_upper.startswith('KIT'):
             if scenario in ['OUT', 'BOTH']:
-                # KIT price = Gas Price + Deposit Price
-                price = gas_price + deposit_price
-                tax_code = 'TX_STD'  # Taxable (includes both gas and deposit)
-                tax_rate = Decimal('23.00')
+                # For per_kg pricing, calculate gas component per kg first, then add deposit
+                if pricing_unit == 'per_kg':
+                    capacity_kg = self._get_capacity_for_variant(product_variants, variant)
+                    if capacity_kg:
+                        # KIT per_kg = (gas_price_per_kg * kg + tax) + deposit
+                        gas_total = gas_price * capacity_kg
+                        gas_with_tax = gas_total + (gas_total * Decimal('23.00') / 100)
+                        price = gas_with_tax + deposit_price
+                    else:
+                        # Fallback: treat as per_cylinder
+                        gas_with_tax = gas_price + (gas_price * Decimal('23.00') / 100)
+                        price = gas_with_tax + deposit_price
+                else:
+                    # Per cylinder: KIT = Gas Price (with tax) + Deposit Price (no tax)
+                    gas_with_tax = gas_price + (gas_price * Decimal('23.00') / 100)
+                    price = gas_with_tax + deposit_price
+                
+                tax_code = 'TX_STD'  # Tax already included in calculation
+                tax_rate = Decimal('0.00')  # No additional tax since already included
             else:
                 return None  # Skip KIT for XCH-only scenarios
                 
@@ -145,8 +160,8 @@ class ProductPricingService:
         else:
             return None  # Skip variants we don't know how to price
             
-        # Calculate effective price based on pricing unit
-        if pricing_unit == 'per_kg':
+        # Calculate effective price based on pricing unit (skip for KIT since it handles per_kg internally)
+        if pricing_unit == 'per_kg' and not (variant.sku_type == 'BUNDLE' or sku_upper.startswith('KIT')):
             # For per_kg pricing, we need to find the capacity from product variants
             capacity_kg = self._get_capacity_for_variant(product_variants, variant)
             if capacity_kg:
