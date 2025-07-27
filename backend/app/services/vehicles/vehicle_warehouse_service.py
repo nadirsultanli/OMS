@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from app.domain.entities.vehicles import Vehicle
 from app.domain.entities.truck_inventory import TruckInventory
@@ -71,9 +71,21 @@ class VehicleWarehouseService:
             
             # Save truck inventory records to database
             if self.truck_inventory_repository:
+                new_records_count = 0
+                updated_records_count = 0
+                
                 for record in truck_inventory_records:
-                    await self.truck_inventory_repository.create_truck_inventory(record)
-                default_logger.info(f"Saved {len(truck_inventory_records)} truck inventory records to database")
+                    # Check if this is a new record (no ID) or existing record (has ID)
+                    if not record.id:
+                        # New record - create it
+                        await self.truck_inventory_repository.create_truck_inventory(record)
+                        new_records_count += 1
+                    else:
+                        # Existing record - update it
+                        await self.truck_inventory_repository.update_truck_inventory(record.id, record)
+                        updated_records_count += 1
+                
+                default_logger.info(f"Saved {new_records_count} new and updated {updated_records_count} existing truck inventory records to database")
             else:
                 default_logger.warning("TruckInventoryRepository not available, records not saved")
                 for record in truck_inventory_records:
@@ -653,31 +665,82 @@ class VehicleWarehouseService:
         """Create truck inventory records for trip tracking"""
         truck_inventory_records = []
         
-        for item in inventory_items:
-            # Handle both dict and Pydantic model
-            if hasattr(item, 'product_id'):
-                # Pydantic model
-                product_id = UUID(item.product_id)
-                variant_id = UUID(item.variant_id)
-                quantity = Decimal(str(item.quantity))
-                empties_expected_qty = Decimal(str(getattr(item, 'empties_expected_qty', 0)))
-            else:
-                # Dict
-                product_id = UUID(item["product_id"])
-                variant_id = UUID(item["variant_id"])
-                quantity = Decimal(str(item["quantity"]))
-                empties_expected_qty = Decimal(str(item.get("empties_expected_qty", 0)))
+        # Import the database session to check for existing records
+        from app.infrastucture.database.connection import direct_db_connection
+        from app.infrastucture.database.models.truck_inventory import TruckInventoryModel
+        from sqlalchemy import select, and_
+        
+        async for session in direct_db_connection.get_session():
+            for item in inventory_items:
+                # Handle both dict and Pydantic model
+                if hasattr(item, 'product_id'):
+                    # Pydantic model
+                    product_id = UUID(item.product_id)
+                    variant_id = UUID(item.variant_id)
+                    quantity = Decimal(str(item.quantity))
+                    empties_expected_qty = Decimal(str(getattr(item, 'empties_expected_qty', 0)))
+                else:
+                    # Dict
+                    product_id = UUID(item["product_id"])
+                    variant_id = UUID(item["variant_id"])
+                    quantity = Decimal(str(item["quantity"]))
+                    empties_expected_qty = Decimal(str(item.get("empties_expected_qty", 0)))
+                
+                # Check if record already exists
+                existing_query = select(TruckInventoryModel).where(
+                    and_(
+                        TruckInventoryModel.trip_id == trip_id,
+                        TruckInventoryModel.vehicle_id == vehicle_id,
+                        TruckInventoryModel.product_id == product_id,
+                        TruckInventoryModel.variant_id == variant_id
+                    )
+                )
+                
+                result = await session.execute(existing_query)
+                existing_record = result.scalar_one_or_none()
+                
+                if existing_record:
+                    # Update existing record by adding to loaded_qty
+                    existing_record.loaded_qty += quantity
+                    existing_record.empties_expected_qty += empties_expected_qty
+                    existing_record.updated_by = created_by
+                    existing_record.updated_at = datetime.now(timezone.utc)
+                    
+                    # Convert to domain entity for return
+                    truck_inventory = TruckInventory(
+                        id=existing_record.id,
+                        trip_id=existing_record.trip_id,
+                        vehicle_id=existing_record.vehicle_id,
+                        product_id=existing_record.product_id,
+                        variant_id=existing_record.variant_id,
+                        loaded_qty=existing_record.loaded_qty,
+                        delivered_qty=existing_record.delivered_qty,
+                        empties_collected_qty=existing_record.empties_collected_qty,
+                        empties_expected_qty=existing_record.empties_expected_qty,
+                        created_at=existing_record.created_at,
+                        created_by=existing_record.created_by,
+                        updated_at=existing_record.updated_at,
+                        updated_by=existing_record.updated_by
+                    )
+                    truck_inventory_records.append(truck_inventory)
+                    
+                    default_logger.info(f"Updated existing truck inventory record for variant {variant_id}")
+                else:
+                    # Create new record
+                    truck_inventory = TruckInventory.create(
+                        trip_id=trip_id,
+                        vehicle_id=vehicle_id,
+                        product_id=product_id,
+                        variant_id=variant_id,
+                        loaded_qty=quantity,
+                        empties_expected_qty=empties_expected_qty,
+                        created_by=created_by
+                    )
+                    truck_inventory_records.append(truck_inventory)
+                    
+                    default_logger.info(f"Created new truck inventory record for variant {variant_id}")
             
-            truck_inventory = TruckInventory.create(
-                trip_id=trip_id,
-                vehicle_id=vehicle_id,
-                product_id=product_id,
-                variant_id=variant_id,
-                loaded_qty=quantity,
-                empties_expected_qty=empties_expected_qty,
-                created_by=created_by
-            )
-            truck_inventory_records.append(truck_inventory)
+            break  # Exit the async for loop after first iteration
         
         return truck_inventory_records
     
