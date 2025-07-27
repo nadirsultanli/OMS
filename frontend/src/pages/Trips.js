@@ -367,17 +367,18 @@ const Trips = () => {
           </select>
 
           <div className="custom-filter-dropdown">
-            <button
-              type="button"
+            <div 
               className="filter-select"
-              onClick={() => {
-                setIsVehicleDropdownOpen(!isVehicleDropdownOpen);
-                setVehicleFilterSearch('');
-              }}
+              onClick={() => setIsVehicleDropdownOpen(!isVehicleDropdownOpen)}
             >
-              {filters.vehicleId ? vehicles.find(v => v.id === filters.vehicleId)?.plate_number : 'All Vehicles'}
+              <span>
+                {filters.vehicleId 
+                  ? vehicles.find(v => v.id === filters.vehicleId)?.plate || 'Unknown Vehicle'
+                  : 'All Vehicles'
+                }
+              </span>
               <span className="dropdown-arrow">▼</span>
-            </button>
+            </div>
             
             {isVehicleDropdownOpen && (
               <div className="custom-dropdown-menu">
@@ -388,34 +389,34 @@ const Trips = () => {
                     placeholder="Search vehicles..."
                     value={vehicleFilterSearch}
                     onChange={(e) => setVehicleFilterSearch(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
                   />
                 </div>
                 <div className="dropdown-options">
-                  <div
+                  <div 
                     className={`dropdown-option ${!filters.vehicleId ? 'selected' : ''}`}
                     onClick={() => {
                       setFilters({ ...filters, vehicleId: '' });
                       setIsVehicleDropdownOpen(false);
+                      setVehicleFilterSearch('');
                     }}
                   >
                     All Vehicles
                   </div>
                   {vehicles
                     .filter(vehicle => 
-                      vehicle.plate_number.toLowerCase().includes(vehicleFilterSearch.toLowerCase())
+                      vehicle.plate?.toLowerCase().includes(vehicleFilterSearch.toLowerCase())
                     )
                     .map(vehicle => (
-                      <div
+                      <div 
                         key={vehicle.id}
                         className={`dropdown-option ${filters.vehicleId === vehicle.id ? 'selected' : ''}`}
                         onClick={() => {
                           setFilters({ ...filters, vehicleId: vehicle.id });
                           setIsVehicleDropdownOpen(false);
+                          setVehicleFilterSearch('');
                         }}
                       >
-                        {vehicle.plate_number} - {vehicle.vehicle_type}
+                        {vehicle.plate}
                       </div>
                     ))
                   }
@@ -425,17 +426,18 @@ const Trips = () => {
           </div>
 
           <div className="custom-filter-dropdown">
-            <button
-              type="button"
+            <div 
               className="filter-select"
-              onClick={() => {
-                setIsDriverDropdownOpen(!isDriverDropdownOpen);
-                setDriverFilterSearch('');
-              }}
+              onClick={() => setIsDriverDropdownOpen(!isDriverDropdownOpen)}
             >
-              {filters.driverId ? drivers.find(d => d.id === filters.driverId)?.name : 'All Drivers'}
+              <span>
+                {filters.driverId 
+                  ? drivers.find(d => d.id === filters.driverId)?.name || drivers.find(d => d.id === filters.driverId)?.full_name || 'Unknown Driver'
+                  : 'All Drivers'
+                }
+              </span>
               <span className="dropdown-arrow">▼</span>
-            </button>
+            </div>
             
             {isDriverDropdownOpen && (
               <div className="custom-dropdown-menu">
@@ -446,34 +448,34 @@ const Trips = () => {
                     placeholder="Search drivers..."
                     value={driverFilterSearch}
                     onChange={(e) => setDriverFilterSearch(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
                   />
                 </div>
                 <div className="dropdown-options">
-                  <div
+                  <div 
                     className={`dropdown-option ${!filters.driverId ? 'selected' : ''}`}
                     onClick={() => {
                       setFilters({ ...filters, driverId: '' });
                       setIsDriverDropdownOpen(false);
+                      setDriverFilterSearch('');
                     }}
                   >
                     All Drivers
                   </div>
                   {drivers
                     .filter(driver => 
-                      driver.name.toLowerCase().includes(driverFilterSearch.toLowerCase())
+                      (driver.name || driver.full_name || '').toLowerCase().includes(driverFilterSearch.toLowerCase())
                     )
                     .map(driver => (
-                      <div
+                      <div 
                         key={driver.id}
                         className={`dropdown-option ${filters.driverId === driver.id ? 'selected' : ''}`}
                         onClick={() => {
                           setFilters({ ...filters, driverId: driver.id });
                           setIsDriverDropdownOpen(false);
+                          setDriverFilterSearch('');
                         }}
                       >
-                        {driver.name}
+                        {driver.name || driver.full_name}
                       </div>
                     ))
                   }
@@ -481,22 +483,28 @@ const Trips = () => {
               </div>
             )}
           </div>
+        </div>
 
-          <input
-            type="date"
-            className="filter-input"
-            value={filters.dateFrom}
-            onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-            placeholder="From Date"
-          />
+        <div className="date-filters-row">
+          <div className="date-filter-group">
+            <label className="filter-label">Date From</label>
+            <input
+              type="date"
+              className="filter-input"
+              value={filters.dateFrom}
+              onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+            />
+          </div>
 
-          <input
-            type="date"
-            className="filter-input"
-            value={filters.dateTo}
-            onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-            placeholder="To Date"
-          />
+          <div className="date-filter-group">
+            <label className="filter-label">Date To</label>
+            <input
+              type="date"
+              className="filter-input"
+              value={filters.dateTo}
+              onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+            />
+          </div>
         </div>
       </div>
 

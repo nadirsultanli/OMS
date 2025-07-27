@@ -122,7 +122,7 @@
 }
 
 /* ============================================
-   FILTERS SECTION - IMPROVED SPACING
+   FILTERS SECTION - IMPROVED SPACING & SYMMETRY
    ============================================ */
 .filters-section {
   background: white;
@@ -227,7 +227,55 @@
 }
 
 /* ============================================
-   TABLE CONTAINER - PROFESSIONAL DESIGN
+   DATE FILTERS ROW - IMPROVED LAYOUT
+   ============================================ */
+.date-filters-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.date-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.date-filter-group .filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.date-filter-group .filter-input {
+  height: 44px;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  transition: all 0.3s ease;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%236b7280' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  color: #374151;
+}
+
+.date-filter-group .filter-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* ============================================
+   TABLE CONTAINER - FULL WIDTH DESIGN
    ============================================ */
 .trips-table-container {
   background: white;
@@ -235,95 +283,35 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   margin-bottom: 24px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
-  max-height: none;
   -webkit-overflow-scrolling: touch;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* Fix table layout */
+/* Use shared table layout from Table.css */
 .trips-table {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  font-size: 14px;
-  position: relative;
-  min-width: 1100px; /* Ensure minimum width for all columns */
+  min-width: 1000px;
 }
 
-/* Table column widths */
-.trip-number-col { width: 180px; }
-.date-col { width: 140px; }
-.vehicle-col { width: 180px; }
-.driver-col { width: 160px; }
-.status-col { width: 140px; }
-.orders-col { width: 80px; }
-.load-col { width: 100px; }
-.actions-col { width: 120px; }
+/* Column width coordination with shared Table.css */
+.trips-table th.trip-number-col { width: 16%; }
+.trips-table th.date-col { width: 12%; }
+.trips-table th.vehicle-col { width: 14%; }
+.trips-table th.driver-col { width: 14%; }
+.trips-table th.status-col { width: 12%; }
+.trips-table th.orders-col { width: 8%; text-align: center; }
+.trips-table th.load-col { width: 10%; text-align: right; }
+.trips-table th.actions-col { width: 14%; text-align: center; }
 
-/* Table cell styles */
-.trip-number-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.date-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.vehicle-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.driver-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.status-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.orders-cell { padding: 16px; text-align: center; vertical-align: middle; }
-.load-cell { padding: 16px; text-align: right; vertical-align: middle; }
-.actions-cell { padding: 16px; text-align: center; vertical-align: middle; }
-
-/* Table header styles */
-.trips-table th {
-  padding: 16px;
-  text-align: left;
-  font-weight: 600;
-  color: #1f2937;
-  border-bottom: 2px solid #e5e7eb;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  background: #f8f9fb;
-  box-sizing: border-box;
-}
-
-.trips-table th.orders-col,
-.trips-table th.load-col,
-.trips-table th.actions-col {
-  text-align: center;
-}
-
-.trips-table th.load-col {
-  text-align: right;
-}
-
-/* Table row styles */
-.trip-row {
-  transition: all 0.2s ease;
-  cursor: pointer;
-  position: relative;
-}
-
-.trip-row:hover {
-  background-color: #f9fafb;
-  transform: translateX(2px);
-}
-
-.trip-row:hover::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  background: linear-gradient(to right, #3b82f6, transparent);
-  opacity: 0.03;
-  pointer-events: none;
-}
+/* Cell alignment coordination with shared Table.css */
+.trips-table td.orders-cell { text-align: center; }
+.trips-table td.load-cell { text-align: right; }
+.trips-table td.actions-cell { text-align: center; }
 
 /* Cell content styles */
 .trip-info {
@@ -429,77 +417,11 @@
   white-space: nowrap;
 }
 
-.trips-table thead {
-  background: #f8f9fb;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
+/* Remove duplicate styles - already defined above */
 
-.trips-table th {
-  font-weight: 600;
-  color: #1f2937;
-  border-bottom: 2px solid #e5e7eb;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  background: #f8f9fb;
-  box-sizing: border-box;
-}
-
-/* Simplified and consistent table styling - remove specific column rules as they're handled inline */
-.trips-table td {
-  border-bottom: 1px solid #f3f4f6;
-  color: #374151;
-  background: white;
-  white-space: nowrap;
-  box-sizing: border-box;
-}
-
-/* Actions Column Specific */
-.trips-table .actions {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  align-items: center;
-  white-space: nowrap;
-}
-
-.trips-table tbody tr {
-  transition: all 0.2s ease;
-  cursor: pointer;
-  position: relative;
-}
-
-.trips-table tbody tr::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  background: linear-gradient(to right, transparent, transparent);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.trips-table tbody tr:hover {
-  background-color: #f9fafb;
-  transform: translateX(2px);
-}
-
-.trips-table tbody tr:hover::before {
-  background: linear-gradient(to right, #3b82f6, transparent);
-  opacity: 0.03;
-}
-
-.trips-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* Table Cell Specific Styling */
+/* ============================================
+   CELL CONTENT STYLES - FIXED ICON ALIGNMENT
+   ============================================ */
 .trip-info,
 .vehicle-info,
 .driver-info {
@@ -508,6 +430,7 @@
   gap: 10px;
   font-weight: 500;
   height: 100%;
+  min-height: 24px;
 }
 
 .trip-info svg,
@@ -517,6 +440,10 @@
   flex-shrink: 0;
   width: 18px;
   height: 18px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .trip-number {
@@ -529,27 +456,44 @@
   font-weight: 600;
 }
 
+.vehicle-name,
+.driver-name {
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+  line-height: 1.4;
+}
+
 .date-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  margin: 0;
 }
 
 .date-info > div:first-child {
   font-weight: 500;
   color: #1f2937;
+  margin: 0;
+  line-height: 1.4;
 }
 
 .time-text {
   font-size: 12px;
   color: #6b7280;
   font-weight: 400;
+  margin: 0;
+  line-height: 1.2;
 }
 
 .orders-count {
   text-align: center;
   display: flex;
   justify-content: center;
+  align-items: center;
+  margin: 0;
 }
 
 .count-badge {
@@ -565,32 +509,30 @@
   font-size: 13px;
   font-weight: 600;
   border: 1px solid #dbeafe;
+  margin: 0;
 }
 
 .load-info {
   font-weight: 600;
   color: #059669;
   white-space: nowrap;
+  margin: 0;
+  text-align: right;
 }
 
-.actions {
+/* ============================================
+   ACTIONS COLUMN - CLEAN LAYOUT
+   ============================================ */
+.trips-table .actions {
   display: flex;
   gap: 6px;
-  align-items: center;
   justify-content: center;
-  min-width: 150px;
-  white-space: nowrap;
-}
-
-/* Text Overflow Handling */
-.text-truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  align-items: center;
   white-space: nowrap;
 }
 
 /* ============================================
-   BADGES - TRIP STATUS STYLING
+   STATUS BADGE - IMPROVED ALIGNMENT
    ============================================ */
 .status-badge {
   display: inline-flex;
@@ -606,49 +548,109 @@
   line-height: 1.2;
   border: 1px solid transparent;
   transition: all 0.2s ease;
+  margin: 0;
 }
 
 .status-badge svg {
   width: 14px;
   height: 14px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
-/* Status-specific styles */
-.status-badge.draft {
-  background: #f3f4f6;
+/* Trip Status Updater Integration */
+.trip-status-updater {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.trip-status-updater .current-status-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.trip-status-updater .trip-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.trip-status-updater .status-update-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
   color: #6b7280;
-  border-color: #e5e7eb;
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.status-badge.planned {
-  background: #eff6ff;
-  color: #2563eb;
-  border-color: #dbeafe;
+.trip-status-updater .status-update-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #374151;
 }
 
-.status-badge.loaded {
-  background: #fef3c7;
-  color: #d97706;
-  border-color: #fde68a;
+.trip-status-updater .status-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 140px;
+  margin-top: 4px;
+  overflow: hidden;
 }
 
-.status-badge.in_progress {
-  background: #dbeafe;
-  color: #1e40af;
-  border-color: #bfdbfe;
+.trip-status-updater .status-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  transition: background-color 0.2s ease;
 }
 
-.status-badge.completed {
-  background: #d1fae5;
-  color: #059669;
-  border-color: #a7f3d0;
+.trip-status-updater .status-dropdown button:hover {
+  background: #f3f4f6;
 }
 
-.status-badge.cancelled {
-  background: #fee2e2;
-  color: #dc2626;
-  border-color: #fecaca;
+.trip-status-updater .status-dropdown button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
+
+/* Status badges use shared styles from Table.css */
 
 /* ============================================
    LOADING & EMPTY STATES
@@ -707,97 +709,754 @@
 }
 
 /* ============================================
-   ACTION BUTTONS - PROFESSIONAL STYLING
+   FORM SYSTEM - PROFESSIONAL LAYOUT
    ============================================ */
-.action-btn {
+.trip-form {
+  padding: 32px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  height: 44px;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #1f2937;
+  background-color: #ffffff;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.form-group textarea {
+  height: auto;
+  min-height: 80px;
+  resize: vertical;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+  border-color: #dc2626;
+  background-color: #fef2f2;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #9ca3af;
+  font-size: 15px;
+}
+
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.error-text {
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+}
+
+.form-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  border: 1px solid #fca5a5;
+}
+
+/* ============================================
+   FORM ACTIONS - PROFESSIONAL BUTTON LAYOUT
+   ============================================ */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+/* Secondary Button Style */
+.cancel-btn {
+  height: 44px;
+  padding: 12px 24px;
+  background: white;
+  color: #2563eb;
+  border: 2px solid #2563eb;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 14px;
-  font-weight: 500;
-  position: relative;
+  min-width: 100px;
 }
 
-.action-btn:hover:not(:disabled) {
+.cancel-btn:hover:not(:disabled) {
+  background: #f0f4ff;
   transform: translateY(-1px);
 }
 
-.action-btn:disabled {
-  opacity: 0.5;
+/* Primary Button Style */
+.submit-btn {
+  height: 44px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+}
+
+.submit-btn:disabled,
+.cancel-btn:disabled {
+  background: #9ca3af;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
+  border: none;
+  opacity: 0.7;
 }
 
-.action-btn svg {
-  width: 18px;
-  height: 18px;
+/* ============================================
+   TRIP DETAILS VIEW - PROFESSIONAL LAYOUT
+   ============================================ */
+.trip-details-content {
+  padding: 32px;
+  overflow-y: auto;
+  flex: 1;
 }
 
-.action-btn.view {
-  background: #eff6ff;
-  color: #2563eb;
-  border-color: #dbeafe;
+.trip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f1f5f9;
 }
 
-.action-btn.view:hover:not(:disabled) {
-  background: #dbeafe;
-  border-color: #bfdbfe;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+.trip-number {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.action-btn.edit {
-  background: #fffbeb;
-  color: #d97706;
-  border-color: #fef3c7;
+.trip-number h3 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
 }
 
-.action-btn.edit:hover:not(:disabled) {
-  background: #fef3c7;
-  border-color: #fde68a;
-  box-shadow: 0 1px 3px rgba(217, 119, 6, 0.2);
+.trip-status {
+  display: flex;
+  align-items: center;
 }
 
-.action-btn.start {
-  background: #ecfdf5;
-  color: #059669;
-  border-color: #d1fae5;
+.trip-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
 }
 
-.action-btn.start:hover:not(:disabled) {
-  background: #d1fae5;
-  border-color: #a7f3d0;
-  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.2);
+.info-section {
+  background: #f9fafb;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
 }
 
-.action-btn.complete {
-  background: #f3f4f6;
+.info-section.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-section h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e5e7eb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row .label {
+  font-size: 14px;
+  font-weight: 500;
   color: #6b7280;
-  border-color: #e5e7eb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.action-btn.complete:hover:not(:disabled) {
-  background: #e5e7eb;
-  border-color: #d1d5db;
-  box-shadow: 0 1px 3px rgba(107, 114, 128, 0.2);
+.info-row .value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.action-btn.delete {
-  background: #fef2f2;
-  color: #dc2626;
-  border-color: #fee2e2;
+.notes-content {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #374151;
+  margin-top: 8px;
 }
 
-.action-btn.delete:hover:not(:disabled) {
-  background: #fee2e2;
-  border-color: #fecaca;
-  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.2);
+.trip-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+  flex-wrap: wrap;
 }
+
+.trip-actions .action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  justify-content: center;
+  height: 44px;
+}
+
+/* ============================================
+   CUSTOM FILTER DROPDOWN
+   ============================================ */
+.custom-filter-dropdown {
+  position: relative;
+  min-width: 200px;
+}
+
+.custom-filter-dropdown .filter-select {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  background: white;
+  height: 44px;
+  border-radius: 8px;
+  background-image: none;
+  padding-right: 16px;
+  cursor: pointer;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  margin-left: 8px;
+  transition: transform 0.2s ease;
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 300px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-search-container {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.dropdown-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.dropdown-search-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.dropdown-options {
+  overflow-y: auto;
+  max-height: 250px;
+}
+
+.dropdown-option {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+  color: #374151;
+}
+
+.dropdown-option:hover {
+  background-color: #f3f4f6;
+}
+
+.dropdown-option.selected {
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-weight: 500;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN - IMPROVED SYMMETRY
+   ============================================ */
+@media (max-width: 1024px) {
+  .trips-container {
+    padding: 16px;
+  }
+  
+  .search-group {
+    min-width: 250px;
+  }
+  
+  .trips-table {
+    min-width: 900px;
+  }
+  
+  /* Adjust column widths for smaller screens - maintain proportions */
+  .trips-table th.trip-number-col { width: 16%; min-width: 140px; }
+  .trips-table th.date-col { width: 12%; min-width: 100px; }
+  .trips-table th.vehicle-col { width: 14%; min-width: 120px; }
+  .trips-table th.driver-col { width: 14%; min-width: 120px; }
+  .trips-table th.status-col { width: 12%; min-width: 100px; }
+  .trips-table th.orders-col { width: 8%; min-width: 60px; }
+  .trips-table th.load-col { width: 10%; min-width: 80px; }
+  .trips-table th.actions-col { width: 14%; min-width: 120px; }
+}
+
+@media (max-width: 768px) {
+  .trips-container {
+    padding: 12px;
+  }
+
+  .trips-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+    padding: 20px;
+  }
+
+  .header-content {
+    gap: 12px;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .page-subtitle {
+    font-size: 14px;
+  }
+
+  .create-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .filters-row {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .search-group {
+    min-width: 100%;
+    max-width: none;
+  }
+
+  .filter-group {
+    width: 100%;
+  }
+
+  .filter-select,
+  .filter-input {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .date-filters-row {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .date-filter-group {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .trip-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-content {
+    margin: 10px;
+    max-width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .modal-header,
+  .trip-form,
+  .trip-details-content {
+    padding: 20px;
+  }
+
+  .trips-table {
+    font-size: 12px;
+    min-width: 800px;
+  }
+
+  .trips-table th,
+  .trips-table td {
+    padding: 12px 8px;
+  }
+  
+  /* Mobile column widths - maintain table structure */
+  .trips-table th.trip-number-col { min-width: 120px; }
+  .trips-table th.date-col { min-width: 80px; }
+  .trips-table th.vehicle-col { min-width: 100px; }
+  .trips-table th.driver-col { min-width: 100px; }
+  .trips-table th.status-col { min-width: 80px; }
+  .trips-table th.orders-col { min-width: 50px; }
+  .trips-table th.load-col { min-width: 70px; }
+  .trips-table th.actions-col { min-width: 80px; }
+
+  .form-actions,
+  .trip-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cancel-btn,
+  .submit-btn,
+  .trip-actions .action-btn {
+    width: 100%;
+  }
+
+  .pagination-container {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 20px;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 4px;
+    min-width: 60px;
+  }
+
+  .action-btn {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .trips-container {
+    padding: 8px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+  }
+
+  .modal-content {
+    margin: 5px;
+    max-width: calc(100vw - 10px);
+    border-radius: 12px;
+  }
+
+  .trips-table {
+    font-size: 11px;
+    min-width: 700px;
+  }
+
+  .trips-table th,
+  .trips-table td {
+    padding: 8px 6px;
+  }
+
+  .status-badge {
+    font-size: 9px;
+    padding: 4px 8px;
+  }
+
+  .count-badge {
+    min-width: 24px;
+    height: 24px;
+    font-size: 11px;
+  }
+
+  .action-btn {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* ============================================
+   HIGH CONTRAST MODE SUPPORT
+   ============================================ */
+@media (prefers-contrast: high) {
+  .trips-header,
+  .filters-section,
+  .trips-table-container,
+  .modal-content,
+  .pagination-container {
+    border: 2px solid #000;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea,
+  .search-input,
+  .filter-select,
+  .filter-input {
+    border-width: 2px;
+  }
+
+  .submit-btn,
+  .create-btn {
+    background: #2563eb;
+    border: 2px solid #2563eb;
+  }
+
+  .cancel-btn {
+    border-width: 2px;
+  }
+
+  .pagination-btn {
+    border-width: 2px;
+  }
+
+  .info-section {
+    border-width: 2px;
+  }
+}
+
+/* ============================================
+   DARK MODE SUPPORT (Future Enhancement)
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  /* Future dark mode implementation */
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .trips-container {
+    background: white;
+    padding: 0;
+  }
+  
+  .create-btn,
+  .filters-section,
+  .actions,
+  .pagination-container {
+    display: none;
+  }
+  
+  .trips-table-container {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+  
+  .trips-table {
+    font-size: 12px;
+  }
+}
+
+/* Tooltip styles for action buttons */
+
+.action-btn::before {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  background: #1f2937;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 1000;
+}
+
+.action-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(2px);
+  border: 4px solid transparent;
+  border-top-color: #1f2937;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 1000;
+}
+
+.action-btn:hover::before,
+.action-btn:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-8px);
+}
+
+.action-btn:hover::after {
+  transform: translateX(-50%) translateY(-2px);
+}
+
+/* Action buttons use shared styles from Table.css */
 
 .action-btn.secondary {
   background: #f9fafb;
@@ -1257,434 +1916,4 @@
   min-width: 120px;
   justify-content: center;
   height: 44px;
-}
-
-/* ============================================
-   CUSTOM FILTER DROPDOWN
-   ============================================ */
-.custom-filter-dropdown {
-  position: relative;
-  min-width: 200px;
-}
-
-.custom-filter-dropdown .filter-select {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  text-align: left;
-  background: white;
-  height: 44px;
-  border-radius: 8px;
-  background-image: none;
-  padding-right: 16px;
-  cursor: pointer;
-}
-
-.dropdown-arrow {
-  font-size: 10px;
-  margin-left: 8px;
-  transition: transform 0.2s ease;
-}
-
-.custom-dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  margin-top: 4px;
-  background: white;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-  max-height: 300px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.dropdown-search-container {
-  padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
-}
-
-.dropdown-search-input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.2s ease;
-}
-
-.dropdown-search-input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.dropdown-options {
-  overflow-y: auto;
-  max-height: 250px;
-}
-
-.dropdown-option {
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  font-size: 14px;
-  color: #374151;
-}
-
-.dropdown-option:hover {
-  background-color: #f3f4f6;
-}
-
-.dropdown-option.selected {
-  background-color: #eff6ff;
-  color: #2563eb;
-  font-weight: 500;
-}
-
-/* ============================================
-   ANIMATIONS
-   ============================================ */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ============================================
-   RESPONSIVE DESIGN - MOBILE FIRST
-   ============================================ */
-@media (max-width: 1024px) {
-  .trips-container {
-    padding: 16px;
-  }
-  
-  .search-group {
-    min-width: 250px;
-  }
-  
-  .trips-table {
-    min-width: 900px;
-  }
-  
-  /* Adjust column widths for smaller screens */
-  .trip-number-col { width: 160px; }
-  .date-col { width: 120px; }
-  .vehicle-col { width: 160px; }
-  .driver-col { width: 140px; }
-  .status-col { width: 120px; }
-  .orders-col { width: 70px; }
-  .load-col { width: 90px; }
-  .actions-col { width: 100px; }
-}
-
-@media (max-width: 768px) {
-  .trips-container {
-    padding: 12px;
-  }
-
-  .trips-header {
-    flex-direction: column;
-    gap: 16px;
-    align-items: stretch;
-    padding: 20px;
-  }
-
-  .header-content {
-    gap: 12px;
-  }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .page-subtitle {
-    font-size: 14px;
-  }
-
-  .create-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .filters-row {
-    flex-direction: column;
-    gap: 16px;
-    align-items: stretch;
-  }
-
-  .search-group {
-    min-width: 100%;
-    max-width: none;
-  }
-
-  .filter-group {
-    width: 100%;
-  }
-
-  .filter-select,
-  .filter-input {
-    width: 100%;
-    min-width: 100%;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .trip-info-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .modal-content {
-    margin: 10px;
-    max-width: calc(100vw - 20px);
-    max-height: calc(100vh - 20px);
-  }
-
-  .modal-header,
-  .trip-form,
-  .trip-details-content {
-    padding: 20px;
-  }
-
-  .trips-table {
-    font-size: 12px;
-    min-width: 800px;
-  }
-
-  .trips-table th,
-  .trips-table td {
-    padding: 12px 8px;
-  }
-  
-  /* Further reduce column widths for mobile */
-  .trip-number-col { width: 140px; }
-  .date-col { width: 100px; }
-  .vehicle-col { width: 140px; }
-  .driver-col { width: 120px; }
-  .status-col { width: 100px; }
-  .orders-col { width: 60px; }
-  .load-col { width: 80px; }
-  .actions-col { width: 80px; }
-
-  .form-actions,
-  .trip-actions {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .cancel-btn,
-  .submit-btn,
-  .trip-actions .action-btn {
-    width: 100%;
-  }
-
-  .pagination-container {
-    flex-direction: column;
-    gap: 16px;
-    padding: 16px 20px;
-  }
-
-  .actions {
-    flex-direction: column;
-    gap: 4px;
-    min-width: 60px;
-  }
-
-  .action-btn {
-    width: 28px;
-    height: 28px;
-  }
-}
-
-@media (max-width: 480px) {
-  .trips-container {
-    padding: 8px;
-  }
-
-  .page-title {
-    font-size: 20px;
-  }
-
-  .page-subtitle {
-    font-size: 13px;
-  }
-
-  .modal-content {
-    margin: 5px;
-    max-width: calc(100vw - 10px);
-    border-radius: 12px;
-  }
-
-  .trips-table {
-    font-size: 11px;
-    min-width: 700px;
-  }
-
-  .trips-table th,
-  .trips-table td {
-    padding: 8px 6px;
-  }
-
-  .status-badge {
-    font-size: 9px;
-    padding: 4px 8px;
-  }
-
-  .count-badge {
-    min-width: 24px;
-    height: 24px;
-    font-size: 11px;
-  }
-
-  .action-btn {
-    width: 24px;
-    height: 24px;
-  }
-}
-
-/* ============================================
-   HIGH CONTRAST MODE SUPPORT
-   ============================================ */
-@media (prefers-contrast: high) {
-  .trips-header,
-  .filters-section,
-  .trips-table-container,
-  .modal-content,
-  .pagination-container {
-    border: 2px solid #000;
-  }
-
-  .form-group input,
-  .form-group select,
-  .form-group textarea,
-  .search-input,
-  .filter-select,
-  .filter-input {
-    border-width: 2px;
-  }
-
-  .submit-btn,
-  .create-btn {
-    background: #2563eb;
-    border: 2px solid #2563eb;
-  }
-
-  .cancel-btn {
-    border-width: 2px;
-  }
-
-  .pagination-btn {
-    border-width: 2px;
-  }
-
-  .info-section {
-    border-width: 2px;
-  }
-}
-
-/* ============================================
-   DARK MODE SUPPORT (Future Enhancement)
-   ============================================ */
-@media (prefers-color-scheme: dark) {
-  /* Future dark mode implementation */
-}
-
-/* ============================================
-   PRINT STYLES
-   ============================================ */
-@media print {
-  .trips-container {
-    background: white;
-    padding: 0;
-  }
-  
-  .create-btn,
-  .filters-section,
-  .actions,
-  .pagination-container {
-    display: none;
-  }
-  
-  .trips-table-container {
-    box-shadow: none;
-    border: 1px solid #000;
-  }
-  
-  .trips-table {
-    font-size: 12px;
-  }
-}
-
-/* Tooltip styles for action buttons */
-
-.action-btn::before {
-  content: attr(title);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(-4px);
-  background: #1f2937;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 1000;
-}
-
-.action-btn::after {
-  content: '';
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(2px);
-  border: 4px solid transparent;
-  border-top-color: #1f2937;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 1000;
-}
-
-.action-btn:hover::before,
-.action-btn:hover::after {
-  opacity: 1;
-  transform: translateX(-50%) translateY(-8px);
-}
-
-.action-btn:hover::after {
-  transform: translateX(-50%) translateY(-2px);
 }
