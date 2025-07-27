@@ -18,10 +18,11 @@
 /* Table Base Styles */
 .trips-table {
   width: 100%;
-  table-layout: fixed;
+  table-layout: auto; /* Changed to auto for better column alignment */
   border-collapse: collapse;
   font-size: 14px;
   background: white;
+  min-width: 1200px; /* Ensure minimum width */
 }
 
 /* Table Header - Maintains existing design */

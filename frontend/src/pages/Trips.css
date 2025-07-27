@@ -235,6 +235,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   margin-bottom: 24px;
+  width: 100%;
 }
 
 .table-wrapper {
@@ -242,39 +243,52 @@
   overflow-x: auto;
   max-height: none;
   -webkit-overflow-scrolling: touch;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  /* Removed duplicate border-radius and box-shadow */
 }
 
 /* Fix table layout */
 .trips-table {
   width: 100%;
-  table-layout: fixed;
+  table-layout: auto; /* Changed from fixed to auto for better alignment */
   border-collapse: collapse;
   font-size: 14px;
   position: relative;
-  min-width: 1100px; /* Ensure minimum width for all columns */
+  min-width: 1200px; /* Increased minimum width */
 }
 
-/* Table column widths */
-.trip-number-col { width: 180px; }
-.date-col { width: 140px; }
-.vehicle-col { width: 180px; }
-.driver-col { width: 160px; }
-.status-col { width: 140px; }
-.orders-col { width: 80px; }
-.load-col { width: 100px; }
-.actions-col { width: 120px; }
+/* Table column widths - Updated for better distribution */
+.trip-number-col { width: 15%; min-width: 150px; }
+.date-col { width: 12%; min-width: 120px; }
+.vehicle-col { width: 18%; min-width: 180px; }
+.driver-col { width: 15%; min-width: 150px; }
+.status-col { width: 12%; min-width: 120px; }
+.orders-col { width: 8%; min-width: 80px; }
+.load-col { width: 10%; min-width: 100px; }
+.actions-col { width: 10%; min-width: 120px; }
 
 /* Table cell styles */
-.trip-number-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.date-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.vehicle-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.driver-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.status-cell { padding: 16px; text-align: left; vertical-align: middle; }
-.orders-cell { padding: 16px; text-align: center; vertical-align: middle; }
-.load-cell { padding: 16px; text-align: right; vertical-align: middle; }
-.actions-cell { padding: 16px; text-align: center; vertical-align: middle; }
+.trip-number-cell, 
+.date-cell, 
+.vehicle-cell, 
+.driver-cell, 
+.status-cell, 
+.orders-cell, 
+.load-cell, 
+.actions-cell {
+  padding: 16px;
+  vertical-align: middle;
+  height: 56px; /* Fixed height for consistency */
+  box-sizing: border-box;
+}
+
+.trip-number-cell { text-align: left; }
+.date-cell { text-align: left; }
+.vehicle-cell { text-align: left; }
+.driver-cell { text-align: left; }
+.status-cell { text-align: left; }
+.orders-cell { text-align: center; }
+.load-cell { text-align: right; }
+.actions-cell { text-align: center; }
 
 /* Table header styles */
 .trips-table th {
@@ -291,15 +305,15 @@
   box-sizing: border-box;
 }
 
-.trips-table th.orders-col,
-.trips-table th.load-col,
-.trips-table th.actions-col {
-  text-align: center;
-}
-
-.trips-table th.load-col {
-  text-align: right;
-}
+/* Header alignment to match cell alignment */
+.trips-table th.trip-number-col { text-align: left; }
+.trips-table th.date-col { text-align: left; }
+.trips-table th.vehicle-col { text-align: left; }
+.trips-table th.driver-col { text-align: left; }
+.trips-table th.status-col { text-align: left; }
+.trips-table th.orders-col { text-align: center; }
+.trips-table th.load-col { text-align: right; }
+.trips-table th.actions-col { text-align: center; }
 
 /* Table row styles */
 .trip-row {
@@ -351,12 +365,14 @@
   color: #2563eb;
   font-weight: 600;
   transition: color 0.2s ease;
+  white-space: nowrap;
 }
 
 .date-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  white-space: nowrap;
 }
 
 .date-main {
@@ -377,6 +393,7 @@
   gap: 8px;
   font-weight: 500;
   height: 100%;
+  max-width: 100%;
 }
 
 .vehicle-icon,
@@ -388,9 +405,10 @@
 .vehicle-name,
 .driver-name {
   color: #374151;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Removed text truncation to show full names */
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: 1.4;
 }
 
 .orders-count {
@@ -422,11 +440,11 @@
 
 .actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
   justify-content: center;
-  min-width: 120px;
   white-space: nowrap;
+  flex-wrap: nowrap;
 }
 
 .trips-table thead {
@@ -1395,14 +1413,14 @@
   }
   
   /* Adjust column widths for smaller screens */
-  .trip-number-col { width: 160px; }
-  .date-col { width: 120px; }
-  .vehicle-col { width: 160px; }
-  .driver-col { width: 140px; }
-  .status-col { width: 120px; }
-  .orders-col { width: 70px; }
-  .load-col { width: 90px; }
-  .actions-col { width: 100px; }
+  .trip-number-col { width: 14%; min-width: 140px; }
+  .date-col { width: 11%; min-width: 110px; }
+  .vehicle-col { width: 17%; min-width: 160px; }
+  .driver-col { width: 14%; min-width: 140px; }
+  .status-col { width: 11%; min-width: 110px; }
+  .orders-col { width: 8%; min-width: 70px; }
+  .load-col { width: 10%; min-width: 90px; }
+  .actions-col { width: 15%; min-width: 100px; }
 }
 
 @media (max-width: 768px) {
@@ -1487,14 +1505,14 @@
   }
   
   /* Further reduce column widths for mobile */
-  .trip-number-col { width: 140px; }
-  .date-col { width: 100px; }
-  .vehicle-col { width: 140px; }
-  .driver-col { width: 120px; }
-  .status-col { width: 100px; }
-  .orders-col { width: 60px; }
-  .load-col { width: 80px; }
-  .actions-col { width: 80px; }
+  .trip-number-col { width: 14%; min-width: 120px; }
+  .date-col { width: 10%; min-width: 90px; }
+  .vehicle-col { width: 16%; min-width: 120px; }
+  .driver-col { width: 14%; min-width: 110px; }
+  .status-col { width: 11%; min-width: 90px; }
+  .orders-col { width: 8%; min-width: 60px; }
+  .load-col { width: 10%; min-width: 80px; }
+  .actions-col { width: 17%; min-width: 80px; }
 
   .form-actions,
   .trip-actions {
