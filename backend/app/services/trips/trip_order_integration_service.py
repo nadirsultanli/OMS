@@ -250,6 +250,9 @@ class TripOrderIntegrationService:
                     try:
                         order = await self.order_repository.get_order_by_id(str(stop.order_id))
                         if order:
+                            # Calculate order weight dynamically
+                            order_weight = await self._calculate_order_weight(order)
+                            
                             order_summary = {
                                 "stop_no": stop.stop_no,
                                 "stop_id": str(stop.id),
@@ -258,7 +261,7 @@ class TripOrderIntegrationService:
                                 "customer_id": str(order.customer_id),
                                 "order_status": order.order_status.value,
                                 "total_amount": float(order.total_amount),
-                                "total_weight_kg": float(order.total_weight_kg) if order.total_weight_kg else 0,
+                                "total_weight_kg": float(order_weight),
                                 "line_count": len(order.order_lines),
                                 "order_lines": [
                                     {
@@ -272,7 +275,7 @@ class TripOrderIntegrationService:
                                 ]
                             }
                             order_summaries.append(order_summary)
-                            total_weight += order.total_weight_kg or Decimal('0')
+                            total_weight += order_weight
                             total_value += order.total_amount
                     except Exception as e:
                         default_logger.warning(f"Could not load order for stop {stop.id}: {str(e)}")
@@ -443,6 +446,52 @@ class TripOrderIntegrationService:
         except Exception as e:
             default_logger.warning(f"Failed to update trip load calculation: {str(e)}")
     
+    async def _calculate_order_weight(self, order: Order) -> Decimal:
+        """Calculate total weight for order based on order lines and variants"""
+        if not order.order_lines:
+            return Decimal('0')
+        
+        total_weight = Decimal('0')
+        
+        # Get unique variant IDs from order lines
+        variant_ids = {line.variant_id for line in order.order_lines if line.variant_id}
+        
+        # Fetch variant weights if we have variant IDs
+        variant_weights = {}
+        if variant_ids:
+            try:
+                # Import variant repository
+                from app.infrastucture.database.repositories.variant_repository import SQLAlchemyVariantRepository
+                from app.infrastucture.database.connection import direct_db_connection
+                
+                async for session in direct_db_connection.get_session():
+                    variant_repo = SQLAlchemyVariantRepository(session)
+                    for variant_id in variant_ids:
+                        try:
+                            variant = await variant_repo.get_by_id(variant_id)
+                            if variant and variant.unit_weight_kg:
+                                variant_weights[variant_id] = variant.unit_weight_kg
+                        except Exception as e:
+                            default_logger.warning(f"Failed to fetch variant {variant_id}: {str(e)}")
+                    break
+            except Exception as e:
+                default_logger.warning(f"Failed to fetch variant weights: {str(e)}")
+        
+        # Calculate weight for each order line
+        for line in order.order_lines:
+            if line.variant_id and line.variant_id in variant_weights:
+                # Use variant weight
+                unit_weight = variant_weights[line.variant_id]
+                total_weight += line.qty_ordered * unit_weight
+            elif line.gas_type:
+                # For gas orders without variant, use default LPG cylinder weight
+                # This is a fallback for orders that don't have proper variant assignment
+                default_weight = Decimal('27.0')  # Default 15kg LPG cylinder weight
+                total_weight += line.qty_ordered * default_weight
+                default_logger.info(f"Using default weight {default_weight}kg for gas order line {line.id}")
+        
+        return total_weight
+
     async def _check_stock_availability_for_order(
         self,
         tenant_id: UUID,
