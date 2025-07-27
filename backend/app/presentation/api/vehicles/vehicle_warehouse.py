@@ -58,7 +58,8 @@ async def load_vehicle_as_warehouse(
             trip_id=request.trip_id,
             source_warehouse_id=request.source_warehouse_id,
             inventory_items=request.inventory_items,
-            loaded_by=current_user.id
+            loaded_by=current_user.id,
+            user=current_user
         )
         
         return LoadVehicleResponse(
@@ -129,7 +130,7 @@ async def get_vehicle_inventory_as_warehouse(
     Returns inventory with TRUCK_STOCK status for the vehicle
     """
     try:
-        inventory = await vehicle_warehouse_service.get_vehicle_inventory_as_warehouse(
+        vehicle_data = await vehicle_warehouse_service.get_vehicle_inventory_as_warehouse(
             vehicle_id=vehicle_id,
             trip_id=trip_id
         )
@@ -137,8 +138,10 @@ async def get_vehicle_inventory_as_warehouse(
         return VehicleInventoryResponse(
             vehicle_id=str(vehicle_id),
             trip_id=str(trip_id) if trip_id else None,
-            inventory=inventory,
-            total_items=len(inventory)
+            inventory=vehicle_data.get("inventory", []),
+            truck_inventory=vehicle_data.get("truck_inventory", []),
+            vehicle=vehicle_data.get("vehicle", {}),
+            total_items=len(vehicle_data.get("inventory", []))
         )
         
     except Exception as e:

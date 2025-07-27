@@ -243,7 +243,18 @@ const Vehicles = () => {
     try {
       const result = await vehicleService.getVehicleInventory(vehicle.id);
       if (result.success) {
-        setSelectedVehicle({ ...vehicle, inventory: result.data });
+        // The backend returns { inventory: [...], truck_inventory: [...], vehicle: {...} }
+        // We need to merge the inventory data with the vehicle object
+        const inventoryData = result.data;
+        const updatedVehicle = {
+          ...vehicle,
+          inventory: inventoryData.inventory || [],
+          truck_inventory: inventoryData.truck_inventory || [],
+          current_load_kg: inventoryData.vehicle?.current_load_kg || 0,
+          capacity_kg: inventoryData.vehicle?.capacity_kg || vehicle.capacity_kg,
+          capacity_m3: inventoryData.vehicle?.capacity_m3 || vehicle.capacity_m3
+        };
+        setSelectedVehicle(updatedVehicle);
         setShowInventoryModal(true);
       } else {
         setMessage({ type: 'error', text: result.error });
@@ -938,7 +949,18 @@ const VehicleInventoryModal = ({ vehicle, onClose }) => {
                 <Weight size={24} />
               </div>
               <div className="summary-info">
-                <div className="summary-value">{vehicle.current_load_kg || 0} kg</div>
+                <div className="summary-value">
+                  {(() => {
+                    // Use current_load_kg from backend if available, otherwise calculate from inventory
+                    if (vehicle.current_load_kg && vehicle.current_load_kg > 0) {
+                      return `${vehicle.current_load_kg.toFixed(1)} kg`;
+                    }
+                    const totalWeight = (vehicle.inventory || []).reduce((sum, item) => {
+                      return sum + ((item.quantity || 0) * (item.unit_weight_kg || 0));
+                    }, 0);
+                    return totalWeight > 0 ? `${totalWeight.toFixed(1)} kg` : '0 kg';
+                  })()}
+                </div>
                 <div className="summary-label">Current Load</div>
               </div>
             </div>
@@ -959,7 +981,19 @@ const VehicleInventoryModal = ({ vehicle, onClose }) => {
               </div>
               <div className="summary-info">
                 <div className="summary-value">
-                  {Math.round(((vehicle.current_load_kg || 0) / (vehicle.capacity_kg || 1)) * 100)}%
+                  {(() => {
+                    // Use current_load_kg from backend if available, otherwise calculate from inventory
+                    let currentLoad = 0;
+                    if (vehicle.current_load_kg && vehicle.current_load_kg > 0) {
+                      currentLoad = vehicle.current_load_kg;
+                    } else {
+                      currentLoad = (vehicle.inventory || []).reduce((sum, item) => {
+                        return sum + ((item.quantity || 0) * (item.unit_weight_kg || 0));
+                      }, 0);
+                    }
+                    const capacity = vehicle.capacity_kg || 1;
+                    return Math.round((currentLoad / capacity) * 100);
+                  })()}%
                 </div>
                 <div className="summary-label">Utilization</div>
               </div>
@@ -968,25 +1002,34 @@ const VehicleInventoryModal = ({ vehicle, onClose }) => {
 
           <div className="inventory-details">
             <h3>Inventory Items</h3>
-            {vehicle.inventory && vehicle.inventory.length > 0 ? (
+            {(vehicle.inventory && vehicle.inventory.length > 0) || (vehicle.truck_inventory && vehicle.truck_inventory.length > 0) ? (
               <table className="inventory-table">
                 <thead>
                   <tr>
-                    <th>Product</th>
+                    <th>Product ID</th>
+                    <th>Variant ID</th>
                     <th>Quantity</th>
-                    <th>Weight (kg)</th>
+                    <th>Unit Weight</th>
+                    <th>Total Weight</th>
+                    <th>Unit Cost</th>
+                    <th>Total Cost</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {vehicle.inventory.map((item, index) => (
+                  {/* Show truck inventory if available, otherwise show stock levels */}
+                  {(vehicle.truck_inventory && vehicle.truck_inventory.length > 0 ? vehicle.truck_inventory : vehicle.inventory).map((item, index) => (
                     <tr key={index}>
-                      <td>{item.product_name || item.sku}</td>
-                      <td>{item.quantity}</td>
-                      <td>{item.total_weight}</td>
+                      <td>{item.product_id}</td>
+                      <td>{item.variant_id}</td>
+                      <td>{item.quantity || item.loaded_qty || 0}</td>
+                      <td>{(item.unit_weight_kg || 0).toFixed(1)} kg</td>
+                      <td>{(item.total_weight_kg || 0).toFixed(1)} kg</td>
+                      <td>${(item.unit_cost || 0).toFixed(2)}</td>
+                      <td>${(item.total_cost || 0).toFixed(2)}</td>
                       <td>
                         <span className="inventory-status">
-                          {item.status || 'On Truck'}
+                          {item.stock_status || 'On Truck'}
                         </span>
                       </td>
                     </tr>

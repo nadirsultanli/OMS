@@ -106,17 +106,16 @@ const LoadVehicleModal = ({
   };
 
   const handleSetupComplete = () => {
-    if (selectedVehicle && sourceWarehouse) {
-      // Create a dummy trip if none selected
-      if (!selectedTrip) {
-        const dummyTrip = {
-          id: `dummy-trip-${Date.now()}`,
-          trip_no: `AUTO-${Date.now()}`,
-          status: 'planned'
-        };
-        setSelectedTrip(dummyTrip);
-      }
+    if (selectedVehicle && selectedTrip && sourceWarehouse) {
       setStep(2);
+    } else {
+      // Show error message for missing selections
+      const missingItems = [];
+      if (!selectedVehicle) missingItems.push('vehicle');
+      if (!selectedTrip) missingItems.push('trip');
+      if (!sourceWarehouse) missingItems.push('source warehouse');
+      
+      console.error(`Missing required selections: ${missingItems.join(', ')}`);
     }
   };
 
@@ -360,7 +359,7 @@ const LoadVehicleModal = ({
                 <button 
                   className="btn btn-primary"
                   onClick={handleSetupComplete}
-                  disabled={!selectedVehicle || !sourceWarehouse}
+                  disabled={!selectedVehicle || !selectedTrip || !sourceWarehouse}
                 >
                   <span className="btn-icon">→</span>
                   Next: Load Vehicle

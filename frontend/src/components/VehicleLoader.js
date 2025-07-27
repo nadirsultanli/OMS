@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import vehicleWarehouseService from '../services/vehicleWarehouseService';
+import stockReservationService from '../services/stockReservationService';
 import WarehouseInventorySelector from './WarehouseInventorySelector';
 import './VehicleLoader.css';
 
@@ -17,6 +18,9 @@ const VehicleLoader = ({
   const [validating, setValidating] = useState(false);
   const [message, setMessage] = useState('');
   const [showInventorySelector, setShowInventorySelector] = useState(false);
+  const [reservationStatus, setReservationStatus] = useState('none'); // 'none', 'checking', 'reserved', 'confirmed'
+  const [reservationDetails, setReservationDetails] = useState(null);
+  const [availabilityCheck, setAvailabilityCheck] = useState(null);
 
   // Add new inventory item
   const addInventoryItem = () => {
@@ -80,12 +84,86 @@ const VehicleLoader = ({
     }
   };
 
-  // Validate capacity whenever inventory changes
+  // Validate capacity and check availability whenever inventory changes
   useEffect(() => {
     if (inventoryItems.length > 0 && vehicle) {
       validateCapacity();
+      checkStockAvailability();
     }
   }, [inventoryItems, vehicle]);
+
+  // Check stock availability and create reservation
+  const checkStockAvailability = async () => {
+    if (!sourceWarehouse || inventoryItems.length === 0) return;
+
+    setReservationStatus('checking');
+    try {
+      const validItems = inventoryItems.filter(item => item.variant_id && item.quantity > 0);
+      
+      if (validItems.length === 0) {
+        setReservationStatus('none');
+        return;
+      }
+
+      const availabilityResult = await stockReservationService.bulkCheckAvailability(
+        sourceWarehouse.id,
+        validItems
+      );
+
+      if (availabilityResult.success) {
+        setAvailabilityCheck(availabilityResult.data);
+        
+        // Check if all items are available
+        const allAvailable = availabilityResult.data.items?.every(item => item.available);
+        
+        if (allAvailable) {
+          // Automatically create reservation
+          await createReservation(validItems);
+        } else {
+          setReservationStatus('none');
+          const unavailableItems = availabilityResult.data.items?.filter(item => !item.available) || [];
+          setMessage(`⚠️ Some items are not available: ${unavailableItems.map(item => 
+            `${item.variant_id} (need: ${item.requested}, available: ${item.available_qty})`
+          ).join(', ')}`);
+        }
+      } else {
+        setReservationStatus('none');
+        console.error('Failed to check availability:', availabilityResult.error);
+      }
+    } catch (error) {
+      setReservationStatus('none');
+      console.error('Error checking availability:', error);
+    }
+  };
+
+  // Create stock reservation
+  const createReservation = async (items) => {
+    if (!sourceWarehouse || !vehicle) return;
+
+    try {
+      const reservationRequest = stockReservationService.createReservationRequest(
+        sourceWarehouse.id,
+        vehicle.id,
+        tripId,
+        items,
+        24 // 24 hour expiry
+      );
+
+      const reservationResult = await stockReservationService.reserveStockForVehicle(reservationRequest);
+
+      if (reservationResult.success) {
+        setReservationStatus('reserved');
+        setReservationDetails(reservationResult.data);
+        setMessage('✅ Stock reserved successfully for vehicle loading');
+      } else {
+        setReservationStatus('none');
+        setMessage(`❌ Failed to reserve stock: ${reservationResult.error}`);
+      }
+    } catch (error) {
+      setReservationStatus('none');
+      setMessage(`❌ Error creating reservation: ${error.message}`);
+    }
+  };
 
   // Validate vehicle capacity
   const validateCapacity = async () => {
@@ -141,10 +219,33 @@ const VehicleLoader = ({
       return;
     }
 
+    // Check if we have a reservation
+    if (reservationStatus !== 'reserved') {
+      setMessage('⚠️ Stock must be reserved before loading. Please wait for reservation to complete.');
+      return;
+    }
+
     setLoading(true);
-    setMessage('');
+    setMessage('Confirming reservation and loading vehicle...');
 
     try {
+      // First confirm the reservation
+      if (reservationDetails?.id) {
+        const confirmResult = await stockReservationService.confirmReservation(
+          reservationDetails.id,
+          validItems
+        );
+
+        if (!confirmResult.success) {
+          setMessage(`❌ Failed to confirm reservation: ${confirmResult.error}`);
+          setLoading(false);
+          return;
+        }
+
+        setReservationStatus('confirmed');
+        setMessage('✅ Reservation confirmed, proceeding with vehicle loading...');
+      }
+
       const loadRequest = vehicleWarehouseService.createLoadRequest(
         tripId,
         sourceWarehouse.id,
@@ -165,6 +266,9 @@ const VehicleLoader = ({
         // Clear form
         setInventoryItems([]);
         setCapacityValidation(null);
+        setReservationStatus('none');
+        setReservationDetails(null);
+        setAvailabilityCheck(null);
       } else {
         const errorMessage = typeof result.error === 'string' ? result.error : 
                          (typeof result.error === 'object' ? JSON.stringify(result.error) : 'Failed to load vehicle');
@@ -199,6 +303,15 @@ const VehicleLoader = ({
         <div className="info-item">
           <label>Source Warehouse:</label>
           <span>{sourceWarehouse?.name || sourceWarehouse?.id}</span>
+        </div>
+        <div className="info-item">
+          <label>Stock Status:</label>
+          <span className={`reservation-status ${reservationStatus}`}>
+            {reservationStatus === 'none' && '⭕ No Reservation'}
+            {reservationStatus === 'checking' && '🔄 Checking Availability...'}
+            {reservationStatus === 'reserved' && '✅ Stock Reserved'}
+            {reservationStatus === 'confirmed' && '🚛 Confirmed & Loading'}
+          </span>
         </div>
       </div>
 
@@ -245,6 +358,49 @@ const VehicleLoader = ({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Stock Availability Summary */}
+      {availabilityCheck && (
+        <div className="availability-summary">
+          <h4>📊 Stock Availability Check</h4>
+          <div className="availability-items">
+            {availabilityCheck.items?.map((item, index) => (
+              <div key={index} className={`availability-item ${item.available ? 'available' : 'unavailable'}`}>
+                <span className="variant-id">{item.variant_id}</span>
+                <span className="quantity-info">
+                  Requested: {item.requested} | Available: {item.available_qty} | 
+                  <span className={item.available ? 'status-ok' : 'status-error'}>
+                    {item.available ? '✅ OK' : '❌ Insufficient'}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reservation Details */}
+      {reservationDetails && (
+        <div className="reservation-details">
+          <h4>🔒 Reservation Details</h4>
+          <div className="reservation-info">
+            <div className="info-item">
+              <label>Reservation ID:</label>
+              <span>{reservationDetails.id}</span>
+            </div>
+            <div className="info-item">
+              <label>Status:</label>
+              <span className={`status ${reservationDetails.status?.toLowerCase()}`}>
+                {reservationDetails.status}
+              </span>
+            </div>
+            <div className="info-item">
+              <label>Expires:</label>
+              <span>{reservationDetails.expires_at ? new Date(reservationDetails.expires_at).toLocaleString() : 'N/A'}</span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -419,11 +575,34 @@ const VehicleLoader = ({
       <div className="actions">
         <button
           onClick={handleLoadVehicle}
-          disabled={loading || validating || (capacityValidation && !capacityValidation.is_valid)}
-          className="btn btn-primary btn-large"
+          disabled={
+            loading || 
+            validating || 
+            reservationStatus === 'checking' ||
+            reservationStatus === 'none' ||
+            (capacityValidation && !capacityValidation.is_valid)
+          }
+          className={`btn btn-primary btn-large ${reservationStatus === 'reserved' ? 'ready-to-load' : ''}`}
         >
-          {loading ? 'Loading Vehicle...' : validating ? 'Validating...' : 'Load Vehicle'}
+          {loading && '🚛 Loading Vehicle...'}
+          {validating && '⚖️ Validating Capacity...'}
+          {reservationStatus === 'checking' && '🔄 Checking Stock...'}
+          {reservationStatus === 'none' && '⏳ Add Items First'}
+          {reservationStatus === 'reserved' && !loading && !validating && '🚛 Load Vehicle'}
+          {reservationStatus === 'confirmed' && '✅ Loading Complete'}
         </button>
+        
+        {reservationStatus === 'reserved' && (
+          <p className="load-instructions">
+            ✅ Stock has been reserved! You can now proceed with loading the vehicle.
+          </p>
+        )}
+        
+        {reservationStatus === 'none' && inventoryItems.length > 0 && (
+          <p className="load-instructions">
+            ⚠️ Please wait for stock availability check and reservation to complete.
+          </p>
+        )}
       </div>
 
       {/* Warehouse Inventory Selector Modal */}

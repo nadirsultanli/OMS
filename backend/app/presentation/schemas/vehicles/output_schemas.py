@@ -51,7 +51,9 @@ class VehicleInventoryResponse(BaseModel):
     """Response for vehicle inventory query"""
     vehicle_id: str = Field(..., description="Vehicle ID")
     trip_id: Optional[str] = Field(None, description="Trip ID if specified")
-    inventory: List[Dict[str, Any]] = Field(..., description="Current inventory on vehicle")
+    inventory: List[Dict[str, Any]] = Field(..., description="Current inventory on vehicle (stock levels)")
+    truck_inventory: Optional[List[Dict[str, Any]]] = Field([], description="Truck inventory records")
+    vehicle: Optional[Dict[str, Any]] = Field({}, description="Vehicle details")
     total_items: int = Field(..., description="Total number of inventory items")
 
 class VehicleCapacityValidationResponse(BaseModel):
