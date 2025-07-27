@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Eye, Edit2, Check, X } from 'lucide-react';
 import stockService from '../services/stockService';
 import warehouseService from '../services/warehouseService';
+import vehicleService from '../services/vehicleService';
+import authService from '../services/authService';
 import CreateStockDocModal from '../components/CreateStockDocModal';
 import StockDocDetailsModal from '../components/StockDocDetailsModal';
 import EditStockDocModal from '../components/EditStockDocModal';
@@ -37,6 +39,7 @@ const STOCK_DOC_STATUS = [
 const StockDocuments = () => {
   const [stockDocs, setStockDocs] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -63,14 +66,47 @@ const StockDocuments = () => {
       try {
         setLoading(true);
         
-        const [warehousesResponse, stockDocsResponse] = await Promise.all([
+        const tenantId = authService.getCurrentTenantId();
+        
+        const [warehousesResponse, stockDocsResponse, vehiclesResponse] = await Promise.all([
           warehouseService.getWarehouses(),
-          stockService.getStockDocuments(filters)
+          stockService.getStockDocuments(filters),
+          vehicleService.getVehicles(tenantId, { limit: 100 })
         ]);
         
-        setWarehouses(warehousesResponse.warehouses || []);
+        console.log('Warehouses response:', warehousesResponse); // Debug log
+        console.log('Stock docs response:', stockDocsResponse); // Debug log
+        console.log('Vehicles response:', vehiclesResponse); // Debug log
+        
+        // Handle different warehouse response formats
+        let warehousesData = [];
+        if (warehousesResponse.success && warehousesResponse.data?.results) {
+          warehousesData = warehousesResponse.data.results;
+        } else if (warehousesResponse.success && warehousesResponse.data?.warehouses) {
+          warehousesData = warehousesResponse.data.warehouses;
+        } else if (warehousesResponse.warehouses) {
+          warehousesData = warehousesResponse.warehouses;
+        } else if (Array.isArray(warehousesResponse.data)) {
+          warehousesData = warehousesResponse.data;
+        } else if (Array.isArray(warehousesResponse)) {
+          warehousesData = warehousesResponse;
+        }
+        
+        setWarehouses(warehousesData);
         setStockDocs(stockDocsResponse.stock_docs || []);
         setTotalCount(stockDocsResponse.total_count || stockDocsResponse.stock_docs?.length || 0);
+        setVehicles(vehiclesResponse.data?.results || vehiclesResponse.vehicles || []);
+        
+        // Debug: Check first stock document structure
+        if (stockDocsResponse.stock_docs && stockDocsResponse.stock_docs.length > 0) {
+          console.log('First stock doc:', stockDocsResponse.stock_docs[0]);
+          console.log('Warehouse IDs in first doc:', {
+            source_wh_id: stockDocsResponse.stock_docs[0].source_wh_id,
+            dest_wh_id: stockDocsResponse.stock_docs[0].dest_wh_id,
+            from_warehouse_id: stockDocsResponse.stock_docs[0].from_warehouse_id,
+            to_warehouse_id: stockDocsResponse.stock_docs[0].to_warehouse_id
+          });
+        }
       } catch (err) {
         setError('Failed to load initial data: ' + err.message);
       } finally {
@@ -80,6 +116,15 @@ const StockDocuments = () => {
 
     loadInitialData();
   }, []);
+
+  // Re-render when warehouses are loaded to update warehouse names
+  useEffect(() => {
+    if (warehouses.length > 0 && stockDocs.length > 0) {
+      console.log('Warehouses loaded, triggering re-render');
+      // Force a re-render by updating the stock docs state
+      setStockDocs([...stockDocs]);
+    }
+  }, [warehouses]);
 
   const loadStockDocuments = useCallback(async (searchFilters = filters) => {
     try {
@@ -151,21 +196,49 @@ const StockDocuments = () => {
 
   const getWarehouseName = (warehouseId) => {
     if (!warehouseId) return '-';
-    const warehouse = warehouses.find(w => w.id === warehouseId);
+    console.log('Looking for warehouse ID:', warehouseId); // Debug log
+    console.log('Available warehouses:', warehouses); // Debug log
+    
+    // Try exact match first
+    let warehouse = warehouses.find(w => w.id === warehouseId);
+    
+    // If not found, try string comparison
+    if (!warehouse) {
+      warehouse = warehouses.find(w => String(w.id) === String(warehouseId));
+    }
+    
+    console.log('Found warehouse:', warehouse); // Debug log
     return warehouse ? `${warehouse.code} - ${warehouse.name}` : 'Loading...';
   };
 
   const getToEntityName = (doc) => {
     // For truck transfers, show truck information
     if (doc.doc_type === 'ISS_LOAD' || doc.doc_type === 'TRF_TRUCK' || doc.doc_type === 'LOAD_MOB') {
+      // First check if there's a direct vehicle_id on the document
       if (doc.vehicle_id) {
         const vehicleInfo = doc.vehicle_plate || doc.vehicle_id;
         return `Truck: ${vehicleInfo}`;
       }
+      
+      // Try to extract vehicle ID from notes
+      if (doc.notes) {
+        const vehicleMatch = doc.notes.match(/(?:vehicle|truck|load\s+vehicle)\s+([a-f0-9-]+)/i);
+        if (vehicleMatch) {
+          const vehicleId = vehicleMatch[1];
+          // Try to find the vehicle in our loaded vehicles
+          const vehicle = vehicles.find(v => v.id === vehicleId);
+          if (vehicle) {
+            return `Truck: ${vehicle.plate_number || vehicle.plate}`;
+          }
+          // If we have the ID but no vehicle data, show loading
+          return 'Truck: Loading...';
+        }
+      }
+      
       return 'Truck (Not specified)';
     }
     // For warehouse transfers and other types, show warehouse
-    const warehouseName = getWarehouseName(doc.to_warehouse_id);
+    const warehouseName = getWarehouseName(doc.dest_wh_id);
     return warehouseName;
   };
 
@@ -423,7 +496,7 @@ const StockDocuments = () => {
                       {getStatusLabel(doc.doc_status || doc.status)}
                     </span>
                   </td>
-                  <td>{getWarehouseName(doc.from_warehouse_id)}</td>
+                  <td>{getWarehouseName(doc.source_wh_id)}</td>
                   <td title={getToEntityName(doc)}>{getToEntityName(doc)}</td>
                   <td>
                     {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'N/A'}
