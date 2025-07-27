@@ -657,6 +657,50 @@ class OrderBusinessService:
         # Save to repository
         return await self.order_repository.update_order(str(order.id), order)
 
+    async def update_order_status_with_business_rules(
+        self,
+        user: User,
+        order: Order,
+        new_status: OrderStatus
+    ) -> bool:
+        """Update order status with business logic validation"""
+        # Check permissions based on the new status
+        if not self._can_update_to_status(user, order, new_status):
+            raise OrderPermissionError(f"User role {user.role} cannot update order to {new_status.value}")
+        
+        # Validate status transition
+        if not self.validate_status_transition(order.order_status, new_status):
+            raise OrderStatusTransitionError(
+                order.order_status.value, 
+                new_status.value, 
+                str(order.id)
+            )
+        
+        # Update status
+        order.update_status(new_status, user.id)
+        
+        # Save to repository
+        updated_order = await self.order_repository.update_order(str(order.id), order)
+        
+        return updated_order is not None
+
+    def _can_update_to_status(self, user: User, order: Order, new_status: OrderStatus) -> bool:
+        """Check if user can update order to specific status"""
+        # Tenant admin can update to any valid status
+        if user.role == UserRoleType.TENANT_ADMIN:
+            return True
+        
+        # Role-based permissions for specific status transitions
+        role_permissions = {
+            UserRoleType.SALES_REP: [OrderStatus.SUBMITTED, OrderStatus.CANCELLED],
+            UserRoleType.ACCOUNTS: [OrderStatus.APPROVED, OrderStatus.CANCELLED],
+            UserRoleType.DISPATCHER: [OrderStatus.ALLOCATED, OrderStatus.LOADED, OrderStatus.IN_TRANSIT],
+            UserRoleType.DRIVER: [OrderStatus.DELIVERED, OrderStatus.CLOSED]
+        }
+        
+        allowed_statuses = role_permissions.get(user.role, [])
+        return new_status in allowed_statuses
+
     async def set_delivery_details(
         self,
         user: User,

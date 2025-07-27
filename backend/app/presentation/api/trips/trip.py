@@ -618,6 +618,55 @@ async def complete_trip(
         default_logger.error(f"Unexpected error completing trip: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@router.patch("/{trip_id}/status", status_code=200)
+async def update_trip_status(
+    trip_id: UUID = Path(..., description="Trip ID"),
+    request: dict = ...,  # Should contain new_status
+    current_user: User = Depends(get_current_user),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """Update trip status with business logic validation"""
+    try:
+        # Get existing trip to check tenant ownership
+        existing_trip = await trip_service.get_trip_by_id(trip_id)
+        if existing_trip.tenant_id != current_user.tenant_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Extract new status from request
+        new_status = request.get("new_status")
+        if not new_status:
+            raise HTTPException(status_code=400, detail="new_status is required")
+        
+        # Update trip status
+        result = await trip_service.update_trip_status(
+            user=current_user,
+            trip_id=trip_id,
+            new_status=new_status,
+            updated_by=current_user.id
+        )
+        
+        if result.get("success"):
+            return {
+                "success": True,
+                "trip_id": str(trip_id),
+                "previous_status": result.get("previous_status"),
+                "new_status": result.get("new_status"),
+                "message": f"Trip status updated to {new_status}",
+                "updated_at": result.get("updated_at")
+            }
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to update trip status"))
+        
+    except TripNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except TripStatusTransitionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except TripValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        default_logger.error(f"Unexpected error updating trip status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 # Mobile Driver endpoints
 
 @router.get("/{trip_id}/mobile-summary", status_code=200)

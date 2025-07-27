@@ -12,11 +12,15 @@ import {
   MapPin,
   Weight,
   Box,
-  TrendingUp
+  TrendingUp,
+  Upload,
+  Download
 } from 'lucide-react';
 import vehicleService from '../services/vehicleService';
 import warehouseService from '../services/warehouseService';
+import tripService from '../services/tripService';
 import authService from '../services/authService';
+import VehicleWarehouseManager from '../components/VehicleWarehouseManager';
 import './Vehicles.css';
 
 const Vehicles = () => {
@@ -27,7 +31,11 @@ const Vehicles = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [showWarehouseManager, setShowWarehouseManager] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [selectedWarehouse, setSelectedWarehouse] = useState(null);
+  const [trips, setTrips] = useState([]);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
   
@@ -61,6 +69,7 @@ const Vehicles = () => {
   useEffect(() => {
     fetchVehicles();
     fetchWarehouses();
+    fetchTrips();
   }, [pagination.currentPage]);
 
   useEffect(() => {
@@ -69,6 +78,7 @@ const Vehicles = () => {
 
   const fetchVehicles = async () => {
     setLoading(true);
+    setMessage({ type: 'info', text: 'Loading vehicles and inventory data...' });
     try {
       const result = await vehicleService.getVehicles(tenantId, {
         limit: pagination.limit,
@@ -76,7 +86,28 @@ const Vehicles = () => {
       });
 
       if (result.success) {
-        setVehicles(result.data.results || []);
+        const vehiclesData = result.data.results || [];
+        
+        // Fetch current load data for each vehicle
+        const vehiclesWithLoad = await Promise.all(
+          vehiclesData.map(async (vehicle) => {
+            try {
+              const inventoryResult = await vehicleService.getVehicleInventory(vehicle.id);
+              if (inventoryResult.success && inventoryResult.data) {
+                return {
+                  ...vehicle,
+                  current_load_kg: inventoryResult.data.vehicle?.current_load_kg || 0,
+                  current_volume_m3: inventoryResult.data.vehicle?.current_volume_m3 || 0
+                };
+              }
+            } catch (error) {
+              console.warn(`Failed to fetch inventory for vehicle ${vehicle.id}:`, error);
+            }
+            return vehicle;
+          })
+        );
+        
+        setVehicles(vehiclesWithLoad);
         setPagination(prev => ({
           ...prev,
           total: result.data.count || 0,
@@ -89,6 +120,7 @@ const Vehicles = () => {
       setMessage({ type: 'error', text: 'Failed to fetch vehicles' });
     } finally {
       setLoading(false);
+      setMessage(null);
     }
   };
 
@@ -104,6 +136,21 @@ const Vehicles = () => {
     } catch (error) {
       console.error('Failed to fetch warehouses:', error);
       setWarehouses([]);
+    }
+  };
+
+  const fetchTrips = async () => {
+    try {
+      const result = await tripService.getTrips({ status: 'planned', limit: 50 });
+      if (result && result.success && result.data) {
+        setTrips(result.data.results || []);
+      } else {
+        console.error('Failed to fetch trips:', result?.error || 'Unknown error');
+        setTrips([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch trips:', error);
+      setTrips([]);
     }
   };
 
@@ -264,6 +311,31 @@ const Vehicles = () => {
     }
   };
 
+  const handleLoadVehicle = async (vehicle) => {
+    setSelectedVehicle(vehicle);
+    setShowWarehouseManager(true);
+  };
+
+  const handleOperationComplete = (operationType, result) => {
+    setMessage({ 
+      type: 'success', 
+      text: `Vehicle ${operationType} operation completed successfully` 
+    });
+    // Refresh vehicles to show updated inventory
+    fetchVehicles();
+  };
+
+  const handleWarehouseError = (error) => {
+    setMessage({ type: 'error', text: error });
+  };
+
+  const handleCloseWarehouseManager = () => {
+    setShowWarehouseManager(false);
+    setSelectedVehicle(null);
+    setSelectedTrip(null);
+    setSelectedWarehouse(null);
+  };
+
   const getStatusBadge = (active) => {
     const status = vehicleStatuses.find(s => s.value === active);
     return (
@@ -287,8 +359,12 @@ const Vehicles = () => {
   };
 
   const getCapacityUtilization = (vehicle) => {
-    if (!vehicle.current_load_kg || !vehicle.capacity_kg) return 0;
-    return Math.round((vehicle.current_load_kg / vehicle.capacity_kg) * 100);
+    // If we have current_load_kg from inventory data, use it
+    if (vehicle.current_load_kg && vehicle.capacity_kg) {
+      return Math.round((vehicle.current_load_kg / vehicle.capacity_kg) * 100);
+    }
+    // Otherwise, return 0 to indicate no inventory data available
+    return 0;
   };
 
   const getCapacityColor = (utilization) => {
@@ -432,7 +508,20 @@ const Vehicles = () => {
                     <td>
                       <div className="load-info">
                         <div className="load-amount">
-                          {vehicle.current_load_kg || 0} kg
+                          {vehicle.current_load_kg > 0 ? (
+                            <>
+                              <div>{vehicle.current_load_kg.toFixed(1)} kg</div>
+                              {vehicle.current_volume_m3 > 0 && (
+                                <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                  {vehicle.current_volume_m3.toFixed(2)} m³
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '12px' }}>
+                              Empty
+                            </span>
+                          )}
                         </div>
                         <div className="capacity-bar">
                           <div 
@@ -444,7 +533,13 @@ const Vehicles = () => {
                           ></div>
                         </div>
                         <div className="utilization-text">
-                          {utilization}% utilized
+                          {vehicle.current_load_kg > 0 ? (
+                            `${utilization}% utilized`
+                          ) : (
+                            <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '10px' }}>
+                              No load
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -462,6 +557,14 @@ const Vehicles = () => {
                         title="View Inventory"
                       >
                         <Package size={16} />
+                      </button>
+                      <button 
+                        className="action-btn load"
+                        onClick={() => handleLoadVehicle(vehicle)}
+                        title="Load Vehicle"
+                        disabled={!vehicle.active}
+                      >
+                        <Upload size={16} />
                       </button>
                       <button 
                         className="action-btn edit"
@@ -549,6 +652,34 @@ const Vehicles = () => {
             setSelectedVehicle(null);
           }}
         />
+      )}
+
+      {showWarehouseManager && selectedVehicle && (
+        <div className="modal-overlay">
+          <div className="modal-content extra-large">
+            <div className="modal-header">
+              <div>
+                <h2>Vehicle Warehouse Operations</h2>
+                <p className="modal-subtitle">
+                  {selectedVehicle.plate_number || selectedVehicle.plate} - 
+                  {selectedVehicle.vehicle_type}
+                </p>
+              </div>
+              <button className="close-btn" onClick={handleCloseWarehouseManager}>×</button>
+            </div>
+            
+            <div className="warehouse-manager-content">
+              <VehicleWarehouseManager
+                vehicle={selectedVehicle}
+                trip={selectedTrip}
+                sourceWarehouse={selectedWarehouse}
+                destinationWarehouse={selectedWarehouse}
+                onOperationComplete={handleOperationComplete}
+                onError={handleWarehouseError}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

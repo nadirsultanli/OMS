@@ -21,6 +21,7 @@ const VehicleInventoryDisplay = ({
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterText, setFilterText] = useState('');
   const [viewMode, setViewMode] = useState('stock'); // 'truck' or 'stock'
+  const [autoRefreshState, setAutoRefreshState] = useState(autoRefresh);
 
   // Load comprehensive vehicle data
   const loadInventory = async () => {
@@ -75,16 +76,21 @@ const VehicleInventoryDisplay = ({
     loadInventory();
   }, [vehicleId, tripId]);
 
+  // Sync autoRefresh prop with local state
+  useEffect(() => {
+    setAutoRefreshState(autoRefresh);
+  }, [autoRefresh]);
+
   // Auto refresh
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefreshState) return;
 
     const interval = setInterval(() => {
       loadInventory();
     }, refreshInterval);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, refreshInterval, vehicleId, tripId]);
+  }, [autoRefreshState, refreshInterval, vehicleId, tripId]);
 
   // Sort inventory
   const sortedInventory = React.useMemo(() => {
@@ -258,8 +264,8 @@ const VehicleInventoryDisplay = ({
           <label className="auto-refresh-toggle">
             <input
               type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh?.(e.target.checked)}
+              checked={autoRefreshState}
+              onChange={(e) => setAutoRefreshState(e.target.checked)}
             />
             Auto refresh ({refreshInterval / 1000}s)
           </label>

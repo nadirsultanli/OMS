@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Trash2
 } from 'lucide-react';
+import TripStatusUpdater from './TripStatusUpdater';
 import './Table.css';
 
 const TripsTable = ({ 
@@ -20,7 +21,8 @@ const TripsTable = ({
   onEditTrip,
   onStartTrip,
   onCompleteTrip,
-  onDeleteTrip
+  onDeleteTrip,
+  onStatusUpdate
 }) => {
   // Helper functions
   const formatDate = (dateString) => {
@@ -196,7 +198,10 @@ const TripsTable = ({
                 
                 {/* Column 5: Status */}
                 <td style={{ padding: '16px', textAlign: 'left', width: '120px', verticalAlign: 'middle' }} className="text-sm">
-                  {getStatusBadge(trip.status)}
+                  <TripStatusUpdater 
+                    trip={trip} 
+                    onStatusUpdate={onStatusUpdate}
+                  />
                 </td>
                 
                 {/* Column 6: Orders Count */}

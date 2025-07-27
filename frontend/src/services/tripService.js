@@ -180,6 +180,16 @@ const tripService = {
     }
   },
 
+  // Update trip status
+  updateTripStatus: async (tripId, newStatus) => {
+    try {
+      const response = await api.patch(`/trips/${tripId}/status`, { new_status: newStatus });
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: extractErrorMessage(error.response?.data) };
+    }
+  },
+
   // Get trip stops
   getTripStops: async (tripId) => {
     try {
