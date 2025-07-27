@@ -8,7 +8,7 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  overflow-x: auto;
   margin-bottom: 24px;
 }
 
@@ -28,6 +28,7 @@
   border-collapse: collapse;
   font-size: 14px;
   background: white;
+  box-sizing: border-box;
 }
 
 /* ============================================
@@ -43,7 +44,7 @@
 
 .orders-table thead th,
 .trips-table thead th {
-  padding: 12px 16px;
+  padding: 16px;
   text-align: left;
   font-weight: 600;
   color: #1f2937;
@@ -53,6 +54,7 @@
   letter-spacing: 0.05em;
   white-space: nowrap;
   background: #f8f9fb;
+  box-sizing: border-box;
 }
 
 /* ============================================
@@ -85,18 +87,35 @@
    ============================================ */
 .orders-table tbody td,
 .trips-table tbody td {
-  padding: 12px 16px;
+  padding: 16px;
   vertical-align: middle;
   white-space: nowrap;
   font-size: 14px;
   color: #374151;
   max-height: 56px;
+  box-sizing: border-box;
 }
 
 /* Remove all margins from child elements */
 .orders-table td *,
 .trips-table td * {
   margin: 0 !important;
+}
+
+/* Ensure consistent alignment for first column */
+.trips-table td:first-child > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+/* Ensure proper text overflow handling */
+.trips-table .truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 /* ============================================
@@ -245,6 +264,16 @@
   background: transparent;
   padding: 0;
   margin: 0;
+  flex-shrink: 0;
+}
+
+/* Action buttons container */
+.trips-table td:last-child > div {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  min-height: 32px;
 }
 
 .action-icon-btn:hover:not(:disabled),
@@ -271,6 +300,7 @@
   background: #eff6ff;
   color: #2563eb;
   border-color: #dbeafe;
+  flex-shrink: 0;
 }
 
 .action-icon-btn:hover:not(:disabled),

@@ -98,40 +98,40 @@ const TripsTable = ({
         }}
       >
         <colgroup>
+          <col style={{ width: '180px' }} />
+          <col style={{ width: '140px' }} />
+          <col style={{ width: '180px' }} />
           <col style={{ width: '160px' }} />
           <col style={{ width: '140px' }} />
-          <col style={{ width: '200px' }} />
-          <col style={{ width: '160px' }} />
-          <col style={{ width: '120px' }} />
           <col style={{ width: '80px' }} />
           <col style={{ width: '100px' }} />
-          <col style={{ width: '150px' }} />
+          <col style={{ width: '120px' }} />
         </colgroup>
         
         <thead>
           <tr>
-            <th style={{ padding: '16px 24px 16px 24px', textAlign: 'left', width: '160px' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            <th style={{ padding: '16px', textAlign: 'left' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
               Trip Number
             </th>
-            <th style={{ padding: '16px', textAlign: 'left', width: '140px' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            <th style={{ padding: '16px', textAlign: 'left' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
               Date
             </th>
-            <th style={{ padding: '16px', textAlign: 'left', width: '200px' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            <th style={{ padding: '16px', textAlign: 'left' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
               Vehicle
             </th>
-            <th style={{ padding: '16px', textAlign: 'left', width: '160px' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            <th style={{ padding: '16px', textAlign: 'left' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
               Driver
             </th>
-            <th style={{ padding: '16px', textAlign: 'left', width: '120px' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            <th style={{ padding: '16px', textAlign: 'left' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
               Status
             </th>
-            <th style={{ padding: '16px', textAlign: 'center', width: '80px' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            <th style={{ padding: '16px', textAlign: 'center' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
               Orders
             </th>
-            <th style={{ padding: '16px', textAlign: 'right', width: '100px' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            <th style={{ padding: '16px', textAlign: 'right' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
               Load (kg)
             </th>
-            <th style={{ padding: '16px 24px 16px 16px', textAlign: 'center', width: '150px' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            <th style={{ padding: '16px', textAlign: 'center' }} className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
               Actions
             </th>
           </tr>
@@ -150,7 +150,7 @@ const TripsTable = ({
               >
                 {/* Column 1: Trip Number */}
                 <td 
-                  style={{ padding: '16px 24px 16px 24px', textAlign: 'left', width: '160px', verticalAlign: 'middle' }}
+                  style={{ padding: '16px', textAlign: 'left', verticalAlign: 'middle' }}
                   className="text-sm cursor-pointer"
                   onClick={() => onViewTrip && onViewTrip(trip)}
                 >
@@ -163,7 +163,7 @@ const TripsTable = ({
                 </td>
                 
                 {/* Column 2: Date */}
-                <td style={{ padding: '16px', textAlign: 'left', width: '140px', verticalAlign: 'middle' }} className="text-sm text-gray-700">
+                <td style={{ padding: '16px', textAlign: 'left', verticalAlign: 'middle' }} className="text-sm text-gray-700">
                   <div>
                     <div className="font-medium whitespace-nowrap">{formatDate(trip.planned_date)}</div>
                     <div className="text-xs text-gray-500 whitespace-nowrap">{formatTime(trip.planned_date)}</div>
@@ -171,7 +171,7 @@ const TripsTable = ({
                 </td>
                 
                 {/* Column 3: Vehicle */}
-                <td style={{ padding: '16px', textAlign: 'left', width: '200px', verticalAlign: 'middle' }} className="text-sm text-gray-700">
+                <td style={{ padding: '16px', textAlign: 'left', verticalAlign: 'middle' }} className="text-sm text-gray-700">
                   <div className="flex items-center gap-2">
                     <Truck size={16} className="text-gray-400 flex-shrink-0" />
                     <span 
@@ -184,7 +184,7 @@ const TripsTable = ({
                 </td>
                 
                 {/* Column 4: Driver */}
-                <td style={{ padding: '16px', textAlign: 'left', width: '160px', verticalAlign: 'middle' }} className="text-sm text-gray-700">
+                <td style={{ padding: '16px', textAlign: 'left', verticalAlign: 'middle' }} className="text-sm text-gray-700">
                   <div className="flex items-center gap-2">
                     <User size={16} className="text-gray-400 flex-shrink-0" />
                     <span 
@@ -197,7 +197,7 @@ const TripsTable = ({
                 </td>
                 
                 {/* Column 5: Status */}
-                <td style={{ padding: '16px', textAlign: 'left', width: '120px', verticalAlign: 'middle' }} className="text-sm">
+                <td style={{ padding: '16px', textAlign: 'left', verticalAlign: 'middle' }} className="text-sm">
                   <TripStatusUpdater 
                     trip={trip} 
                     onStatusUpdate={onStatusUpdate}
@@ -205,22 +205,22 @@ const TripsTable = ({
                 </td>
                 
                 {/* Column 6: Orders Count */}
-                <td style={{ padding: '16px', textAlign: 'center', width: '80px', verticalAlign: 'middle' }} className="text-sm">
+                <td style={{ padding: '16px', textAlign: 'center', verticalAlign: 'middle' }} className="text-sm">
                   <span className="inline-flex items-center justify-center min-w-[32px] h-8 px-2.5 bg-blue-50 text-blue-700 rounded-full font-semibold">
                     {trip.order_count || 0}
                   </span>
                 </td>
                 
                 {/* Column 7: Load */}
-                <td style={{ padding: '16px', textAlign: 'right', width: '100px', verticalAlign: 'middle' }} className="text-sm text-gray-700 font-medium">
+                <td style={{ padding: '16px', textAlign: 'right', verticalAlign: 'middle' }} className="text-sm text-gray-700 font-medium">
                   <span className="whitespace-nowrap">
                     {trip.gross_loaded_kg || 0} kg
                   </span>
                 </td>
                 
                 {/* Column 8: Actions */}
-                <td style={{ padding: '16px 24px 16px 16px', textAlign: 'center', width: '150px', verticalAlign: 'middle' }} className="text-sm">
-                  <div className="flex gap-1 justify-center">
+                <td style={{ padding: '16px', textAlign: 'center', verticalAlign: 'middle' }} className="text-sm">
+                  <div className="flex gap-1 justify-center items-center">
                     {/* View button - always visible */}
                     <button 
                       className="action-btn view"
