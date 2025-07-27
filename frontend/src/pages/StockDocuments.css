@@ -351,6 +351,13 @@ select.form-control option {
 .table-scroll-wrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  border-radius: 16px;
+}
+
+/* Table scroll wrapper for horizontal scrolling */
+.table-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table {
@@ -381,7 +388,7 @@ select.form-control option {
 .table th:nth-child(2) { min-width: 180px; } /* Type */
 .table th:nth-child(3) { min-width: 120px; } /* Status */
 .table th:nth-child(4) { min-width: 200px; } /* From Warehouse */
-.table th:nth-child(5) { min-width: 200px; } /* To Entity */
+.table th:nth-child(5) { min-width: 250px; } /* To Entity */
 .table th:nth-child(6) { min-width: 120px; } /* Created Date */
 .table th:nth-child(7) { min-width: 120px; } /* Created By */
 .table th:nth-child(8) { 
@@ -407,16 +414,28 @@ select.form-control option {
   color: #374151;
   vertical-align: middle;
   max-width: 300px;
+}
+
+/* Specific column width overrides */
+.table td:nth-child(5) {
+  max-width: 250px;
+  min-width: 250px;
+}
+
+/* Text overflow handling for specific columns */
+.table td:nth-child(4) {
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Text overflow handling for specific columns */
-.table td:nth-child(4),
+/* To Entity column - allow full text display */
 .table td:nth-child(5) {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  word-wrap: break-word;
+  line-height: 1.4;
 }
 
 /* Document Number */
@@ -788,7 +807,14 @@ select.form-control option {
   }
   
   .table {
-    min-width: 1000px;
+    min-width: 1200px;
+  }
+  
+  /* Adjust column widths for mobile */
+  .table th:nth-child(5),
+  .table td:nth-child(5) {
+    min-width: 200px;
+    max-width: 200px;
   }
   
   .btn {
