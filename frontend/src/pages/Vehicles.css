@@ -277,6 +277,8 @@
   vertical-align: middle;
   position: relative;
   max-width: 200px;
+  height: 64px;
+  box-sizing: border-box;
 }
 
 /* Ensure actions column cells have same alignment */
@@ -286,12 +288,13 @@
   text-align: center;
   white-space: nowrap;
   max-width: none;
+  height: auto;
 }
 
 .vehicles-table tbody tr {
   transition: background-color 0.15s ease;
   cursor: pointer;
-  min-height: 64px;
+  height: 64px;
 }
 
 .vehicles-table tbody tr:hover {
@@ -531,6 +534,7 @@
   justify-content: center;
   min-width: 140px;
   flex-wrap: nowrap;
+  height: 32px;
 }
 
 .action-btn {
@@ -549,6 +553,7 @@
   margin: 0;
   padding: 0;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .action-btn svg {
