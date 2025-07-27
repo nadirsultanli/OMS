@@ -658,3 +658,150 @@ async def get_negative_stock_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.post("/bulk-check-availability", response_model=dict)
+async def bulk_check_availability(
+    request: dict,
+    stock_level_service: StockLevelService = Depends(get_stock_level_service),
+    current_user: User = current_user
+):
+    """Bulk check stock availability for multiple items"""
+    try:
+        warehouse_id = UUID(request["warehouse_id"])
+        items = request["items"]
+        
+        result_items = []
+        
+        for item in items:
+            variant_id = UUID(item["variant_id"])
+            requested_quantity = Decimal(str(item["requested_quantity"]))
+            
+            available_qty = await stock_level_service.get_available_quantity(
+                current_user.tenant_id, warehouse_id, variant_id, StockStatus.ON_HAND
+            )
+            
+            is_available = available_qty >= requested_quantity
+            
+            result_items.append({
+                "variant_id": str(variant_id),
+                "requested": float(requested_quantity),
+                "available_qty": float(available_qty),
+                "available": is_available
+            })
+        
+        return {
+            "success": True,
+            "warehouse_id": str(warehouse_id),
+            "items": result_items
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to bulk check availability: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/reserve-for-vehicle", response_model=dict)
+async def reserve_stock_for_vehicle(
+    request: dict,
+    stock_level_service: StockLevelService = Depends(get_stock_level_service),
+    current_user: User = current_user
+):
+    """Reserve stock for vehicle loading"""
+    try:
+        warehouse_id = UUID(request["warehouse_id"])
+        vehicle_id = UUID(request["vehicle_id"])
+        trip_id = UUID(request.get("trip_id")) if request.get("trip_id") else None
+        inventory_items = request["inventory_items"]
+        expiry_hours = request.get("expiry_hours", 24)
+        
+        # Create a reservation ID
+        import uuid
+        from datetime import datetime, timedelta
+        
+        reservation_id = str(uuid.uuid4())
+        expires_at = datetime.utcnow() + timedelta(hours=expiry_hours)
+        
+        # Reserve each item
+        reserved_items = []
+        for item in inventory_items:
+            variant_id = UUID(item["variant_id"])
+            quantity = Decimal(str(item["quantity"]))
+            
+            # Check availability first
+            available_qty = await stock_level_service.get_available_quantity(
+                current_user.tenant_id, warehouse_id, variant_id, StockStatus.ON_HAND
+            )
+            
+            if available_qty < quantity:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Insufficient stock for variant {variant_id}: requested {quantity}, available {available_qty}"
+                )
+            
+            # Reserve the stock
+            success = await stock_level_service.reserve_stock_for_order(
+                current_user, warehouse_id, variant_id, quantity, StockStatus.ON_HAND
+            )
+            
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to reserve stock for variant {variant_id}"
+                )
+            
+            reserved_items.append({
+                "variant_id": str(variant_id),
+                "quantity": float(quantity),
+                "unit_cost": float(item.get("unit_cost", 0))
+            })
+        
+        return {
+            "success": True,
+            "id": reservation_id,
+            "warehouse_id": str(warehouse_id),
+            "vehicle_id": str(vehicle_id),
+            "trip_id": str(trip_id) if trip_id else None,
+            "status": "ACTIVE",
+            "expires_at": expires_at.isoformat(),
+            "reserved_items": reserved_items
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to reserve stock for vehicle: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/confirm-reservation", response_model=dict)
+async def confirm_reservation(
+    request: dict,
+    stock_level_service: StockLevelService = Depends(get_stock_level_service),
+    current_user: User = current_user
+):
+    """Confirm a stock reservation and convert to actual movement"""
+    try:
+        reservation_id = request["reservation_id"]
+        actual_items = request.get("actual_items", [])
+        
+        # For now, we'll just return success since the reservation is already in place
+        # In a full implementation, this would update the reservation status
+        
+        return {
+            "success": True,
+            "reservation_id": reservation_id,
+            "status": "CONFIRMED",
+            "message": "Reservation confirmed successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to confirm reservation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

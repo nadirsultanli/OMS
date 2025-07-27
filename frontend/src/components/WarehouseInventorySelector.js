@@ -66,11 +66,14 @@ const WarehouseInventorySelector = ({
         const stockData = stockResponse.stock_levels || [];
         console.log('Total stock items received:', stockData.length);
         
-        if (stockData.length > 0) {
-          console.log('Sample stock item structure:', stockData[0]);
-          console.log('Stock item product_id:', stockData[0].product_id);
-          console.log('Stock item variant_id:', stockData[0].variant_id);
-        }
+                 if (stockData.length > 0) {
+           console.log('Sample stock item structure:', stockData[0]);
+           console.log('Stock item product_id:', stockData[0].product_id);
+           console.log('Stock item variant_id:', stockData[0].variant_id);
+           console.log('Stock item warehouse_id:', stockData[0].warehouse_id);
+           console.log('Stock item available_qty:', stockData[0].available_qty);
+           console.log('Stock item stock_status:', stockData[0].stock_status);
+         }
         
         // Filter to only show items with available stock for this warehouse
         const availableStock = stockData.filter(item => {
@@ -96,32 +99,50 @@ const WarehouseInventorySelector = ({
         
         console.log('Filtered available stock for warehouse:', availableStock.length, 'items');
         
-        if (availableStock.length === 0) {
-          // Try with more lenient filtering for debugging
-          const debugStock = stockData.filter(item => {
-            const itemWarehouseId = String(item.warehouse_id);
-            const targetWarehouseId = String(warehouse.id);
-            return itemWarehouseId === targetWarehouseId;
-          });
-          
-          console.log('Items for this warehouse (any status/qty):', debugStock.length);
-          if (debugStock.length > 0) {
-            console.log('Sample warehouse items:', debugStock.slice(0, 3).map(item => ({
-              variant_id: item.variant_id,
-              available_qty: item.available_qty,
-              stock_status: item.stock_status,
-              warehouse_id: item.warehouse_id
-            })));
-          }
-          
-          setError(`No available inventory found for warehouse ${warehouse.code}. Found ${debugStock.length} total items for this warehouse but none have available quantity > 0 with ON_HAND status.`);
-        }
+                 if (availableStock.length === 0) {
+           // Try with more lenient filtering for debugging
+           const debugStock = stockData.filter(item => {
+             const itemWarehouseId = String(item.warehouse_id);
+             const targetWarehouseId = String(warehouse.id);
+             return itemWarehouseId === targetWarehouseId;
+           });
+           
+           console.log('Items for this warehouse (any status/qty):', debugStock.length);
+           if (debugStock.length > 0) {
+             console.log('Sample warehouse items:', debugStock.slice(0, 3).map(item => ({
+               variant_id: item.variant_id,
+               available_qty: item.available_qty,
+               stock_status: item.stock_status,
+               warehouse_id: item.warehouse_id
+             })));
+           }
+           
+           // Show all items for this warehouse regardless of status for debugging
+           const allWarehouseItems = stockData.filter(item => {
+             const itemWarehouseId = String(item.warehouse_id);
+             const targetWarehouseId = String(warehouse.id);
+             return itemWarehouseId === targetWarehouseId;
+           });
+           
+           console.log('All items for warehouse (including non-ON_HAND):', allWarehouseItems);
+           
+           setError(`No available inventory found for warehouse ${warehouse.code}. Found ${debugStock.length} total items for this warehouse but none have available quantity > 0 with ON_HAND status.`);
+         }
         
-        setStockItems(availableStock);
+        // Add product_id to stock items using variant mapping
+        const stockItemsWithProductId = availableStock.map(item => {
+          // We'll add product_id later when variants are loaded
+          return {
+            ...item,
+            product_id: null // Will be populated after variant loading
+          };
+        });
+        
+        setStockItems(stockItemsWithProductId);
         
         // Load product and variant details for better display
         if (availableStock.length > 0) {
-          await loadProductDetails(availableStock);
+          await loadProductDetails(stockItemsWithProductId);
         }
       } else {
         console.error('No stock levels in response:', stockResponse);
@@ -170,24 +191,19 @@ const WarehouseInventorySelector = ({
         promises.push(Promise.resolve([]));
       }
 
-      // Load variants  
-      if (variantIds.length > 0) {
-        promises.push(
-          Promise.all(variantIds.map(async id => {
-            try {
-              console.log(`Loading variant ${id}...`);
-              const result = await variantService.getVariantById(id);
-              console.log(`Variant ${id} result:`, result);
-              return { type: 'variant', id, result };
-            } catch (error) {
-              console.error(`Failed to load variant ${id}:`, error);
-              return { type: 'variant', id, result: { success: false, error: error.message } };
-            }
-          }))
-        );
-      } else {
-        promises.push(Promise.resolve([]));
-      }
+             // Load all variants to get product_id mapping
+       console.log('Loading all variants to get product_id mapping...');
+       promises.push(
+         variantService.getVariants(null, { limit: 1000, active_only: true })
+           .then(result => {
+             console.log('Variants loaded:', result);
+             return result.success ? result.data.variants || [] : [];
+           })
+           .catch(error => {
+             console.error('Failed to load variants:', error);
+             return [];
+           })
+       );
 
       const [productsResults, variantsResults] = await Promise.all(promises);
 
@@ -205,18 +221,38 @@ const WarehouseInventorySelector = ({
         }
       });
 
+      // Process variants and create variant_id to product_id mapping
       const variantsMap = {};
+      const variantToProductMap = {};
       const failedVariants = [];
       
-      variantsResults.forEach(({ id, result }) => {
-        if (result.success && result.data) {
-          variantsMap[id] = result.data;
-          console.log(`✅ Successfully loaded variant ${id}:`, result.data);
-        } else {
-          failedVariants.push({ id, error: result.error });
-          console.log(`❌ Failed to load variant ${id}:`, result.error);
-        }
-      });
+      // Handle the new bulk variant loading structure
+      if (Array.isArray(variantsResults)) {
+        // This is the bulk variant loading case
+        variantsResults.forEach(variant => {
+          if (variant.id && variant.product_id) {
+            variantsMap[variant.id] = variant;
+            variantToProductMap[variant.id] = variant.product_id;
+            console.log(`✅ Bulk loaded variant ${variant.id} -> product ${variant.product_id}:`, variant);
+          }
+        });
+      } else {
+        // This is the individual variant loading case (legacy)
+        variantsResults.forEach(({ id, result }) => {
+          if (result.success && result.data) {
+            variantsMap[id] = result.data;
+            if (result.data.product_id) {
+              variantToProductMap[id] = result.data.product_id;
+            }
+            console.log(`✅ Successfully loaded variant ${id}:`, result.data);
+          } else {
+            failedVariants.push({ id, error: result.error });
+            console.log(`❌ Failed to load variant ${id}:`, result.error);
+          }
+        });
+      }
+      
+      console.log('Variant to product mapping:', variantToProductMap);
 
       console.log('📊 Loading summary:', {
         productsLoaded: Object.keys(productsMap).length,
@@ -234,6 +270,20 @@ const WarehouseInventorySelector = ({
 
       setProducts(productsMap);
       setVariants(variantsMap);
+      
+      // Update stock items with product_id from variant mapping
+      setStockItems(prevItems => {
+        return prevItems.map(item => {
+          const productId = variantToProductMap[item.variant_id];
+          if (productId) {
+            console.log(`✅ Added product_id ${productId} to stock item ${item.variant_id}`);
+            return { ...item, product_id: productId };
+          } else {
+            console.log(`❌ No product_id found for variant ${item.variant_id}`);
+            return item;
+          }
+        });
+      });
 
       // If we have high failure rates, try to load all variants/products and create lookup
       if (failedVariants.length > variantsResults.length * 0.5) {
@@ -568,10 +618,14 @@ const WarehouseInventorySelector = ({
                   </div>
                 ) : (
                   filteredItems.map((item) => {
-                    const product = products[item.product_id];
-                    const variant = variants[item.variant_id];
-                    const cartQty = getCartQuantity(item);
-                    const remainingQty = item.available_qty - cartQty;
+                                         const product = products[item.product_id];
+                     const variant = variants[item.variant_id];
+                     const cartQty = getCartQuantity(item);
+                     const remainingQty = item.available_qty - cartQty;
+                     
+                     // Use item data directly if variant not loaded
+                     const itemWeight = variant?.unit_weight_kg || variant?.weight_kg || item.unit_weight_kg || 0;
+                     const itemVolume = variant?.unit_volume_m3 || variant?.volume_m3 || item.unit_volume_m3 || 0;
                     
                     return (
                       <div key={`${item.product_id}-${item.variant_id}`} className={`inventory-item ${cartQty > 0 ? 'has-cart-items' : ''}`}>
@@ -599,13 +653,13 @@ const WarehouseInventorySelector = ({
                             {cartQty > 0 && (
                               <span className="cart-quantity">🛒 In Cart: {cartQty}</span>
                             )}
-                            <span className="unit-cost">💰 ${(parseFloat(item.unit_cost) || 0).toFixed(2)}</span>
-                            {variant?.unit_weight_kg && (
-                              <span>⚖️ {variant.unit_weight_kg}kg</span>
-                            )}
-                            {variant?.weight_kg && !variant?.unit_weight_kg && (
-                              <span>⚖️ {variant.weight_kg}kg</span>
-                            )}
+                                                         <span className="unit-cost">💰 ${(parseFloat(item.unit_cost) || 0).toFixed(2)}</span>
+                             {itemWeight > 0 && (
+                               <span>⚖️ {itemWeight}kg</span>
+                             )}
+                             {itemVolume > 0 && (
+                               <span>📦 {itemVolume}m³</span>
+                             )}
                           </div>
                         </div>
                         <div className="item-actions">
