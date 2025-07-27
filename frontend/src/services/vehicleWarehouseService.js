@@ -106,8 +106,15 @@ class VehicleWarehouseService {
     };
     console.log('Formatted item:', formatted);
     
+    // Validate required fields
     if (!formatted.product_id) {
       console.error('WARNING: Formatted item missing product_id:', { original: item, formatted });
+    }
+    if (!formatted.variant_id) {
+      console.error('WARNING: Formatted item missing variant_id:', { original: item, formatted });
+    }
+    if (formatted.quantity <= 0) {
+      console.error('WARNING: Formatted item has invalid quantity:', { original: item, formatted });
     }
     
     return formatted;
@@ -117,6 +124,7 @@ class VehicleWarehouseService {
    * Helper method to format vehicle data for API
    */
   formatVehicleData(vehicle) {
+    const now = new Date().toISOString();
     return {
       id: vehicle.id,
       tenant_id: vehicle.tenant_id || vehicle.tenantId,
@@ -127,9 +135,9 @@ class VehicleWarehouseService {
       volume_unit: vehicle.volume_unit || vehicle.volumeUnit,
       depot_id: vehicle.depot_id || vehicle.depotId,
       active: vehicle.active !== undefined ? vehicle.active : true,
-      created_at: vehicle.created_at || vehicle.createdAt,
+      created_at: vehicle.created_at || vehicle.createdAt || now,
       created_by: vehicle.created_by || vehicle.createdBy,
-      updated_at: vehicle.updated_at || vehicle.updatedAt,
+      updated_at: vehicle.updated_at || vehicle.updatedAt || now,
       updated_by: vehicle.updated_by || vehicle.updatedBy,
       deleted_at: vehicle.deleted_at || vehicle.deletedAt,
       deleted_by: vehicle.deleted_by || vehicle.deletedBy

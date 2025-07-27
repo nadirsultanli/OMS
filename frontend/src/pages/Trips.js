@@ -301,6 +301,20 @@ const Trips = () => {
     }
   };
 
+  const handleStatusUpdate = async (tripId, newStatus) => {
+    try {
+      const result = await tripService.updateTripStatus(tripId, newStatus);
+      if (result.success) {
+        setMessage({ type: 'success', text: `Trip status updated to ${newStatus}` });
+        fetchTrips();
+      } else {
+        setMessage({ type: 'error', text: ensureStringError(result.error) });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to update trip status' });
+    }
+  };
+
   // Helper functions moved to TripsTable component
 
   return (
@@ -515,6 +529,7 @@ const Trips = () => {
           onStartTrip={handleStartTrip}
           onCompleteTrip={handleCompleteTrip}
           onDeleteTrip={handleDeleteTrip}
+          onStatusUpdate={handleStatusUpdate}
         />
       )}
 

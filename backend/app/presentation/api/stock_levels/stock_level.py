@@ -18,7 +18,10 @@ from app.presentation.schemas.stock_levels.input_schemas import (
     PhysicalCountRequest,
     BulkStockUpdateRequest,
     StockLevelQueryRequest,
-    StockAlertRequest
+    StockAlertRequest,
+    BulkAvailabilityCheckRequest,
+    VehicleStockReservationRequest,
+    ReservationConfirmationRequest
 )
 from app.presentation.schemas.stock_levels.output_schemas import (
     StockLevelResponse,
@@ -36,7 +39,12 @@ from app.presentation.schemas.stock_levels.output_schemas import (
     NegativeStockReportResponse,
     NegativeStockReport,
     BulkStockUpdateResponse,
-    WarehouseStockOverviewResponse
+    WarehouseStockOverviewResponse,
+    BulkAvailabilityCheckResponse,
+    BulkAvailabilityCheckItem,
+    VehicleStockReservationResponse,
+    VehicleReservationItem,
+    ReservationConfirmationResponse
 )
 from app.services.stock_levels.stock_level_service import StockLevelService
 from app.services.dependencies.stock_levels import get_stock_level_service
@@ -660,22 +668,22 @@ async def get_negative_stock_report(
         )
 
 
-@router.post("/bulk-check-availability", response_model=dict)
+@router.post("/bulk-check-availability", response_model=BulkAvailabilityCheckResponse)
 async def bulk_check_availability(
-    request: dict,
+    request: BulkAvailabilityCheckRequest,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
     current_user: User = current_user
 ):
     """Bulk check stock availability for multiple items"""
     try:
-        warehouse_id = UUID(request["warehouse_id"])
-        items = request["items"]
+        warehouse_id = request.warehouse_id
+        items = request.items
         
         result_items = []
         
         for item in items:
-            variant_id = UUID(item["variant_id"])
-            requested_quantity = Decimal(str(item["requested_quantity"]))
+            variant_id = item.variant_id
+            requested_quantity = item.requested_quantity
             
             available_qty = await stock_level_service.get_available_quantity(
                 current_user.tenant_id, warehouse_id, variant_id, StockStatus.ON_HAND
@@ -683,18 +691,18 @@ async def bulk_check_availability(
             
             is_available = available_qty >= requested_quantity
             
-            result_items.append({
-                "variant_id": str(variant_id),
-                "requested": float(requested_quantity),
-                "available_qty": float(available_qty),
-                "available": is_available
-            })
+            result_items.append(BulkAvailabilityCheckItem(
+                variant_id=str(variant_id),
+                requested=float(requested_quantity),
+                available_qty=float(available_qty),
+                available=is_available
+            ))
         
-        return {
-            "success": True,
-            "warehouse_id": str(warehouse_id),
-            "items": result_items
-        }
+        return BulkAvailabilityCheckResponse(
+            success=True,
+            warehouse_id=str(warehouse_id),
+            items=result_items
+        )
 
     except Exception as e:
         logger.error(f"Failed to bulk check availability: {str(e)}")
@@ -704,19 +712,19 @@ async def bulk_check_availability(
         )
 
 
-@router.post("/reserve-for-vehicle", response_model=dict)
+@router.post("/reserve-for-vehicle", response_model=VehicleStockReservationResponse)
 async def reserve_stock_for_vehicle(
-    request: dict,
+    request: VehicleStockReservationRequest,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
     current_user: User = current_user
 ):
     """Reserve stock for vehicle loading"""
     try:
-        warehouse_id = UUID(request["warehouse_id"])
-        vehicle_id = UUID(request["vehicle_id"])
-        trip_id = UUID(request.get("trip_id")) if request.get("trip_id") else None
-        inventory_items = request["inventory_items"]
-        expiry_hours = request.get("expiry_hours", 24)
+        warehouse_id = request.warehouse_id
+        vehicle_id = request.vehicle_id
+        trip_id = request.trip_id
+        inventory_items = request.inventory_items
+        expiry_hours = request.expiry_hours
         
         # Create a reservation ID
         import uuid
@@ -728,8 +736,8 @@ async def reserve_stock_for_vehicle(
         # Reserve each item
         reserved_items = []
         for item in inventory_items:
-            variant_id = UUID(item["variant_id"])
-            quantity = Decimal(str(item["quantity"]))
+            variant_id = item.variant_id
+            quantity = item.quantity
             
             # Check availability first
             available_qty = await stock_level_service.get_available_quantity(
@@ -753,22 +761,22 @@ async def reserve_stock_for_vehicle(
                     detail=f"Failed to reserve stock for variant {variant_id}"
                 )
             
-            reserved_items.append({
-                "variant_id": str(variant_id),
-                "quantity": float(quantity),
-                "unit_cost": float(item.get("unit_cost", 0))
-            })
+            reserved_items.append(VehicleReservationItem(
+                variant_id=str(variant_id),
+                quantity=float(quantity),
+                unit_cost=float(item.unit_cost or 0)
+            ))
         
-        return {
-            "success": True,
-            "id": reservation_id,
-            "warehouse_id": str(warehouse_id),
-            "vehicle_id": str(vehicle_id),
-            "trip_id": str(trip_id) if trip_id else None,
-            "status": "ACTIVE",
-            "expires_at": expires_at.isoformat(),
-            "reserved_items": reserved_items
-        }
+        return VehicleStockReservationResponse(
+            success=True,
+            id=reservation_id,
+            warehouse_id=str(warehouse_id),
+            vehicle_id=str(vehicle_id),
+            trip_id=str(trip_id) if trip_id else None,
+            status="ACTIVE",
+            expires_at=expires_at.isoformat(),
+            reserved_items=reserved_items
+        )
 
     except Exception as e:
         logger.error(f"Failed to reserve stock for vehicle: {str(e)}")
@@ -778,26 +786,26 @@ async def reserve_stock_for_vehicle(
         )
 
 
-@router.post("/confirm-reservation", response_model=dict)
+@router.post("/confirm-reservation", response_model=ReservationConfirmationResponse)
 async def confirm_reservation(
-    request: dict,
+    request: ReservationConfirmationRequest,
     stock_level_service: StockLevelService = Depends(get_stock_level_service),
     current_user: User = current_user
 ):
     """Confirm a stock reservation and convert to actual movement"""
     try:
-        reservation_id = request["reservation_id"]
-        actual_items = request.get("actual_items", [])
+        reservation_id = request.reservation_id
+        actual_items = request.actual_items or []
         
         # For now, we'll just return success since the reservation is already in place
         # In a full implementation, this would update the reservation status
         
-        return {
-            "success": True,
-            "reservation_id": reservation_id,
-            "status": "CONFIRMED",
-            "message": "Reservation confirmed successfully"
-        }
+        return ReservationConfirmationResponse(
+            success=True,
+            reservation_id=reservation_id,
+            status="CONFIRMED",
+            message="Reservation confirmed successfully"
+        )
 
     except Exception as e:
         logger.error(f"Failed to confirm reservation: {str(e)}")

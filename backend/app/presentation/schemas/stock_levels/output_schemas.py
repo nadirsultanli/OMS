@@ -171,3 +171,45 @@ class WarehouseStockOverviewResponse(BaseModel):
     low_stock_variants: int = Field(..., description="Number of low stock variants")
     negative_stock_variants: int = Field(..., description="Number of negative stock variants")
     stock_by_status: dict = Field(..., description="Stock quantities by status bucket")
+
+
+class BulkAvailabilityCheckItem(BaseModel):
+    """Schema for individual item in bulk availability check response"""
+    variant_id: str = Field(..., description="Variant ID")
+    requested: float = Field(..., description="Requested quantity")
+    available_qty: float = Field(..., description="Available quantity")
+    available: bool = Field(..., description="Whether sufficient stock is available")
+
+
+class BulkAvailabilityCheckResponse(BaseModel):
+    """Schema for bulk stock availability check response"""
+    success: bool = Field(..., description="Whether the check was successful")
+    warehouse_id: str = Field(..., description="Warehouse ID checked")
+    items: List[BulkAvailabilityCheckItem] = Field(..., description="Availability check results for each item")
+
+
+class VehicleReservationItem(BaseModel):
+    """Schema for individual reserved item in vehicle reservation response"""
+    variant_id: str = Field(..., description="Variant ID")
+    quantity: float = Field(..., description="Reserved quantity")
+    unit_cost: float = Field(..., description="Unit cost")
+
+
+class VehicleStockReservationResponse(BaseModel):
+    """Schema for vehicle stock reservation response"""
+    success: bool = Field(..., description="Whether reservation was successful")
+    id: str = Field(..., description="Reservation ID")
+    warehouse_id: str = Field(..., description="Source warehouse ID")
+    vehicle_id: str = Field(..., description="Vehicle ID")
+    trip_id: Optional[str] = Field(None, description="Trip ID if part of a trip")
+    status: str = Field(..., description="Reservation status")
+    expires_at: str = Field(..., description="Reservation expiry timestamp")
+    reserved_items: List[VehicleReservationItem] = Field(..., description="List of reserved items")
+
+
+class ReservationConfirmationResponse(BaseModel):
+    """Schema for reservation confirmation response"""
+    success: bool = Field(..., description="Whether confirmation was successful")
+    reservation_id: str = Field(..., description="Confirmed reservation ID")
+    status: str = Field(..., description="Updated reservation status")
+    message: str = Field(..., description="Confirmation result message")

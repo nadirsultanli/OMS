@@ -18,10 +18,16 @@ class VehicleWarehouseService:
     def __init__(
         self, 
         stock_doc_service: StockDocService,
-        stock_level_service: StockLevelService
+        stock_level_service: StockLevelService,
+        vehicle_service=None,
+        variant_service=None,
+        truck_inventory_repository=None
     ):
         self.stock_doc_service = stock_doc_service
         self.stock_level_service = stock_level_service
+        self.vehicle_service = vehicle_service
+        self.variant_service = variant_service
+        self.truck_inventory_repository = truck_inventory_repository
     
     async def load_vehicle_as_warehouse(
         self,
@@ -51,7 +57,9 @@ class VehicleWarehouseService:
                 user=user
             )
             
-            # Stock levels are updated manually to transfer from ON_HAND to TRUCK_STOCK
+            # Note: We don't create stock levels for vehicles since they're not warehouses
+            # Vehicle inventory is tracked in the truck_inventory table
+            # The stock document will handle the transfer from warehouse ON_HAND to TRUCK_STOCK
             
             # Create truck inventory records for trip tracking
             truck_inventory_records = await self._create_truck_inventory_records(
@@ -62,11 +70,14 @@ class VehicleWarehouseService:
             )
             
             # Save truck inventory records to database
-            # Note: This would require a TruckInventoryRepository
-            # For now, we'll just log the records
-            default_logger.info(f"Created {len(truck_inventory_records)} truck inventory records")
-            for record in truck_inventory_records:
-                default_logger.info(f"Truck inventory record: {record.to_dict()}")
+            if self.truck_inventory_repository:
+                for record in truck_inventory_records:
+                    await self.truck_inventory_repository.create_truck_inventory(record)
+                default_logger.info(f"Saved {len(truck_inventory_records)} truck inventory records to database")
+            else:
+                default_logger.warning("TruckInventoryRepository not available, records not saved")
+                for record in truck_inventory_records:
+                    default_logger.info(f"Truck inventory record: {record.to_dict()}")
             
             default_logger.info(
                 f"Vehicle loaded as warehouse",
@@ -115,7 +126,8 @@ class VehicleWarehouseService:
         destination_warehouse_id: UUID,
         actual_inventory: List[Dict[str, Any]],
         expected_inventory: List[Dict[str, Any]],
-        unloaded_by: UUID
+        unloaded_by: UUID,
+        user: User
     ) -> Dict[str, Any]:
         """
         Unload vehicle inventory back to warehouse with variance handling
@@ -149,14 +161,16 @@ class VehicleWarehouseService:
                     trip_id=trip_id,
                     destination_warehouse_id=destination_warehouse_id,
                     variances=variances,
-                    created_by=unloaded_by
+                    created_by=unloaded_by,
+                    user=user
                 )
             
             # Update stock levels
             await self._update_stock_levels_for_unloading(
                 vehicle_id=vehicle_id,
                 destination_warehouse_id=destination_warehouse_id,
-                actual_inventory=actual_inventory
+                actual_inventory=actual_inventory,
+                user=user
             )
             
             default_logger.info(
@@ -183,104 +197,162 @@ class VehicleWarehouseService:
     async def get_vehicle_inventory_as_warehouse(
         self,
         vehicle_id: UUID,
-        trip_id: Optional[UUID] = None
+        trip_id: Optional[UUID] = None,
+        user: Optional[User] = None
     ) -> Dict[str, Any]:
         """
-        Get current inventory on vehicle
+        Get current inventory on vehicle using stock_levels (vehicle as warehouse)
         """
         try:
             default_logger.info(f"Getting vehicle inventory for vehicle {vehicle_id}, trip {trip_id}")
             
-            # For now, let's use a simpler approach and just return all TRUCK_STOCK items
-            # In a full implementation, we would filter by vehicle context
-            tenant_id = UUID("332072c1-5405-4f09-a56f-a631defa911b")  # Your tenant ID
-            
-            # Get all stock levels with TRUCK_STOCK status for this tenant
-            all_stock_levels = await self.stock_level_service.get_all_stock_levels(tenant_id)
-            truck_stock_levels = [level for level in all_stock_levels if level.stock_status == StockStatus.TRUCK_STOCK and level.quantity > 0]
-            
-            # For now, use estimated weights based on typical cylinder weights
-            # In a full implementation, we would fetch variant details
-            estimated_weights = {
-                "78755b8d-c581-4c9f-9465-a57b288b14ca": 27.0,  # 9kg tare + 18kg capacity
-                "8445af28-65c9-4af8-be17-2133d92c6e8b": 27.0   # 9kg tare + 18kg capacity
-            }
-            
-            # Convert to dict format for the API with weight information
-            inventory_items = []
+            # Get vehicle inventory from truck_inventory table
+            # Vehicles are not warehouses, so we don't query stock_levels
+            truck_inventory_items = []
             total_weight_kg = 0.0
             total_volume_m3 = 0.0
             
-            for level in truck_stock_levels:
-                variant_id_str = str(level.variant_id)
-                unit_weight_kg = estimated_weights.get(variant_id_str, 27.0)  # Default to 27kg if not found
-                unit_volume_m3 = 0.036  # Estimate: 18kg capacity * 0.002 m³/kg
+            # Import the database session to query truck_inventory directly
+            from app.infrastucture.database.connection import direct_db_connection
+            from app.infrastucture.database.models.truck_inventory import TruckInventoryModel
+            from sqlalchemy import select, and_
+            
+            # Get tenant ID from user context or fallback to a default
+            if user and user.tenant_id:
+                tenant_id = user.tenant_id
+            else:
+                # Fallback: could also be passed as parameter or retrieved from context
+                tenant_id = UUID("332072c1-5405-4f09-a56f-a631defa911b")
+            
+            # Get database session using the direct connection
+            async for session in direct_db_connection.get_session():
+                # Get truck inventory for this vehicle and trip
+                truck_inventory_query = select(TruckInventoryModel).where(
+                    and_(
+                        TruckInventoryModel.vehicle_id == vehicle_id,
+                        TruckInventoryModel.trip_id == trip_id if trip_id else True
+                    )
+                )
                 
-                quantity = float(level.quantity)
-                item_weight = unit_weight_kg * quantity
-                item_volume = unit_volume_m3 * quantity
+                result = await session.execute(truck_inventory_query)
+                truck_inventory_records = result.scalars().all()
                 
-                total_weight_kg += item_weight
-                total_volume_m3 += item_volume
+                default_logger.info(f"Found {len(truck_inventory_records)} truck inventory records for vehicle {vehicle_id}")
                 
+                # Get variant details for weight and volume calculations
+                variant_details = {}
+                if self.variant_service and truck_inventory_records:
+                    for record in truck_inventory_records:
+                        try:
+                            variant = await self.variant_service.get_variant_by_id(record.variant_id)
+                            if variant:
+                                variant_details[str(record.variant_id)] = {
+                                    'unit_weight_kg': float(getattr(variant, 'unit_weight_kg', 27.0)),
+                                    'unit_volume_m3': float(getattr(variant, 'unit_volume_m3', 0.036)),
+                                    'product_id': str(getattr(variant, 'product_id', record.variant_id))
+                                }
+                        except Exception as e:
+                            default_logger.warning(f"Failed to fetch variant details for {record.variant_id}: {e}")
+                
+                # Fallback weights for variants without database details
+                default_weight_kg = 27.0  # Default cylinder weight
+                default_volume_m3 = 0.036  # Default cylinder volume
+                
+                # Convert truck inventory records to inventory format
+                for record in truck_inventory_records:
+                    variant_id_str = str(record.variant_id)
+                    variant_info = variant_details.get(variant_id_str, {
+                        'unit_weight_kg': default_weight_kg,
+                        'unit_volume_m3': default_volume_m3,
+                        'product_id': str(record.product_id)
+                    })
+                    
+                    unit_weight_kg = variant_info['unit_weight_kg']
+                    unit_volume_m3 = variant_info['unit_volume_m3']
+                    product_id = variant_info['product_id']
+                    
+                    remaining_qty = float(record.loaded_qty - record.delivered_qty)
+                    item_weight = unit_weight_kg * remaining_qty
+                    item_volume = unit_volume_m3 * remaining_qty
+                    
+                    total_weight_kg += item_weight
+                    total_volume_m3 += item_volume
+                    
+                    truck_inventory_items.append({
+                        "product_id": product_id,
+                        "variant_id": str(record.variant_id),
+                        "loaded_qty": float(record.loaded_qty),
+                        "delivered_qty": float(record.delivered_qty),
+                        "remaining_qty": remaining_qty,
+                        "empties_expected_qty": float(record.empties_expected_qty),
+                        "empties_collected_qty": float(record.empties_collected_qty),
+                        "unit_weight_kg": unit_weight_kg,
+                        "unit_volume_m3": unit_volume_m3,
+                        "total_weight_kg": item_weight,
+                        "total_volume_m3": item_volume
+                    })
+                
+                break  # Exit the async for loop after first iteration
+            
+            # Convert to inventory format for API
+            # Note: Vehicles are not warehouses, so we don't create stock level entries
+            inventory_items = []
+            for item in truck_inventory_items:
                 inventory_items.append({
-                    "warehouse_id": str(level.warehouse_id),
-                    "variant_id": str(level.variant_id),
-                    "product_id": str(level.variant_id),  # Using variant_id as placeholder
+                    "warehouse_id": None,  # Vehicle is not a warehouse
+                    "variant_id": item["variant_id"],
+                    "product_id": item["product_id"],
                     "stock_status": "TRUCK_STOCK",
-                    "quantity": quantity,
-                    "reserved_qty": float(level.reserved_qty),
-                    "available_qty": float(level.available_qty),
-                    "unit_cost": float(level.unit_cost),
-                    "total_cost": float(level.total_cost),
-                    "unit_weight_kg": unit_weight_kg,
-                    "unit_volume_m3": unit_volume_m3,
-                    "total_weight_kg": item_weight,
-                    "total_volume_m3": item_volume,
-                    "last_transaction_date": level.last_transaction_date.isoformat() if level.last_transaction_date else None
+                    "quantity": item["remaining_qty"],
+                    "reserved_qty": 0.0,  # No reservations on vehicle
+                    "available_qty": item["remaining_qty"],
+                    "unit_cost": 0.0,  # Cost not tracked in truck inventory
+                    "total_cost": 0.0,
+                    "unit_weight_kg": item["unit_weight_kg"],
+                    "unit_volume_m3": item["unit_volume_m3"],
+                    "total_weight_kg": item["total_weight_kg"],
+                    "total_volume_m3": item["total_volume_m3"],
+                    "last_transaction_date": None
                 })
             
-            # TODO: Get truck inventory records from truck_inventory table
-            # For now, convert stock level data to truck inventory format for display
-            truck_inventory_items = []
-            for level in truck_stock_levels:
-                variant_id_str = str(level.variant_id)
-                unit_weight_kg = estimated_weights.get(variant_id_str, 27.0)  # Default to 27kg if not found
-                unit_volume_m3 = 0.036  # Estimate: 18kg capacity * 0.002 m³/kg
-                
-                quantity = float(level.quantity)
-                truck_inventory_items.append({
-                    "product_id": str(level.variant_id),  # Using variant as product for now
-                    "variant_id": str(level.variant_id),
-                    "loaded_qty": quantity,
-                    "delivered_qty": 0.0,  # Would come from actual deliveries
-                    "remaining_qty": quantity,
-                    "empties_expected_qty": 0.0,  # Would come from truck_inventory table
-                    "empties_collected_qty": 0.0,  # Would come from actual collections
-                    "unit_cost": float(level.unit_cost),
-                    "total_cost": float(level.total_cost),
-                    "unit_weight_kg": unit_weight_kg,
-                    "unit_volume_m3": unit_volume_m3,
-                    "total_weight_kg": unit_weight_kg * quantity,
-                    "total_volume_m3": unit_volume_m3 * quantity
-                })
+            # Get vehicle details from database if service is available
+            vehicle_details = {}
+            if self.vehicle_service:
+                try:
+                    vehicle = await self.vehicle_service.get_vehicle_by_id(vehicle_id)
+                    if vehicle:
+                        vehicle_details = {
+                            "id": str(vehicle_id),
+                            "plate": getattr(vehicle, 'plate', f"VEH-{str(vehicle_id)[:8]}"),
+                            "vehicle_type": getattr(vehicle, 'vehicle_type', "TRUCK"),
+                            "capacity_kg": float(getattr(vehicle, 'capacity_kg', 2000)),
+                            "capacity_m3": float(getattr(vehicle, 'capacity_m3', 20)) if getattr(vehicle, 'capacity_m3', None) else 20.0,
+                            "current_load_kg": total_weight_kg,
+                            "current_volume_m3": total_volume_m3
+                        }
+                except Exception as e:
+                    default_logger.warning(f"Failed to fetch vehicle details for {vehicle_id}: {e}")
             
-            # Return structured data with both stock levels and truck inventory
-            vehicle_data = {
-                "vehicle": {
+            # Fallback vehicle details if service is not available or fails
+            if not vehicle_details:
+                vehicle_details = {
                     "id": str(vehicle_id),
                     "plate": f"VEH-{str(vehicle_id)[:8]}",
                     "vehicle_type": "TRUCK",
-                    "capacity_kg": 5000,
-                    "capacity_m3": 50,
+                    "capacity_kg": 2000.0,  # Default capacity
+                    "capacity_m3": 20.0,    # Default capacity
                     "current_load_kg": total_weight_kg,
                     "current_volume_m3": total_volume_m3
-                },
+                }
+            
+            # Return structured data with both stock levels and truck inventory
+            vehicle_data = {
+                "vehicle": vehicle_details,
                 "inventory": inventory_items,
                 "truck_inventory": truck_inventory_items
             }
             
-            default_logger.info(f"Found {len(inventory_items)} TRUCK_STOCK items and {len(truck_inventory_items)} truck inventory items for vehicle inventory. Total weight: {total_weight_kg}kg, Total volume: {total_volume_m3}m³")
+            default_logger.info(f"Found {len(inventory_items)} inventory items and {len(truck_inventory_items)} truck inventory items for vehicle {vehicle_id}. Total weight: {total_weight_kg}kg, Total volume: {total_volume_m3}m³")
             
             return vehicle_data
             
@@ -395,17 +467,7 @@ class VehicleWarehouseService:
         
         # Create stock document using the service
         if user is None:
-            # Fallback to mock user if no user provided
-            user = User(
-                id=created_by,
-                tenant_id=UUID("00000000-0000-0000-0000-000000000000"),  # Will be set from context
-                auth_id=UUID("00000000-0000-0000-0000-000000000000"),
-                email="system@oms.com",
-                first_name="System",
-                last_name="User",
-                role="ADMIN",
-                active=True
-            )
+            raise ValueError("User context is required for stock document creation. Please provide a valid user.")
         
         # For vehicle loading, we create a transfer from source warehouse to vehicle's depot
         # The stock document service will handle the transfer from ON_HAND to TRUCK_STOCK
@@ -492,10 +554,11 @@ class VehicleWarehouseService:
             })
         
         # Create stock document using the service
+        # Note: This method should be updated to accept and require a user parameter
         from app.domain.entities.users import User
         mock_user = User(
             id=created_by,
-            tenant_id=UUID("00000000-0000-0000-0000-000000000000"),  # Will be set from context
+            tenant_id=UUID("00000000-0000-0000-0000-000000000000"),  # TODO: Pass tenant_id from context
             auth_id=UUID("00000000-0000-0000-0000-000000000000"),
             email="system@oms.com",
             first_name="System",
@@ -535,19 +598,9 @@ class VehicleWarehouseService:
                 quantity = Decimal(str(item["quantity"]))
             
             # Decrease warehouse stock (ON_HAND) - items are being loaded onto vehicle
-            # We need to pass a user object for the stock level service
+            # User is required for the stock level service
             if user is None:
-                # Create a mock user for the stock operation
-                user = User(
-                    id=UUID("00000000-0000-0000-0000-000000000000"),
-                    tenant_id=UUID("00000000-0000-0000-0000-000000000000"),
-                    auth_id=UUID("00000000-0000-0000-0000-000000000000"),
-                    email="system@oms.com",
-                    first_name="System",
-                    last_name="User",
-                    role="ADMIN",
-                    active=True
-                )
+                raise ValueError("User context is required for stock level operations. Please provide a valid user.")
             
             await self.stock_level_service.issue_stock(
                 user=user,
@@ -570,18 +623,9 @@ class VehicleWarehouseService:
         user: Optional[User] = None
     ):
         """Update stock levels when unloading vehicle"""
-        # Create mock user if not provided
+        # User is required for stock level operations
         if user is None:
-            user = User(
-                id=UUID("00000000-0000-0000-0000-000000000000"),
-                tenant_id=UUID("00000000-0000-0000-0000-000000000000"),
-                auth_id=UUID("00000000-0000-0000-0000-000000000000"),
-                email="system@oms.com",
-                first_name="System",
-                last_name="User",
-                role="ADMIN",
-                active=True
-            )
+            raise ValueError("User context is required for stock level operations. Please provide a valid user.")
         
         for item in actual_inventory:
             variant_id = UUID(item["variant_id"])
@@ -674,7 +718,8 @@ class VehicleWarehouseService:
         trip_id: UUID,
         destination_warehouse_id: UUID,
         variances: List[Dict[str, Any]],
-        created_by: UUID
+        created_by: UUID,
+        user: Optional[User] = None
     ) -> List[StockDoc]:
         """Create variance adjustment documents"""
         variance_docs = []
@@ -685,8 +730,11 @@ class VehicleWarehouseService:
                 doc_no = f"ADJ-VAR-{trip_id}-{variance['variant_id']}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
                 
                 # Create adjustment document
+                if user is None:
+                    raise ValueError("User context is required for variance adjustment creation.")
+                
                 stock_doc = StockDoc.create(
-                    tenant_id=UUID("00000000-0000-0000-0000-000000000000"),  # Will be set from context
+                    tenant_id=user.tenant_id,
                     doc_no=doc_no,
                     doc_type=StockDocType.ADJ_VARIANCE,
                     dest_wh_id=destination_warehouse_id,
