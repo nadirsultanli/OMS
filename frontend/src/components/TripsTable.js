@@ -133,7 +133,7 @@ const TripsTable = ({
                   
                   {/* Vehicle */}
                   <td className="vehicle-cell">
-                    <div className="vehicle-info">
+                    <div className="vehicle-info" title={vehicleName}>
                       <Truck size={16} className="vehicle-icon" />
                       <span className="vehicle-name">{vehicleName}</span>
                     </div>
@@ -141,7 +141,7 @@ const TripsTable = ({
                   
                   {/* Driver */}
                   <td className="driver-cell">
-                    <div className="driver-info">
+                    <div className="driver-info" title={driverName}>
                       <User size={16} className="driver-icon" />
                       <span className="driver-name">{driverName}</span>
                     </div>

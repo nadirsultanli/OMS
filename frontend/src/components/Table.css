@@ -24,7 +24,7 @@
 .orders-table,
 .trips-table {
   width: 100%;
-  table-layout: fixed;
+  table-layout: auto; /* Changed to auto for better column alignment */
   border-collapse: collapse;
   font-size: 14px;
   background: white;
@@ -108,14 +108,6 @@
   align-items: center;
   gap: 8px;
   min-height: 24px;
-}
-
-/* Ensure proper text overflow handling */
-.trips-table .truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
 }
 
 /* ============================================
