@@ -451,94 +451,105 @@ const VehicleLoader = ({
               </button>
             </div>
 
-            <div className="item-fields">
-              <div className="field-group">
-                <label>Product ID:</label>
-                <input
-                  type="text"
-                  value={item.product_id}
-                  onChange={(e) => updateInventoryItem(item.id, 'product_id', e.target.value)}
-                  disabled={loading}
-                  placeholder="Enter product ID"
-                />
+            <div className="item-content">
+              {/* Product Information Section */}
+              <div className="product-info-section">
+                <div className="field-group readonly">
+                  <label>Product ID:</label>
+                  <div className="readonly-field">
+                    {item.product_id || <span className="placeholder">Not assigned</span>}
+                  </div>
+                </div>
+
+                <div className="field-group readonly">
+                  <label>Variant ID:</label>
+                  <div className="readonly-field">
+                    {item.variant_id || <span className="placeholder">Not assigned</span>}
+                  </div>
+                </div>
               </div>
 
-              <div className="field-group">
-                <label>Variant ID:</label>
-                <input
-                  type="text"
-                  value={item.variant_id}
-                  onChange={(e) => updateInventoryItem(item.id, 'variant_id', e.target.value)}
-                  disabled={loading}
-                  placeholder="Enter variant ID"
-                />
-              </div>
+              {/* Main Input Fields Section */}
+              <div className="input-fields-section">
+                <div className="field-row">
+                  <div className="field-group">
+                    <label>Quantity:</label>
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => updateInventoryItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                      disabled={loading}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
 
-              <div className="field-group">
-                <label>Quantity:</label>
-                <input
-                  type="number"
-                  value={item.quantity}
-                  onChange={(e) => updateInventoryItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                  disabled={loading}
-                  min="0"
-                  step="0.01"
-                />
-              </div>
+                  <div className="field-group">
+                    <label>Expected Empties:</label>
+                    <input
+                      type="number"
+                      value={item.empties_expected_qty}
+                      onChange={(e) => updateInventoryItem(item.id, 'empties_expected_qty', parseFloat(e.target.value) || 0)}
+                      disabled={loading}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
 
-              <div className="field-group">
-                <label>Unit Weight (kg):</label>
-                <input
-                  type="number"
-                  value={item.unit_weight_kg}
-                  onChange={(e) => updateInventoryItem(item.id, 'unit_weight_kg', parseFloat(e.target.value) || 0)}
-                  disabled={loading}
-                  min="0"
-                  step="0.01"
-                />
-              </div>
+                <div className="field-row">
+                  <div className="field-group">
+                    <label>Unit Weight (kg):</label>
+                    <input
+                      type="number"
+                      value={item.unit_weight_kg}
+                      onChange={(e) => updateInventoryItem(item.id, 'unit_weight_kg', parseFloat(e.target.value) || 0)}
+                      disabled={loading}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
 
-              <div className="field-group">
-                <label>Unit Volume (m³):</label>
-                <input
-                  type="number"
-                  value={item.unit_volume_m3}
-                  onChange={(e) => updateInventoryItem(item.id, 'unit_volume_m3', parseFloat(e.target.value) || 0)}
-                  disabled={loading}
-                  min="0"
-                  step="0.001"
-                />
-              </div>
+                  <div className="field-group">
+                    <label>Unit Volume (m³):</label>
+                    <input
+                      type="number"
+                      value={item.unit_volume_m3}
+                      onChange={(e) => updateInventoryItem(item.id, 'unit_volume_m3', parseFloat(e.target.value) || 0)}
+                      disabled={loading}
+                      min="0"
+                      step="0.001"
+                    />
+                  </div>
 
-              <div className="field-group">
-                <label>Unit Cost:</label>
-                <input
-                  type="number"
-                  value={item.unit_cost}
-                  onChange={(e) => updateInventoryItem(item.id, 'unit_cost', parseFloat(e.target.value) || 0)}
-                  disabled={loading}
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-
-              <div className="field-group">
-                <label>Expected Empties:</label>
-                <input
-                  type="number"
-                  value={item.empties_expected_qty}
-                  onChange={(e) => updateInventoryItem(item.id, 'empties_expected_qty', parseFloat(e.target.value) || 0)}
-                  disabled={loading}
-                  min="0"
-                  step="0.01"
-                />
+                  <div className="field-group">
+                    <label>Unit Cost:</label>
+                    <input
+                      type="number"
+                      value={item.unit_cost}
+                      onChange={(e) => updateInventoryItem(item.id, 'unit_cost', parseFloat(e.target.value) || 0)}
+                      disabled={loading}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="item-totals">
-              <span>Total Weight: {(item.quantity * item.unit_weight_kg).toFixed(2)}kg</span>
-              <span>Total Volume: {(item.quantity * item.unit_volume_m3).toFixed(3)}m³</span>
-              <span>Total Cost: ${(item.quantity * item.unit_cost).toFixed(2)}</span>
+              <div className="total-item">
+                <span className="label">Weight:</span>
+                <span className="value">{(item.quantity * item.unit_weight_kg).toFixed(2)}kg</span>
+              </div>
+              <div className="total-item">
+                <span className="label">Volume:</span>
+                <span className="value">{(item.quantity * item.unit_volume_m3).toFixed(3)}m³</span>
+              </div>
+              <div className="total-item">
+                <span className="label">Cost:</span>
+                <span className="value">${(item.quantity * item.unit_cost).toFixed(2)}</span>
+              </div>
             </div>
           </div>
         ))}
