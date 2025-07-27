@@ -159,12 +159,14 @@ const StockDocuments = () => {
     // For truck transfers, show truck information
     if (doc.doc_type === 'ISS_LOAD' || doc.doc_type === 'TRF_TRUCK' || doc.doc_type === 'LOAD_MOB') {
       if (doc.vehicle_id) {
-        return `Truck: ${doc.vehicle_plate || doc.vehicle_id}`;
+        const vehicleInfo = doc.vehicle_plate || doc.vehicle_id;
+        return `Truck: ${vehicleInfo}`;
       }
       return 'Truck (Not specified)';
     }
     // For warehouse transfers and other types, show warehouse
-    return getWarehouseName(doc.to_warehouse_id);
+    const warehouseName = getWarehouseName(doc.to_warehouse_id);
+    return warehouseName;
   };
 
   const handlePostDocument = async (docId) => {
@@ -380,7 +382,8 @@ const StockDocuments = () => {
 
       {/* Documents Table */}
       <div className="stock-docs-table">
-        <table className="table">
+        <div className="table-scroll-wrapper">
+          <table className="table">
           <thead>
             <tr>
               <th>Document No.</th>
@@ -421,7 +424,7 @@ const StockDocuments = () => {
                     </span>
                   </td>
                   <td>{getWarehouseName(doc.from_warehouse_id)}</td>
-                  <td>{getToEntityName(doc)}</td>
+                  <td title={getToEntityName(doc)}>{getToEntityName(doc)}</td>
                   <td>
                     {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'N/A'}
                   </td>
@@ -477,6 +480,7 @@ const StockDocuments = () => {
             )}
           </tbody>
         </table>
+        </div>
         
         {/* Pagination Controls */}
         {totalCount > 0 && (
