@@ -380,11 +380,14 @@ select.form-control option {
 .table th:nth-child(1) { min-width: 140px; } /* Document No */
 .table th:nth-child(2) { min-width: 180px; } /* Type */
 .table th:nth-child(3) { min-width: 120px; } /* Status */
-.table th:nth-child(4) { min-width: 180px; } /* From Warehouse */
-.table th:nth-child(5) { min-width: 180px; } /* To Warehouse */
+.table th:nth-child(4) { min-width: 200px; } /* From Warehouse */
+.table th:nth-child(5) { min-width: 200px; } /* To Entity */
 .table th:nth-child(6) { min-width: 120px; } /* Created Date */
 .table th:nth-child(7) { min-width: 120px; } /* Created By */
-.table th:nth-child(8) { min-width: 200px; } /* Actions */
+.table th:nth-child(8) { 
+  min-width: 200px; 
+  text-align: center;
+} /* Actions */
 
 .table tbody tr {
   border-bottom: 1px solid #e5e7eb;

@@ -1,11 +1,12 @@
 .vehicle-loader {
-  max-width: 1000px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 20px;
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow-x: hidden;
 }
 
 .vehicle-loader-header {
@@ -37,7 +38,7 @@
 
 .trip-warehouse-info {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
   padding: 16px;
@@ -158,11 +159,17 @@
 }
 
 .inventory-item {
-  background: #f9fafb;
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+.inventory-item:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .item-header {
@@ -189,11 +196,58 @@
   color: #374151;
 }
 
-.item-fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+/* New layout structure for inventory items */
+.item-content {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   margin-bottom: 12px;
+}
+
+.product-info-section {
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border-left: 4px solid #3b82f6;
+}
+
+.input-fields-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+/* Read-only field styling */
+.field-group.readonly {
+  flex: 1;
+}
+
+.readonly-field {
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.readonly-field .placeholder {
+  color: #9ca3af;
+  font-style: italic;
+  font-weight: normal;
 }
 
 .field-group {
@@ -228,14 +282,186 @@
   cursor: not-allowed;
 }
 
-.item-totals {
+/* Status and reservation styling */
+.reservation-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reservation-status.none {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.reservation-status.checking {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.reservation-status.reserved {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.reservation-status.confirmed {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* Availability summary improvements */
+.availability-summary {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.availability-summary h4 {
+  margin: 0 0 12px 0;
+  color: #374151;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.availability-items {
   display: flex;
-  gap: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #d1d5db;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.availability-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
   font-size: 14px;
+}
+
+.availability-item.available {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.availability-item.unavailable {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.availability-item .variant-id {
+  font-weight: 600;
+  color: #374151;
+}
+
+.availability-item .quantity-info {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.availability-item .status-ok {
+  color: #059669;
+  font-weight: 500;
+}
+
+.availability-item .status-error {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* Reservation details improvements */
+.reservation-details {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f0f9ff;
+  border-radius: 8px;
+  border: 1px solid #bae6fd;
+}
+
+.reservation-details h4 {
+  margin: 0 0 12px 0;
+  color: #374151;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.reservation-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.reservation-info .info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.reservation-info .info-item label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.reservation-info .info-item span {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.status.active {
+  color: #059669;
+}
+
+.status.pending {
+  color: #d97706;
+}
+
+.status.expired {
+  color: #dc2626;
+}
+
+.item-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 13px;
   color: #6b7280;
   font-weight: 500;
+  border: 1px solid #e5e7eb;
+}
+
+.item-totals .total-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 8px 4px;
+  gap: 4px;
+}
+
+.item-totals .total-item .label {
+  font-size: 12px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.item-totals .total-item .value {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 600;
 }
 
 .empty-state {
@@ -336,21 +562,85 @@
   font-weight: 600;
 }
 
+.btn-primary.ready-to-load {
+  background: #059669;
+  animation: pulse 2s infinite;
+}
+
+.btn-primary.ready-to-load:hover:not(:disabled) {
+  background: #047857;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.load-instructions {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #6b7280;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Compact design for modals */
+.vehicle-loader.modal-compact {
+  padding: 16px;
+  margin: 0;
+  max-width: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.vehicle-loader.modal-compact .inventory-item {
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.vehicle-loader.modal-compact .capacity-validation,
+.vehicle-loader.modal-compact .availability-summary,
+.vehicle-loader.modal-compact .reservation-details {
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
+/* Improved spacing for modal usage */
+.vehicle-loader.modal-compact .vehicle-loader-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+}
+
+.vehicle-loader.modal-compact .trip-warehouse-info {
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
 @media (max-width: 768px) {
   .vehicle-loader {
     padding: 16px;
+    max-width: 100%;
   }
   
   .trip-warehouse-info {
     grid-template-columns: 1fr;
   }
   
-  .item-fields {
+  .product-info-section {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .field-row {
     grid-template-columns: 1fr;
   }
   
   .item-totals {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 8px;
   }
   
@@ -377,4 +667,41 @@
   .empty-state-buttons .btn {
     width: 100%;
   }
+}
+
+/* Additional responsive improvements */
+@media (max-width: 600px) {
+  .vehicle-loader {
+    padding: 12px;
+  }
+  
+  .vehicle-loader-header h3 {
+    font-size: 20px;
+  }
+  
+  .field-row {
+    gap: 8px;
+  }
+  
+  .product-info-section {
+    padding: 8px;
+  }
+}
+
+/* Improved container constraints for modal usage */
+.vehicle-loader {
+  box-sizing: border-box;
+}
+
+.vehicle-loader * {
+  box-sizing: border-box;
+}
+
+/* Ensure no content forces horizontal scroll */
+.vehicle-loader,
+.inventory-item,
+.item-content,
+.field-row {
+  max-width: 100%;
+  overflow-x: hidden;
 }

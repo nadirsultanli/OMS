@@ -451,15 +451,6 @@ const TripDetailView = ({ tripId: propTripId, onClose }) => {
           </div>
         </div>
         <div className="header-right">
-          {canEditTrip && (
-            <button 
-              className="btn btn-primary"
-              onClick={() => navigate(`/trips/${tripId}/edit`)}
-            >
-              <Edit2 size={16} />
-              Edit Trip
-            </button>
-          )}
         </div>
       </div>
 

@@ -150,9 +150,21 @@ const StockDocuments = () => {
   };
 
   const getWarehouseName = (warehouseId) => {
-    if (!warehouseId) return 'N/A';
+    if (!warehouseId) return '-';
     const warehouse = warehouses.find(w => w.id === warehouseId);
-    return warehouse ? `${warehouse.code} - ${warehouse.name}` : 'Unknown';
+    return warehouse ? `${warehouse.code} - ${warehouse.name}` : 'Loading...';
+  };
+
+  const getToEntityName = (doc) => {
+    // For truck transfers, show truck information
+    if (doc.doc_type === 'ISS_LOAD' || doc.doc_type === 'TRF_TRUCK' || doc.doc_type === 'LOAD_MOB') {
+      if (doc.vehicle_id) {
+        return `Truck: ${doc.vehicle_plate || doc.vehicle_id}`;
+      }
+      return 'Truck (Not specified)';
+    }
+    // For warehouse transfers and other types, show warehouse
+    return getWarehouseName(doc.to_warehouse_id);
   };
 
   const handlePostDocument = async (docId) => {
@@ -375,7 +387,7 @@ const StockDocuments = () => {
               <th>Type</th>
               <th>Status</th>
               <th>From Warehouse</th>
-              <th>To Warehouse</th>
+              <th>To Entity</th>
               <th>Created Date</th>
               <th>Created By</th>
               <th>Actions</th>
@@ -409,7 +421,7 @@ const StockDocuments = () => {
                     </span>
                   </td>
                   <td>{getWarehouseName(doc.from_warehouse_id)}</td>
-                  <td>{getWarehouseName(doc.to_warehouse_id)}</td>
+                  <td>{getToEntityName(doc)}</td>
                   <td>
                     {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'N/A'}
                   </td>
