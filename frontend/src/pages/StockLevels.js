@@ -215,15 +215,19 @@ const StockLevels = () => {
   // Pagination handlers
   const handlePageChange = (newPage) => {
     const newOffset = (newPage - 1) * filters.limit;
-    setFilters(prev => ({ ...prev, offset: newOffset }));
+    const newFilters = { ...filters, offset: newOffset };
+    setFilters(newFilters);
+    loadStockLevels(newFilters); // Immediately load with new pagination
   };
 
   const handlePageSizeChange = (newSize) => {
-    setFilters(prev => ({ 
-      ...prev, 
+    const newFilters = { 
+      ...filters, 
       limit: parseInt(newSize), 
       offset: 0 // Reset to first page
-    }));
+    };
+    setFilters(newFilters);
+    loadStockLevels(newFilters); // Immediately load with new page size
   };
 
   const currentPage = Math.floor(filters.offset / filters.limit) + 1;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import tripService from '../services/tripService';
 import authService from '../services/authService';
 
@@ -49,7 +49,7 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
   };
 
   const handleStatusUpdate = async (newStatus) => {
-    if (!newStatus || newStatus === trip.trip_status) return;
+    if (!newStatus || newStatus === trip.status) return;
 
     setIsUpdating(true);
     try {
@@ -68,47 +68,55 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
     }
   };
 
-  const allowedTransitions = getAllowedTransitions(trip.trip_status);
+  const allowedTransitions = getAllowedTransitions(trip.status);
   const canUpdateStatus = !disabled && allowedTransitions.length > 0;
+
+  // Handle clicking outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showDropdown && !event.target.closest('.trip-status-updater')) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [showDropdown]);
+
+  const handleStatusClick = (e) => {
+    e.stopPropagation();
+    if (canUpdateStatus) {
+      setShowDropdown(!showDropdown);
+    }
+  };
 
   return (
     <div className="trip-status-updater">
-      <div className="current-status-container">
+      <div className="status-container">
         <span 
-          className="trip-status-badge"
+          className={`trip-status-badge ${canUpdateStatus ? 'clickable' : ''}`}
           style={{ 
-            backgroundColor: statusConfig[trip.trip_status]?.color || '#6c757d',
+            backgroundColor: statusConfig[trip.status]?.color || '#6c757d',
             color: 'white',
-            padding: '4px 12px',
+            padding: '6px 14px',
             borderRadius: '16px',
             fontSize: '0.875rem',
             fontWeight: '500',
-            display: 'inline-block'
+            display: 'inline-block',
+            cursor: canUpdateStatus ? 'pointer' : 'default',
+            transition: 'all 0.2s ease',
+            border: '1px solid transparent'
           }}
+          onClick={handleStatusClick}
+          title={canUpdateStatus ? "Click to change status" : "Status"}
         >
-          {statusConfig[trip.trip_status]?.label || trip.trip_status}
+          {statusConfig[trip.status]?.label || trip.status}
+          {isUpdating && <span className="loading-dots">...</span>}
         </span>
-
-        {canUpdateStatus && (
-          <button
-            className="status-update-btn"
-            onClick={() => setShowDropdown(!showDropdown)}
-            disabled={isUpdating}
-            style={{
-              marginLeft: '8px',
-              padding: '4px 8px',
-              border: '1px solid #dee2e6',
-              borderRadius: '4px',
-              backgroundColor: 'white',
-              color: '#495057',
-              cursor: 'pointer',
-              fontSize: '0.75rem'
-            }}
-            title={isAdmin ? "Admin: Update to any valid status" : "Update status"}
-          >
-            {isUpdating ? '...' : '✏️'}
-          </button>
-        )}
       </div>
 
       {showDropdown && canUpdateStatus && (
@@ -120,13 +128,25 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
             left: '0',
             backgroundColor: 'white',
             border: '1px solid #dee2e6',
-            borderRadius: '4px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             zIndex: 1000,
-            minWidth: '150px',
-            marginTop: '4px'
+            minWidth: '180px',
+            marginTop: '8px',
+            padding: '8px 0'
           }}
         >
+          <div className="dropdown-header" style={{
+            padding: '8px 16px',
+            borderBottom: '1px solid #e5e7eb',
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#6b7280',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            Change Status
+          </div>
           {allowedTransitions.map(status => (
             <button
               key={status}
@@ -135,18 +155,32 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
               style={{
                 display: 'block',
                 width: '100%',
-                padding: '8px 12px',
+                padding: '12px 16px',
                 border: 'none',
                 backgroundColor: 'transparent',
                 textAlign: 'left',
                 cursor: 'pointer',
                 fontSize: '0.875rem',
-                color: statusConfig[status]?.color || '#495057'
+                color: statusConfig[status]?.color || '#495057',
+                transition: 'background-color 0.2s ease',
+                fontWeight: '500'
               }}
               onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
               onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
             >
-              {statusConfig[status]?.label || status}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: statusConfig[status]?.color || '#495057'
+                }}></span>
+                {statusConfig[status]?.label || status}
+              </div>
             </button>
           ))}
         </div>
@@ -158,8 +192,20 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
           display: inline-block;
         }
         
-        .status-update-btn:hover {
-          background-color: #f8f9fa !important;
+        .trip-status-badge.clickable:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        .loading-dots {
+          margin-left: 4px;
+          animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+          0%, 20% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
         }
         
         .status-dropdown button:hover {
