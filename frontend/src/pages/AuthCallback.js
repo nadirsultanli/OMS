@@ -77,6 +77,12 @@ const AuthCallback = () => {
         tenant_id: tenantId
       }));
       
+      console.log('AuthCallback - Stored in localStorage:', {
+        accessToken: localStorage.getItem('accessToken'),
+        refreshToken: localStorage.getItem('refreshToken'),
+        user: localStorage.getItem('user')
+      });
+      
       // Update auth service
       if (refreshToken) {
         authService.setTokens(accessToken, refreshToken);
@@ -84,12 +90,14 @@ const AuthCallback = () => {
         authService.setTokens(accessToken, null);
       }
       
+      console.log('AuthCallback - isAuthenticated check:', authService.isAuthenticated());
+      
       setStatus('success');
       
-      // Redirect to dashboard after a short delay
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 1500);
+      // Redirect to dashboard immediately
+      console.log('AuthCallback - Redirecting to dashboard...');
+      console.log('AuthCallback - Final isAuthenticated check:', authService.isAuthenticated());
+      navigate('/dashboard', { replace: true });
       
     } catch (error) {
       console.error('Auth callback error:', error);

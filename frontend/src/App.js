@@ -270,7 +270,9 @@ function App() {
           {/* Default redirect */}
           <Route 
             path="/" 
-            element={<AuthCallback />}
+            element={
+              <Navigate to={authService.isAuthenticated() ? "/dashboard" : "/login"} replace />
+            }
           />
           
           {/* Catch all route */}

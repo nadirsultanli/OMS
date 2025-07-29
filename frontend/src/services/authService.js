@@ -101,6 +101,16 @@ class AuthService {
     return !!(token && user);
   }
 
+  // Set tokens manually (for OAuth callbacks)
+  setTokens(accessToken, refreshToken) {
+    if (accessToken) {
+      localStorage.setItem('accessToken', accessToken);
+    }
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+    }
+  }
+
   // Get current user
   getCurrentUser() {
     const userStr = localStorage.getItem('user');
