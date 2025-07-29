@@ -1,3 +1,4 @@
+import os
 from typing import Optional, List
 from app.domain.entities.users import User, UserRoleType, UserStatus
 from app.domain.repositories.user_repository import UserRepository
@@ -11,7 +12,6 @@ from app.domain.exceptions.users import (
 )
 from app.infrastucture.logs.logger import default_logger
 from app.infrastucture.database.connection import get_supabase_admin_client_sync
-from decouple import config
 from uuid import UUID, uuid4
 from datetime import datetime
 import asyncio
@@ -93,9 +93,9 @@ class UserService:
                 # Continue - this is just a pre-check, not critical
             
             # Configure redirect URL based on role  
-            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+            frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
             if role.value.lower() == "driver":
-                driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                driver_frontend_url = os.getenv("DRIVER_FRONTEND_URL", "https://omsfrontend.netlify.app")
                 redirect_url = driver_frontend_url
             else:
                 redirect_url = frontend_url
@@ -378,9 +378,9 @@ class UserService:
             user = await self.get_user_by_id(user_id)
             
             # Configure redirect URL based on role
-            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+            frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
             if user.role.value.lower() == "driver":
-                driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                driver_frontend_url = os.getenv("DRIVER_FRONTEND_URL", "https://omsfrontend.netlify.app")
                 redirect_url = driver_frontend_url
             else:
                 redirect_url = frontend_url
@@ -485,9 +485,9 @@ class UserService:
                             
                             # Try to send invitation
                             try:
-                                frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+                                frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
                                 if user.role.value.lower() == "driver":
-                                    driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                                    driver_frontend_url = os.getenv("DRIVER_FRONTEND_URL", "https://omsfrontend.netlify.app")
                                     redirect_url = driver_frontend_url
                                 else:
                                     redirect_url = frontend_url
@@ -613,9 +613,9 @@ class UserService:
             supabase = get_supabase_admin_client_sync()
             
             # Configure redirect URL based on role  
-            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+            frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
             if role.value.lower() == "driver":
-                driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                driver_frontend_url = os.getenv("DRIVER_FRONTEND_URL", "https://omsfrontend.netlify.app")
                 redirect_url = driver_frontend_url
             else:
                 redirect_url = frontend_url
@@ -734,9 +734,9 @@ class UserService:
             # Configure redirect URL based on role
             # Note: Supabase will redirect to the root URL with auth parameters
             # Our AuthCallback component will then route to the appropriate page
-            frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+            frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
             if role.value.lower() == "driver":
-                driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+                driver_frontend_url = os.getenv("DRIVER_FRONTEND_URL", "https://omsfrontend.netlify.app")
                 redirect_url = driver_frontend_url
             else:
                 redirect_url = frontend_url
