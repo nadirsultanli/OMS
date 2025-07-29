@@ -217,7 +217,7 @@ class GoogleOAuthService:
             query_string = urlencode(encoded_data)
             
             # Create redirect URL
-            redirect_url = f"{self.frontend_url}/auth-callback?{query_string}"
+            redirect_url = f"{self.frontend_url}/auth/callback?{query_string}"
             
             logger.info(f"Generated frontend redirect URL: {redirect_url}")
             logger.info(f"Frontend URL: {self.frontend_url}")

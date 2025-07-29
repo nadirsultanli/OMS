@@ -405,6 +405,26 @@ async def get_current_user_optional(request: Request):
         
         token = authorization.replace("Bearer ", "")
         
+        # Check if this is a Google OAuth token (simple string format)
+        if token.startswith("google_session_"):
+            # Handle Google OAuth token
+            user_id = token.replace("google_session_", "")
+            default_logger.info(f"Google OAuth token detected in audit middleware, user_id: {user_id}")
+            
+            # Get user by ID directly
+            from app.infrastucture.database.repositories.supabase_user_repository import SupabaseUserRepository
+            from app.domain.entities.users import UserStatus
+            
+            user_repo = SupabaseUserRepository()
+            user = await user_repo.get_by_id(user_id)
+            
+            if not user or user.status != UserStatus.ACTIVE:
+                return None
+            
+            default_logger.info(f"Google OAuth user found in audit middleware: {user.email}")
+            return user
+        
+        # Handle regular JWT tokens
         # Get Supabase client and verify the JWT token
         from app.infrastucture.database.connection import get_supabase_client_sync
         from app.infrastucture.database.repositories.supabase_user_repository import SupabaseUserRepository

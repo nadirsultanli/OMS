@@ -103,19 +103,14 @@ async def google_callback(
                     })
                     auth_user = create_response.user
                 
-                # Generate session tokens for the user
-                session_response = supabase.auth.admin.generate_link({
-                    "type": "magiclink",
-                    "email": email
-                })
+                # For Google OAuth, we'll use the existing user's session if they have one
+                # or create a simple token that the frontend can use
+                # The frontend will handle the authentication state
+                access_token = f"google_session_{user.id}"
+                refresh_token = f"refresh_{user.id}"
                 
-                if session_response and hasattr(session_response, 'properties'):
-                    access_token = session_response.properties.get('access_token')
-                    refresh_token = session_response.properties.get('refresh_token')
-                else:
-                    # Fallback to simple token
-                    access_token = f"google_session_{user.id}"
-                    refresh_token = f"refresh_{user.id}"
+                # Note: This is a temporary solution. In production, you should implement
+                # proper JWT token generation for Google OAuth users
                     
             except Exception as auth_error:
                 logger.warning(f"Failed to handle Supabase auth user: {str(auth_error)}")

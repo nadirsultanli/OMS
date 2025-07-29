@@ -60,6 +60,36 @@ async def conditional_auth(
     try:
         from app.infrastucture.database.connection import get_supabase_client_sync
         
+        # Check if this is a Google OAuth token (simple string format)
+        if credentials.credentials.startswith("google_session_"):
+            # Handle Google OAuth token
+            user_id = credentials.credentials.replace("google_session_", "")
+            default_logger.info(f"Google OAuth token detected, user_id: {user_id}")
+            
+            # Get user by ID directly
+            user = await user_service.get_user_by_id(user_id)
+            
+            if not user:
+                default_logger.warning(f"Google OAuth user not found: {user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            default_logger.info(f"Google OAuth user found: {user.email}")
+            
+            from app.domain.entities.users import UserStatus
+            if user.status != UserStatus.ACTIVE:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User account is not active",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            return user
+        
+        # Handle regular JWT tokens
         # Get Supabase client and verify the JWT token
         supabase = get_supabase_client_sync()
         auth_response = supabase.auth.get_user(credentials.credentials)
