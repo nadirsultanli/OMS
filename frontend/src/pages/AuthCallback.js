@@ -29,12 +29,12 @@ const AuthCallback = () => {
         return;
       }
       
-      // Get tokens and user data
+      // Get tokens and user data (URL decode them)
       const accessToken = urlParams.get('access_token');
       const refreshToken = urlParams.get('refresh_token');
       const userId = urlParams.get('user_id');
-      const email = urlParams.get('email');
-      const name = urlParams.get('name');
+      const email = decodeURIComponent(urlParams.get('email') || '');
+      const name = decodeURIComponent(urlParams.get('name') || '');
       const role = urlParams.get('role');
       const tenantId = urlParams.get('tenant_id');
       
@@ -46,6 +46,16 @@ const AuthCallback = () => {
         name: name ? 'present' : 'missing',
         role: role ? 'present' : 'missing',
         tenantId: tenantId ? 'present' : 'missing'
+      });
+      
+      console.log('AuthCallback - Decoded values:', {
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        userId: userId,
+        email: email,
+        name: name,
+        role: role,
+        tenantId: tenantId
       });
       
       if (!accessToken || !userId || !email) {
