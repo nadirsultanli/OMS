@@ -20,3 +20,4 @@ shapely
 greenletgoogle-auth
 google-auth-oauthlib
 google-auth-httplib2
+# Google OAuth dependencies added
