@@ -140,18 +140,47 @@ async def google_callback(
             status_code=302
         )
 
+@google_auth_router.get("/debug-env")
+async def debug_environment():
+    """Debug environment variables"""
+    import os
+    return {
+        "FRONTEND_URL": os.getenv("FRONTEND_URL", "NOT_SET"),
+        "BACKEND_URL": os.getenv("BACKEND_URL", "NOT_SET"),
+        "ENVIRONMENT": os.getenv("ENVIRONMENT", "NOT_SET"),
+        "GOOGLE_CLIENT_ID_SET": bool(os.getenv("GOOGLE_CLIENT_ID")),
+        "GOOGLE_CLIENT_SECRET_SET": bool(os.getenv("GOOGLE_CLIENT_SECRET")),
+    }
+
 @google_auth_router.get("/test")
 async def test_google_config():
     """Test Google OAuth configuration"""
     try:
         google_service = GoogleOAuthService()
+        
+        # Test URL generation
+        test_user_data = {
+            "user_id": "test-user-123",
+            "email": "test@example.com", 
+            "name": "Test User",
+            "role": "admin",
+            "tenant_id": "test-tenant-123"
+        }
+        
+        test_redirect_url = google_service.generate_frontend_redirect_url(
+            test_user_data, 
+            "test_access_token", 
+            "test_refresh_token"
+        )
+        
         return {
             "status": "success",
             "message": "Google OAuth service initialized successfully",
             "frontend_url": google_service.frontend_url,
             "backend_url": google_service.backend_url,
             "client_id_configured": bool(google_service.client_id),
-            "client_secret_configured": bool(google_service.client_secret)
+            "client_secret_configured": bool(google_service.client_secret),
+            "test_redirect_url": test_redirect_url
         }
     except Exception as e:
         logger.error(f"Google OAuth configuration test failed: {str(e)}")

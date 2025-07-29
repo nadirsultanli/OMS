@@ -18,6 +18,11 @@ const AuthCallback = () => {
     try {
       setStatus('processing');
       
+      // Debug: Log the current URL to understand where we are
+      console.log('AuthCallback - Current URL:', window.location.href);
+      console.log('AuthCallback - Current origin:', window.location.origin);
+      console.log('AuthCallback - Search params:', location.search);
+      
       // Get URL parameters
       const urlParams = new URLSearchParams(location.search);
       

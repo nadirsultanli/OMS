@@ -41,6 +41,13 @@ class GoogleOAuthService:
         self.frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
         self.backend_url = os.getenv("BACKEND_URL", "https://aware-endurance-production.up.railway.app")
         
+        # Debug logging for environment variables
+        logger.info(f"GoogleOAuthService initialized with:")
+        logger.info(f"  FRONTEND_URL: {self.frontend_url}")
+        logger.info(f"  BACKEND_URL: {self.backend_url}")
+        logger.info(f"  GOOGLE_CLIENT_ID configured: {bool(self.client_id)}")
+        logger.info(f"  GOOGLE_CLIENT_SECRET configured: {bool(self.client_secret)}")
+        
         if not self.client_id or not self.client_secret:
             logger.error("Google OAuth credentials not configured")
             raise ValueError("Google OAuth credentials not configured")
