@@ -105,6 +105,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
             default_logger.info(f"⏭️ Skipping audit - path {path} is audit endpoint")
             return True
 
+        # Skip Google OAuth endpoints to prevent unnecessary logging
+        if path.startswith("/api/v1/auth/google"):
+            default_logger.info(f"⏭️ Skipping audit - path {path} is Google OAuth endpoint")
+            return True
+
         default_logger.info(f"✅ Audit will be logged for {method} {path}")
         return False
 

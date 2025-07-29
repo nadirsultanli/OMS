@@ -23,6 +23,10 @@ EXCLUDED_PATHS = {
     "/api/v1/auth/forgot-password",
     "/api/v1/auth/reset-password",
     "/api/v1/auth/accept-invitation",
+    "/api/v1/auth/google/login",
+    "/api/v1/auth/google/callback",
+    "/api/v1/auth/google/validate-token",
+    "/api/v1/auth/google/test",
     "/api/v1/verification/send-verification-email",
     "/api/v1/verification/verify-email"
 }

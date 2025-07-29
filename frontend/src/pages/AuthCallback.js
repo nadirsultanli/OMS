@@ -1,137 +1,142 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import authService from '../services/authService';
+import Logo from '../assets/Logo.svg';
+import './AuthCallback.css';
 
 const AuthCallback = () => {
+  const [status, setStatus] = useState('processing');
+  const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const handleAuthCallback = () => {
-      // Parse URL parameters and hash fragments
-      const urlParams = new URLSearchParams(location.search);
-      const hashParams = new URLSearchParams(location.hash.substring(1));
-      
-      console.log('AuthCallback - Full URL:', window.location.href);
-      console.log('AuthCallback - Search params:', location.search);
-      console.log('AuthCallback - Hash params:', location.hash);
-      
-      // Check for various token parameters
-      const accessToken = urlParams.get('access_token') || hashParams.get('access_token');
-      const token = urlParams.get('token') || hashParams.get('token');
-      const type = urlParams.get('type') || hashParams.get('type');
-      const refreshToken = urlParams.get('refresh_token') || hashParams.get('refresh_token');
-      const error = urlParams.get('error') || hashParams.get('error');
-      const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
-      
-      console.log('AuthCallback - Parsed params:', {
-        accessToken: accessToken ? 'present' : 'missing',
-        token: token ? 'present' : 'missing',
-        type,
-        refreshToken: refreshToken ? 'present' : 'missing',
-        error,
-        errorDescription
-      });
-      
-      // Handle errors first
-      if (error) {
-        console.error('Auth callback error:', error, errorDescription);
-        navigate('/login', {
-          state: {
-            error: errorDescription || error,
-            message: 'Authentication failed. Please try again.'
-          }
-        });
-        return;
-      }
-      
-      // Handle invitation flow
-      if (type === 'invite' && (accessToken || token)) {
-        console.log('AuthCallback - Invitation detected, redirecting to accept-invitation');
-        const inviteToken = accessToken || token;
-        
-        // Redirect to accept invitation page with token in URL
-        navigate(`/accept-invitation?access_token=${encodeURIComponent(inviteToken)}&type=invite`);
-        return;
-      }
-      
-      // Handle password reset flow
-      if (type === 'recovery' && (accessToken || token)) {
-        console.log('AuthCallback - Password reset detected, redirecting to reset-password');
-        const resetToken = accessToken || token;
-        
-        // Redirect to password reset page with token in hash (like Supabase normally does)
-        navigate(`/reset-password#access_token=${encodeURIComponent(resetToken)}&type=recovery`);
-        return;
-      }
-      
-      // Handle email verification
-      if (type === 'signup') {
-        console.log('AuthCallback - Email verification detected');
-        navigate('/login', {
-          state: {
-            message: 'Email verified successfully! You can now login.',
-            verified: true
-          }
-        });
-        return;
-      }
-      
-      // Handle successful login with tokens
-      if (accessToken && refreshToken && !type) {
-        console.log('AuthCallback - Login tokens detected');
-        // This would be a successful OAuth login flow
-        // For now, redirect to login to handle normally
-        navigate('/login');
-        return;
-      }
-      
-      // Default behavior - check if user is already authenticated
-      // But don't redirect to dashboard if we just completed an invitation
-      const justCompletedInvitation = sessionStorage.getItem('justCompletedInvitation');
-      
-      if (authService.isAuthenticated() && !justCompletedInvitation) {
-        console.log('AuthCallback - User already authenticated, redirecting to dashboard');
-        navigate('/dashboard');
-      } else {
-        console.log('AuthCallback - No valid auth flow detected or just completed invitation, redirecting to login');
-        // Clear the flag if it exists
-        sessionStorage.removeItem('justCompletedInvitation');
-        navigate('/login');
-      }
-    };
+    handleAuthCallback();
+  }, []);
 
-    // Small delay to ensure URL parsing is complete
-    const timer = setTimeout(handleAuthCallback, 100);
-    
-    return () => clearTimeout(timer);
-  }, [navigate, location]);
+  const handleAuthCallback = async () => {
+    try {
+      setStatus('processing');
+      
+      // Get URL parameters
+      const urlParams = new URLSearchParams(location.search);
+      
+      // Check for error parameters
+      const errorParam = urlParams.get('error');
+      if (errorParam) {
+        setError(getErrorMessage(errorParam));
+        setStatus('error');
+        return;
+      }
+      
+      // Get tokens and user data
+      const accessToken = urlParams.get('access_token');
+      const refreshToken = urlParams.get('refresh_token');
+      const userId = urlParams.get('user_id');
+      const email = urlParams.get('email');
+      const name = urlParams.get('name');
+      const role = urlParams.get('role');
+      const tenantId = urlParams.get('tenant_id');
+      
+      if (!accessToken || !refreshToken || !userId || !email) {
+        setError('Missing authentication data');
+        setStatus('error');
+        return;
+      }
+      
+      // Store authentication data
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('user', JSON.stringify({
+        id: userId,
+        email: email,
+        name: name,
+        role: role,
+        tenant_id: tenantId
+      }));
+      
+      // Update auth service
+      authService.setTokens(accessToken, refreshToken);
+      
+      setStatus('success');
+      
+      // Redirect to dashboard after a short delay
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Auth callback error:', error);
+      setError('Authentication failed. Please try again.');
+      setStatus('error');
+    }
+  };
+
+  const getErrorMessage = (errorCode) => {
+    switch (errorCode) {
+      case 'user_not_found':
+        return 'Account not found. Please contact your administrator to create an account.';
+      case 'no_email':
+        return 'Email address is required for authentication.';
+      case 'session_creation_failed':
+        return 'Failed to create user session. Please try again.';
+      case 'callback_failed':
+        return 'Authentication callback failed. Please try again.';
+      default:
+        return 'Authentication failed. Please try again.';
+    }
+  };
+
+  const handleRetry = () => {
+    navigate('/login');
+  };
+
+  const handleBackToLogin = () => {
+    navigate('/login');
+  };
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100vh',
-      flexDirection: 'column',
-      gap: '20px'
-    }}>
-      <div style={{
-        width: '40px',
-        height: '40px',
-        border: '4px solid #f3f3f3',
-        borderTop: '4px solid #3498db',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite'
-      }}></div>
-      <p>Processing authentication...</p>
-      
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
+    <div className="auth-callback-container">
+      <div className="auth-callback-card">
+        <div className="auth-callback-header">
+          <img src={Logo} alt="CIRCL Logo" className="company-logo" />
+          <h1 className="auth-callback-title">Authentication</h1>
+        </div>
+
+        <div className="auth-callback-content">
+          {status === 'processing' && (
+            <div className="processing-state">
+              <div className="spinner"></div>
+              <h2>Processing Authentication...</h2>
+              <p>Please wait while we complete your sign-in.</p>
+            </div>
+          )}
+
+          {status === 'success' && (
+            <div className="success-state">
+              <div className="success-icon">✓</div>
+              <h2>Authentication Successful!</h2>
+              <p>You have been successfully signed in. Redirecting to dashboard...</p>
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="error-state">
+              <div className="error-icon">✕</div>
+              <h2>Authentication Failed</h2>
+              <p className="error-message">{error}</p>
+              <div className="error-actions">
+                <button onClick={handleRetry} className="retry-button">
+                  Try Again
+                </button>
+                <button onClick={handleBackToLogin} className="back-button">
+                  Back to Login
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

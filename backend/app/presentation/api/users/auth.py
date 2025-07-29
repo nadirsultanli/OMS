@@ -30,9 +30,18 @@ from app.infrastucture.database.connection import get_supabase_client_sync, get_
 from decouple import config
 from app.domain.entities.users import UserStatus
 from app.core.user_context import UserContext, user_context
-
 logger = get_logger("auth_api")
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+# Conditionally include Google OAuth router if dependencies are available
+try:
+    from app.presentation.api.users.google_auth import google_auth_router
+    auth_router.include_router(google_auth_router)
+    logger.info("Google OAuth router included successfully")
+except ImportError as e:
+    logger.warning(f"Google OAuth router not available: {str(e)}")
+except Exception as e:
+    logger.error(f"Failed to include Google OAuth router: {str(e)}")
 
 
 # @auth_router.post("/signup", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
