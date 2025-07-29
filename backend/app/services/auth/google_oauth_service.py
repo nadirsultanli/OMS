@@ -57,8 +57,7 @@ class GoogleOAuthService:
                         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                         "token_uri": "https://oauth2.googleapis.com/token",
                         "redirect_uris": [
-                            f"{self.backend_url}/api/v1/auth/google/callback",
-                            "http://localhost:8000/api/v1/auth/google/callback"
+                            f"{self.backend_url}/api/v1/auth/google/callback"
                         ]
                     }
                 },
@@ -101,8 +100,7 @@ class GoogleOAuthService:
                         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                         "token_uri": "https://oauth2.googleapis.com/token",
                         "redirect_uris": [
-                            f"{self.backend_url}/api/v1/auth/google/callback",
-                            "http://localhost:8000/api/v1/auth/google/callback"
+                            f"{self.backend_url}/api/v1/auth/google/callback"
                         ]
                     }
                 },
