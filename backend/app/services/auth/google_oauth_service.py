@@ -202,15 +202,15 @@ class GoogleOAuthService:
     def generate_frontend_redirect_url(self, user_data: Dict[str, Any], access_token: str, refresh_token: str) -> str:
         """Generate redirect URL for frontend with user data and tokens"""
         try:
-            # URL encode the data
+            # Prepare the data (urlencode will handle encoding)
             encoded_data = {
-                "access_token": quote(access_token, safe=''),
-                "refresh_token": quote(refresh_token, safe=''),
-                "user_id": quote(str(user_data["user_id"]), safe=''),
-                "email": quote(user_data["email"], safe=''),
-                "name": quote(user_data.get("name", ""), safe=''),
-                "role": quote(user_data["role"], safe=''),
-                "tenant_id": quote(user_data["tenant_id"], safe='')
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "user_id": str(user_data["user_id"]),
+                "email": user_data["email"],
+                "name": user_data.get("name", ""),
+                "role": user_data["role"],
+                "tenant_id": user_data["tenant_id"]
             }
             
             # Build query string
