@@ -36,6 +36,10 @@ LOG_LEVEL = config("LOG_LEVEL", default="INFO")
 ENVIRONMENT = config("ENVIRONMENT", default="development")
 AUDIT_ENABLED = config("AUDIT_ENABLED", default="true", cast=bool)
 
+# CORS configuration
+CORS_ORIGINS = config("CORS_ORIGINS", default="*")
+ALLOWED_ORIGINS = ["*"] if CORS_ORIGINS == "*" else [origin.strip() for origin in CORS_ORIGINS.split(",")]
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -131,11 +135,14 @@ setup_logging(app, log_level=LOG_LEVEL)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now - configure properly for production
+    allow_origins=["*"],  # Allow all origins for now
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+default_logger.info(f"CORS middleware configured with origins: {ALLOWED_ORIGINS}")
 
 # Add audit middleware for automatic request/response logging (if enabled)
 if AUDIT_ENABLED:
@@ -223,6 +230,9 @@ app.openapi = custom_openapi
 
 @app.options("/{path:path}")
 async def options_handler(request: Request, path: str):
+    """Handle OPTIONS requests for CORS preflight"""
+    origin = request.headers.get("origin", "*")
+    
     return JSONResponse(
         status_code=200,
         content="OK",
@@ -231,6 +241,7 @@ async def options_handler(request: Request, path: str):
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
             "Access-Control-Allow-Headers": "*",
             "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "86400",
         }
     )
 
@@ -254,7 +265,21 @@ async def cors_test():
     """Test endpoint to verify CORS headers"""
     return {
         "message": "CORS test successful",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "allowed_origins": ALLOWED_ORIGINS,
+        "environment": ENVIRONMENT,
+        "cors_enabled": True
+    }
+
+@app.get("/api/v1/cors-test")
+async def api_cors_test():
+    """Test endpoint to verify CORS headers for API routes"""
+    return {
+        "message": "API CORS test successful",
+        "timestamp": datetime.now().isoformat(),
+        "allowed_origins": ALLOWED_ORIGINS,
+        "environment": ENVIRONMENT,
+        "cors_enabled": True
     }
 
 
