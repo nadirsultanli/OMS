@@ -10,7 +10,7 @@ async def get_current_user(
     authorization: Optional[str] = Header(None, include_in_schema=False),
     user_service: UserService = Depends(get_user_service)
 ) -> User:
-    """Dependency to get current authenticated user from Supabase JWT token"""
+    """Dependency to get current authenticated user from Supabase JWT token or Google OAuth token"""
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -27,6 +27,29 @@ async def get_current_user(
     token = authorization.replace("Bearer ", "")
     
     try:
+        # Check if this is a Google OAuth token (simple string format)
+        if token.startswith("google_session_"):
+            # Handle Google OAuth token
+            user_id = token.replace("google_session_", "")
+            
+            # Get user by ID directly
+            user = await user_service.get_user_by_id(user_id)
+            
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found"
+                )
+            
+            if user.status != UserStatus.ACTIVE:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User account is not active"
+                )
+            
+            return user
+        
+        # Handle regular JWT tokens
         # Get Supabase client and verify the JWT token
         supabase = get_supabase_client_sync()
         auth_response = supabase.auth.get_user(token)
