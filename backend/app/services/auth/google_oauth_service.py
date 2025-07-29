@@ -219,7 +219,11 @@ class GoogleOAuthService:
             # Create redirect URL
             redirect_url = f"{self.frontend_url}/auth-callback?{query_string}"
             
-            logger.info(f"Generated frontend redirect URL: {redirect_url[:100]}...")
+            logger.info(f"Generated frontend redirect URL: {redirect_url}")
+            logger.info(f"Frontend URL: {self.frontend_url}")
+            logger.info(f"User data: {user_data}")
+            logger.info(f"Access token: {access_token[:20]}...")
+            logger.info(f"Refresh token: {refresh_token[:20] if refresh_token else 'None'}...")
             return redirect_url
             
         except Exception as e:

@@ -38,7 +38,17 @@ const AuthCallback = () => {
       const role = urlParams.get('role');
       const tenantId = urlParams.get('tenant_id');
       
-      if (!accessToken || !refreshToken || !userId || !email) {
+      console.log('AuthCallback - URL params:', {
+        accessToken: accessToken ? 'present' : 'missing',
+        refreshToken: refreshToken ? 'present' : 'missing',
+        userId: userId ? 'present' : 'missing',
+        email: email ? 'present' : 'missing',
+        name: name ? 'present' : 'missing',
+        role: role ? 'present' : 'missing',
+        tenantId: tenantId ? 'present' : 'missing'
+      });
+      
+      if (!accessToken || !userId || !email) {
         setError('Missing authentication data');
         setStatus('error');
         return;
@@ -46,7 +56,9 @@ const AuthCallback = () => {
       
       // Store authentication data
       localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
+      }
       localStorage.setItem('user', JSON.stringify({
         id: userId,
         email: email,
@@ -56,7 +68,11 @@ const AuthCallback = () => {
       }));
       
       // Update auth service
-      authService.setTokens(accessToken, refreshToken);
+      if (refreshToken) {
+        authService.setTokens(accessToken, refreshToken);
+      } else {
+        authService.setTokens(accessToken, null);
+      }
       
       setStatus('success');
       
