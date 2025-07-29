@@ -37,12 +37,19 @@ const Dashboard = () => {
   const loadDashboardData = async () => {
     try {
       // Load customers count
-      customerService.getAllCustomers({ limit: 1, offset: 0 })
+      customerService.getCustomers({ limit: 1, offset: 0 })
         .then(response => {
-          setDashboardData(prev => ({
-            ...prev,
-            customers: { total: response.total || 0, loading: false }
-          }));
+          if (response.success) {
+            setDashboardData(prev => ({
+              ...prev,
+              customers: { total: response.data.total || 0, loading: false }
+            }));
+          } else {
+            setDashboardData(prev => ({
+              ...prev,
+              customers: { total: 0, loading: false }
+            }));
+          }
         })
         .catch(() => {
           setDashboardData(prev => ({
@@ -52,15 +59,22 @@ const Dashboard = () => {
         });
 
       // Load orders summary
-      orderService.getAllOrders({ limit: 1000 })
+      orderService.getOrders(null, { limit: 1000 })
         .then(response => {
-          const orders = response.orders || [];
-          const pending = orders.filter(o => o.status === 'pending').length;
-          const completed = orders.filter(o => o.status === 'completed').length;
-          setDashboardData(prev => ({
-            ...prev,
-            orders: { total: orders.length, pending, completed, loading: false }
-          }));
+          if (response.success) {
+            const orders = response.data.orders || [];
+            const pending = orders.filter(o => o.status === 'pending').length;
+            const completed = orders.filter(o => o.status === 'completed').length;
+            setDashboardData(prev => ({
+              ...prev,
+              orders: { total: orders.length, pending, completed, loading: false }
+            }));
+          } else {
+            setDashboardData(prev => ({
+              ...prev,
+              orders: { total: 0, pending: 0, completed: 0, loading: false }
+            }));
+          }
         })
         .catch(() => {
           setDashboardData(prev => ({
@@ -87,15 +101,22 @@ const Dashboard = () => {
         });
 
       // Load trips summary
-      tripService.getAllTrips({ limit: 1000 })
+      tripService.getTrips({ limit: 1000 })
         .then(response => {
-          const trips = response.trips || [];
-          const active = trips.filter(t => t.status === 'in_progress').length;
-          const pending = trips.filter(t => t.status === 'planned').length;
-          setDashboardData(prev => ({
-            ...prev,
-            trips: { active, pending, loading: false }
-          }));
+          if (response.success) {
+            const trips = response.data.results || [];
+            const active = trips.filter(t => t.status === 'IN_PROGRESS').length;
+            const pending = trips.filter(t => t.status === 'PLANNED').length;
+            setDashboardData(prev => ({
+              ...prev,
+              trips: { active, pending, loading: false }
+            }));
+          } else {
+            setDashboardData(prev => ({
+              ...prev,
+              trips: { active: 0, pending: 0, loading: false }
+            }));
+          }
         })
         .catch(() => {
           setDashboardData(prev => ({
@@ -105,14 +126,23 @@ const Dashboard = () => {
         });
 
       // Load vehicles summary
-      vehicleService.getAllVehicles({ limit: 1000 })
+      const currentUser = authService.getCurrentUser();
+      const tenantId = currentUser?.tenant_id;
+      vehicleService.getVehicles(tenantId, { limit: 1000 })
         .then(response => {
-          const vehicles = response.vehicles || [];
-          const active = vehicles.filter(v => v.status === 'active').length;
-          setDashboardData(prev => ({
-            ...prev,
-            vehicles: { total: vehicles.length, active, loading: false }
-          }));
+          if (response.success) {
+            const vehicles = response.data.results || [];
+            const active = vehicles.filter(v => v.status === 'active').length;
+            setDashboardData(prev => ({
+              ...prev,
+              vehicles: { total: vehicles.length, active, loading: false }
+            }));
+          } else {
+            setDashboardData(prev => ({
+              ...prev,
+              vehicles: { total: 0, active: 0, loading: false }
+            }));
+          }
         })
         .catch(() => {
           setDashboardData(prev => ({
@@ -218,8 +248,8 @@ const Dashboard = () => {
           
           <MetricCard
             title="Vehicles"
-            value={dashboardData.vehicles.active}
-            subtitle={`${dashboardData.vehicles.total} total vehicles`}
+            value={dashboardData.vehicles.total}
+            subtitle={`${dashboardData.vehicles.active} active vehicles`}
             icon={Truck}
             color="indigo"
             link="/vehicles"
