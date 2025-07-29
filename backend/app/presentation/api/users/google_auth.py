@@ -4,7 +4,6 @@ from typing import Optional
 from pydantic import BaseModel
 from app.services.auth.google_oauth_service import GoogleOAuthService
 from app.infrastucture.logs.logger import get_logger
-from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
 from app.services.dependencies.railway_users import get_railway_user_service
 from app.domain.entities.users import UserStatus
 
@@ -68,55 +67,16 @@ async def google_callback(
                 status_code=302
             )
         
-        # Generate JWT tokens using Supabase Admin client
-        supabase = get_supabase_admin_client_sync()
-        
-        # Get user from our database
-        user_service = get_railway_user_service()
-        user = await user_service.get_user_by_email(email)
-        
-        # Create session for existing user using admin client
+        # User already verified to exist in database (and should have Supabase auth user)
+        # Google OAuth only authenticates existing users - no new registrations
         try:
-            # Use admin client to create a session for the existing user
-            # First, get or create the user in Supabase auth if not exists
-            try:
-                # Try to get the user by email from Supabase
-                existing_auth_user = supabase.auth.admin.list_users()
-                auth_user = None
-                
-                # Find user by email
-                for su_user in existing_auth_user.users:
-                    if su_user.email == email:
-                        auth_user = su_user
-                        break
-                
-                if not auth_user:
-                    # Create user in Supabase auth if doesn't exist  
-                    create_response = supabase.auth.admin.create_user({
-                        "email": email,
-                        "email_confirm": True,
-                        "user_metadata": {
-                            "user_id": str(user.id),
-                            "tenant_id": str(user.tenant_id),
-                            "role": user.role.value
-                        }
-                    })
-                    auth_user = create_response.user
-                
-                # For Google OAuth, we'll use the existing user's session if they have one
-                # or create a simple token that the frontend can use
-                # The frontend will handle the authentication state
-                access_token = f"google_session_{user.id}"
-                refresh_token = f"refresh_{user.id}"
-                
-                # Note: This is a temporary solution. In production, you should implement
-                # proper JWT token generation for Google OAuth users
-                    
-            except Exception as auth_error:
-                logger.warning(f"Failed to handle Supabase auth user: {str(auth_error)}")
-                # Use fallback tokens
-                access_token = f"google_session_{user.id}"
-                refresh_token = f"refresh_{user.id}"
+            # Create simple session tokens for existing user
+            # Note: Supabase auth user should already exist from normal user creation
+            access_token = f"google_session_{user_data['user_id']}"
+            refresh_token = f"refresh_{user_data['user_id']}"
+            
+            logger.info(f"Google OAuth authentication successful for existing user: {email}")
+            logger.info(f"User ID: {user_data['user_id']}, Role: {user_data['role']}, Tenant: {user_data['tenant_id']}")
             
             # Generate frontend redirect URL
             redirect_url = google_service.generate_frontend_redirect_url(
@@ -127,7 +87,7 @@ async def google_callback(
             return RedirectResponse(url=redirect_url, status_code=302)
             
         except Exception as session_error:
-            logger.error(f"Failed to create Supabase session: {str(session_error)}")
+            logger.error(f"Failed to create Google OAuth session: {str(session_error)}")
             return RedirectResponse(
                 url="https://omsfrontend.netlify.app/login?error=session_creation_failed",
                 status_code=302
