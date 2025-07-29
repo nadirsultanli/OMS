@@ -35,7 +35,8 @@ const Audit = () => {
     actorId: '',
     startDate: '',
     endDate: '',
-    severityLevel: ''
+    severityLevel: '',
+    source: ''
   });
   
   // View states
@@ -53,30 +54,43 @@ const Audit = () => {
   // Event type options
   const eventTypeOptions = [
     { value: '', label: 'All Events' },
-    { value: 'CREATE', label: 'Created' },
-    { value: 'UPDATE', label: 'Updated' },
-    { value: 'DELETE', label: 'Deleted' },
-    { value: 'READ', label: 'Viewed' },
-    { value: 'LOGIN', label: 'Login' },
-    { value: 'LOGOUT', label: 'Logout' },
-    { value: 'STATUS_CHANGE', label: 'Status Changed' },
-    { value: 'ACCESS', label: 'Accessed' },
-    { value: 'ERROR', label: 'Error' }
+    { value: 'create', label: 'Created' },
+    { value: 'update', label: 'Updated' },
+    { value: 'delete', label: 'Deleted' },
+    { value: 'read', label: 'Viewed' },
+    { value: 'login', label: 'Login' },
+    { value: 'logout', label: 'Logout' },
+    { value: 'status_change', label: 'Status Changed' },
+    { value: 'permission_change', label: 'Permission Changed' },
+    { value: 'price_change', label: 'Price Changed' },
+    { value: 'stock_adjustment', label: 'Stock Adjusted' },
+    { value: 'delivery_complete', label: 'Delivery Complete' },
+    { value: 'delivery_failed', label: 'Delivery Failed' },
+    { value: 'trip_start', label: 'Trip Started' },
+    { value: 'trip_complete', label: 'Trip Complete' },
+    { value: 'credit_approval', label: 'Credit Approved' },
+    { value: 'credit_rejection', label: 'Credit Rejected' },
+    { value: 'error', label: 'Error' }
   ];
 
   // Object type options
   const objectTypeOptions = [
     { value: '', label: 'All Objects' },
-    { value: 'ORDER', label: 'Orders' },
-    { value: 'CUSTOMER', label: 'Customers' },
-    { value: 'PRODUCT', label: 'Products' },
-    { value: 'VARIANT', label: 'Variants' },
-    { value: 'WAREHOUSE', label: 'Warehouses' },
-    { value: 'TRIP', label: 'Trips' },
-    { value: 'VEHICLE', label: 'Vehicles' },
-    { value: 'USER', label: 'Users' },
-    { value: 'STOCK_DOC', label: 'Stock Documents' },
-    { value: 'STOCK_LEVEL', label: 'Stock Levels' }
+    { value: 'order', label: 'Orders' },
+    { value: 'customer', label: 'Customers' },
+    { value: 'product', label: 'Products' },
+    { value: 'variant', label: 'Variants' },
+    { value: 'warehouse', label: 'Warehouses' },
+    { value: 'trip', label: 'Trips' },
+    { value: 'vehicle', label: 'Vehicles' },
+    { value: 'user', label: 'Users' },
+    { value: 'stock_doc', label: 'Stock Documents' },
+    { value: 'stock_level', label: 'Stock Levels' },
+    { value: 'tenant', label: 'Tenants' },
+    { value: 'price_list', label: 'Price Lists' },
+    { value: 'address', label: 'Addresses' },
+    { value: 'delivery', label: 'Deliveries' },
+    { value: 'other', label: 'Other' }
   ];
 
   // Severity level options
@@ -120,8 +134,24 @@ const Audit = () => {
       }
       
       if (result.success) {
-        setAuditEvents(result.data.events || []);
-        setTotalEvents(result.data.total_events || 0);
+        let events = result.data.events || [];
+        
+        // Apply client-side source filter if specified
+        if (filters.source) {
+          events = events.filter(event => {
+            const path = event.context?.request?.path;
+            if (!path) return false;
+            
+            // Extract the resource name after /api/v1/
+            const match = path.match(/\/api\/v1\/([^\/]+)/);
+            const resourceName = match ? match[1] : path.replace('/api/v1/', '');
+            
+            return resourceName.toLowerCase().includes(filters.source.toLowerCase());
+          });
+        }
+        
+        setAuditEvents(events);
+        setTotalEvents(events.length);
       } else {
         setError(result.error);
       }
@@ -189,7 +219,8 @@ const Audit = () => {
       actorId: '',
       startDate: '',
       endDate: '',
-      severityLevel: ''
+      severityLevel: '',
+      source: ''
     });
     setCurrentPage(1);
   };
@@ -235,15 +266,23 @@ const Audit = () => {
   // Get event icon
   const getEventIcon = (eventType) => {
     const icons = {
-      'CREATE': FileText,
-      'UPDATE': FileText,
-      'DELETE': FileText,
-      'READ': Eye,
-      'LOGIN': User,
-      'LOGOUT': User,
-      'STATUS_CHANGE': Activity,
-      'ACCESS': Shield,
-      'ERROR': AlertTriangle
+      'create': FileText,
+      'update': FileText,
+      'delete': FileText,
+      'read': Eye,
+      'login': User,
+      'logout': User,
+      'status_change': Activity,
+      'permission_change': Shield,
+      'price_change': FileText,
+      'stock_adjustment': FileText,
+      'delivery_complete': Activity,
+      'delivery_failed': AlertTriangle,
+      'trip_start': Activity,
+      'trip_complete': Activity,
+      'credit_approval': FileText,
+      'credit_rejection': AlertTriangle,
+      'error': AlertTriangle
     };
     const Icon = icons[eventType] || Activity;
     return <Icon size={16} />;
@@ -437,6 +476,17 @@ const Audit = () => {
                       className="filter-input"
                     />
                   </div>
+
+                  <div className="filter-group">
+                    <label>Source/Endpoint</label>
+                    <input
+                      type="text"
+                      placeholder="Filter by resource (e.g., customers, orders)..."
+                      value={filters.source}
+                      onChange={(e) => handleFilterChange('source', e.target.value)}
+                      className="filter-input"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -473,6 +523,7 @@ const Audit = () => {
                         <th>Object</th>
                         <th>Actor</th>
                         <th>Severity</th>
+                        <th>Source</th>
                         <th>Summary</th>
                         <th>Actions</th>
                       </tr>
@@ -514,6 +565,29 @@ const Audit = () => {
                             <span className={`severity-badge ${getSeverityBadgeClass(event.severity_level)}`}>
                               {event.severity_level || 'LOW'}
                             </span>
+                          </td>
+                          <td>
+                            <div className="source-cell">
+                              {event.context?.request?.path ? (
+                                <div className="endpoint-info">
+                                  <span className="method-badge">{event.context.request.method}</span>
+                                  <span className="endpoint-path">
+                                    {(() => {
+                                      const path = event.context.request.path;
+                                      // Extract the resource name after /api/v1/
+                                      const match = path.match(/\/api\/v1\/([^\/]+)/);
+                                      if (match) {
+                                        return match[1];
+                                      }
+                                      // Fallback: show the full path if it doesn't match the pattern
+                                      return path.replace('/api/v1/', '');
+                                    })()}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="no-source">N/A</span>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <div className="summary-cell">
@@ -583,7 +657,9 @@ const Audit = () => {
                 <Activity size={24} />
               </div>
               <div className="metric-content">
-                <div className="metric-value">{recentActivity.length}</div>
+                <div className="metric-value">
+                  {dashboardData?.recent_activity?.length || recentActivity.length}
+                </div>
                 <div className="metric-label">Recent Events (24h)</div>
               </div>
             </div>
@@ -594,7 +670,8 @@ const Audit = () => {
               </div>
               <div className="metric-content">
                 <div className="metric-value">
-                  {auditEvents.filter(e => e.severity_level === 'HIGH' || e.severity_level === 'CRITICAL').length}
+                  {dashboardData?.security_alerts?.length || 
+                   auditEvents.filter(e => e.severity_level === 'HIGH' || e.severity_level === 'CRITICAL').length}
                 </div>
                 <div className="metric-label">High Priority Events</div>
               </div>
@@ -606,7 +683,9 @@ const Audit = () => {
               </div>
               <div className="metric-content">
                 <div className="metric-value">
-                  {new Set(auditEvents.map(e => e.actor_id).filter(Boolean)).size}
+                  {dashboardData?.summary?.events_by_actor ? 
+                   Object.keys(dashboardData.summary.events_by_actor).length :
+                   new Set(auditEvents.map(e => e.actor_id).filter(Boolean)).size}
                 </div>
                 <div className="metric-label">Active Users</div>
               </div>
@@ -617,7 +696,9 @@ const Audit = () => {
                 <Shield size={24} />
               </div>
               <div className="metric-content">
-                <div className="metric-value">{totalEvents}</div>
+                <div className="metric-value">
+                  {dashboardData?.summary?.total_events || totalEvents}
+                </div>
                 <div className="metric-label">Total Audit Events</div>
               </div>
             </div>
@@ -628,8 +709,11 @@ const Audit = () => {
             <h3>Event Type Distribution</h3>
             <div className="event-distribution">
               {eventTypeOptions.slice(1).map(eventType => {
-                const count = auditEvents.filter(e => e.event_type === eventType.value).length;
-                const percentage = totalEvents > 0 ? Math.round((count / totalEvents) * 100) : 0;
+                // Use dashboardData.top_events if available, otherwise fall back to auditEvents
+                const count = dashboardData?.top_events?.[eventType.value] || 
+                             auditEvents.filter(e => e.event_type === eventType.value).length;
+                const totalForDistribution = dashboardData?.summary?.total_events || totalEvents;
+                const percentage = totalForDistribution > 0 ? Math.round((count / totalForDistribution) * 100) : 0;
                 
                 return (
                   <div key={eventType.value} className="distribution-item">
@@ -654,13 +738,13 @@ const Audit = () => {
           <div className="dashboard-widget">
             <h3>Recent Activity</h3>
             <div className="activity-feed">
-              {recentActivity.length === 0 ? (
+              {(dashboardData?.recent_activity || recentActivity).length === 0 ? (
                 <div className="empty-activity">
                   <Clock size={24} />
                   <p>No recent activity</p>
                 </div>
               ) : (
-                recentActivity.slice(0, 10).map((event) => (
+                (dashboardData?.recent_activity || recentActivity).slice(0, 10).map((event) => (
                   <div key={event.id} className="activity-item">
                     <div className="activity-icon">
                       {getEventIcon(event.event_type)}

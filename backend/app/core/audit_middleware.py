@@ -255,6 +255,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # Determine object type and ID from URL
         object_type, object_id = self._extract_object_info(request.url.path)
         
+        # For CREATE operations, object ID will be "N/A" since it's not in the URL
+        # The actual object ID would be in the response body, but we don't capture it
+        # to avoid interfering with the response stream
+        if event_type == AuditEventType.CREATE:
+            default_logger.info(f"🎯 CREATE operation - object ID will be 'N/A' (not captured from response body)")
+        
         # Build context
         context = {
             "request": request_data,
@@ -282,6 +288,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         
         default_logger.info(f"✅ Audit event created with ID: {audit_event.id if audit_event else 'None'}")
 
+
+
     def _determine_event_type(self, method: str, status_code: int) -> AuditEventType:
         """Determine audit event type based on HTTP method and response"""
         if not (200 <= status_code < 400):
@@ -307,7 +315,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 
                 # Debug logging
                 default_logger.info(f"🔍 Extracting object info from path: {path}")
-                default_logger.info(f"   Resource: {resource}")
+                default_logger.info(f"   Parts: {parts}")
+                default_logger.info(f"   Resource (original): {parts[2]}")
+                default_logger.info(f"   Resource (uppercase): {resource}")
                 
                 # Map resource names to audit object types
                 resource_mapping = {
@@ -329,6 +339,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 }
                 
                 object_type = resource_mapping.get(resource, AuditObjectType.OTHER)
+                default_logger.info(f"   Resource mapping lookup: {resource}")
+                default_logger.info(f"   Available keys: {list(resource_mapping.keys())}")
                 default_logger.info(f"   Mapped object type: {object_type}")
                 
                 # Try to extract object ID
@@ -358,7 +370,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 return object_type, object_id
             
             return AuditObjectType.OTHER, None
-        except Exception:
+        except Exception as e:
+            default_logger.error(f"Error extracting object info: {str(e)}")
             return AuditObjectType.OTHER, None
 
     def _get_client_ip(self, request: Request) -> str:

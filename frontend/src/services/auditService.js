@@ -340,15 +340,23 @@ class AuditService {
   // Get event type display name
   getEventTypeDisplayName(eventType) {
     const eventTypeNames = {
-      'CREATE': 'Created',
-      'UPDATE': 'Updated', 
-      'DELETE': 'Deleted',
-      'READ': 'Viewed',
-      'LOGIN': 'Login',
-      'LOGOUT': 'Logout',
-      'STATUS_CHANGE': 'Status Changed',
-      'ACCESS': 'Accessed',
-      'ERROR': 'Error'
+      'create': 'Created',
+      'update': 'Updated', 
+      'delete': 'Deleted',
+      'read': 'Viewed',
+      'login': 'Login',
+      'logout': 'Logout',
+      'status_change': 'Status Changed',
+      'permission_change': 'Permission Changed',
+      'price_change': 'Price Changed',
+      'stock_adjustment': 'Stock Adjusted',
+      'delivery_complete': 'Delivery Complete',
+      'delivery_failed': 'Delivery Failed',
+      'trip_start': 'Trip Started',
+      'trip_complete': 'Trip Complete',
+      'credit_approval': 'Credit Approved',
+      'credit_rejection': 'Credit Rejected',
+      'error': 'Error'
     };
     return eventTypeNames[eventType] || eventType;
   }
@@ -356,17 +364,21 @@ class AuditService {
   // Get object type display name
   getObjectTypeDisplayName(objectType) {
     const objectTypeNames = {
-      'ORDER': 'Order',
-      'CUSTOMER': 'Customer',
-      'PRODUCT': 'Product',
-      'VARIANT': 'Variant',
-      'WAREHOUSE': 'Warehouse',
-      'TRIP': 'Trip',
-      'VEHICLE': 'Vehicle',
-      'USER': 'User',
-      'STOCK_DOC': 'Stock Document',
-      'STOCK_LEVEL': 'Stock Level',
-      'OTHER': 'Other'
+      'order': 'Order',
+      'customer': 'Customer',
+      'product': 'Product',
+      'variant': 'Variant',
+      'warehouse': 'Warehouse',
+      'trip': 'Trip',
+      'vehicle': 'Vehicle',
+      'user': 'User',
+      'stock_doc': 'Stock Document',
+      'stock_level': 'Stock Level',
+      'tenant': 'Tenant',
+      'price_list': 'Price List',
+      'address': 'Address',
+      'delivery': 'Delivery',
+      'other': 'Other'
     };
     return objectTypeNames[objectType] || objectType;
   }

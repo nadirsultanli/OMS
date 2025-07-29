@@ -224,117 +224,107 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> AuditSummary:
         """Get audit summary statistics"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            # Base query for filtering
+            base_conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if start_date:
-                query = query.filter(AuditEventModel.event_time >= start_date)
+                base_conditions.append(AuditEventModel.event_time >= start_date)
             if end_date:
-                query = query.filter(AuditEventModel.event_time <= end_date)
+                base_conditions.append(AuditEventModel.event_time <= end_date)
             
             # Get total events
-            result = await self.db_session.execute(query)
-            total_events = len(result.scalars().all())
+            total_query = select(func.count(AuditEventModel.id)).where(*base_conditions)
+            result = await self.db_session.execute(total_query)
+            total_events = result.scalar()
             
             # Get events by type
-            events_by_type = {}
-            type_counts_query = self.db_session.query(
+            type_query = select(
                 AuditEventModel.event_type,
                 func.count(AuditEventModel.id)
-            ).filter(
-                AuditEventModel.tenant_id == tenant_id,
-                AuditEventModel.deleted_at.is_(None)
-            )
-            if start_date:
-                type_counts = type_counts.filter(AuditEventModel.event_time >= start_date)
-            if end_date:
-                type_counts = type_counts.filter(AuditEventModel.event_time <= end_date)
+            ).where(*base_conditions).group_by(AuditEventModel.event_type)
             
-            type_counts = type_counts.group_by(AuditEventModel.event_type).all()
+            result = await self.db_session.execute(type_query)
+            type_counts = result.all()
             events_by_type = {event_type: count for event_type, count in type_counts}
             
             # Get events by object type
-            events_by_object_type = {}
-            object_type_counts = self.db_session.query(
+            object_type_query = select(
                 AuditEventModel.object_type,
                 func.count(AuditEventModel.id)
-            ).filter(
-                AuditEventModel.tenant_id == tenant_id,
-                AuditEventModel.deleted_at.is_(None)
-            )
-            if start_date:
-                object_type_counts = object_type_counts.filter(AuditEventModel.event_time >= start_date)
-            if end_date:
-                object_type_counts = object_type_counts.filter(AuditEventModel.event_time <= end_date)
+            ).where(*base_conditions).group_by(AuditEventModel.object_type)
             
-            object_type_counts = object_type_counts.group_by(AuditEventModel.object_type).all()
+            result = await self.db_session.execute(object_type_query)
+            object_type_counts = result.all()
             events_by_object_type = {object_type: count for object_type, count in object_type_counts}
             
             # Get events by actor
-            events_by_actor = {}
-            actor_counts = self.db_session.query(
+            actor_query = select(
                 AuditEventModel.actor_id,
                 func.count(AuditEventModel.id)
-            ).filter(
-                AuditEventModel.tenant_id == tenant_id,
-                AuditEventModel.actor_id.isnot(None),
-                AuditEventModel.deleted_at.is_(None)
-            )
-            if start_date:
-                actor_counts = actor_counts.filter(AuditEventModel.event_time >= start_date)
-            if end_date:
-                actor_counts = actor_counts.filter(AuditEventModel.event_time <= end_date)
+            ).where(
+                *base_conditions,
+                AuditEventModel.actor_id.isnot(None)
+            ).group_by(AuditEventModel.actor_id)
             
-            actor_counts = actor_counts.group_by(AuditEventModel.actor_id).all()
-            events_by_actor = {str(actor_id): count for actor_id, count in actor_counts}
+            result = await self.db_session.execute(actor_query)
+            actor_counts = result.all()
+            events_by_actor = {str(actor_id): count for actor_id, count in actor_counts if actor_id}
             
             # Get events by date
-            events_by_date = {}
-            date_counts = self.db_session.query(
+            date_query = select(
                 func.date(AuditEventModel.event_time),
                 func.count(AuditEventModel.id)
-            ).filter(
-                AuditEventModel.tenant_id == tenant_id,
-                AuditEventModel.deleted_at.is_(None)
-            )
-            if start_date:
-                date_counts = date_counts.filter(AuditEventModel.event_time >= start_date)
-            if end_date:
-                date_counts = date_counts.filter(AuditEventModel.event_time <= end_date)
+            ).where(*base_conditions).group_by(func.date(AuditEventModel.event_time))
             
-            date_counts = date_counts.group_by(func.date(AuditEventModel.event_time)).all()
+            result = await self.db_session.execute(date_query)
+            date_counts = result.all()
             events_by_date = {str(date): count for date, count in date_counts}
             
             # Calculate specific event counts
-            security_events = query.filter(
+            security_query = select(func.count(AuditEventModel.id)).where(
+                *base_conditions,
                 AuditEventModel.event_type.in_(['login', 'logout', 'permission_change'])
-            ).count()
+            )
+            result = await self.db_session.execute(security_query)
+            security_events = result.scalar()
             
-            business_events = query.filter(
+            business_query = select(func.count(AuditEventModel.id)).where(
+                *base_conditions,
                 AuditEventModel.event_type.in_(['status_change', 'credit_approval', 'credit_rejection', 'delivery_complete', 'delivery_failed', 'trip_start', 'trip_complete'])
-            ).count()
+            )
+            result = await self.db_session.execute(business_query)
+            business_events = result.scalar()
             
-            field_changes = query.filter(
+            field_changes_query = select(func.count(AuditEventModel.id)).where(
+                *base_conditions,
                 AuditEventModel.event_type == 'update',
                 AuditEventModel.field_name.isnot(None)
-            ).count()
+            )
+            result = await self.db_session.execute(field_changes_query)
+            field_changes = result.scalar()
             
-            status_changes = query.filter(
+            status_changes_query = select(func.count(AuditEventModel.id)).where(
+                *base_conditions,
                 AuditEventModel.event_type == 'status_change'
-            ).count()
+            )
+            result = await self.db_session.execute(status_changes_query)
+            status_changes = result.scalar()
             
             return AuditSummary(
-                total_events=total_events,
+                total_events=total_events or 0,
                 events_by_type=events_by_type,
                 events_by_object_type=events_by_object_type,
                 events_by_actor=events_by_actor,
                 events_by_date=events_by_date,
-                security_events=security_events,
-                business_events=business_events,
-                field_changes=field_changes,
-                status_changes=status_changes
+                security_events=security_events or 0,
+                business_events=business_events or 0,
+                field_changes=field_changes or 0,
+                status_changes=status_changes or 0
             )
             
         except Exception as e:
@@ -349,18 +339,22 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> List[AuditEvent]:
         """Get security-related audit events"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.event_type.in_(['login', 'logout', 'permission_change']),
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if start_date:
-                query = query.filter(AuditEventModel.event_time >= start_date)
+                conditions.append(AuditEventModel.event_time >= start_date)
             if end_date:
-                query = query.filter(AuditEventModel.event_time <= end_date)
+                conditions.append(AuditEventModel.event_time <= end_date)
             
-            db_models = query.order_by(desc(AuditEventModel.event_time)).limit(limit).all()
+            query = select(AuditEventModel).where(*conditions).order_by(desc(AuditEventModel.event_time)).limit(limit)
+            result = await self.db_session.execute(query)
+            db_models = result.scalars().all()
             return [AuditEvent.from_dict(model.to_dict()) for model in db_models]
             
         except Exception as e:
@@ -375,18 +369,22 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> List[AuditEvent]:
         """Get business process audit events"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.event_type.in_(['status_change', 'credit_approval', 'credit_rejection', 'delivery_complete', 'delivery_failed', 'trip_start', 'trip_complete']),
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if start_date:
-                query = query.filter(AuditEventModel.event_time >= start_date)
+                conditions.append(AuditEventModel.event_time >= start_date)
             if end_date:
-                query = query.filter(AuditEventModel.event_time <= end_date)
+                conditions.append(AuditEventModel.event_time <= end_date)
             
-            db_models = query.order_by(desc(AuditEventModel.event_time)).limit(limit).all()
+            query = select(AuditEventModel).where(*conditions).order_by(desc(AuditEventModel.event_time)).limit(limit)
+            result = await self.db_session.execute(query)
+            db_models = result.scalars().all()
             return [AuditEvent.from_dict(model.to_dict()) for model in db_models]
             
         except Exception as e:
@@ -401,19 +399,23 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> List[AuditEvent]:
         """Get field change audit events for a specific object"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.object_type == object_type,
                 AuditEventModel.object_id == object_id,
                 AuditEventModel.event_type == 'update',
                 AuditEventModel.field_name.isnot(None),
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if field_name:
-                query = query.filter(AuditEventModel.field_name == field_name)
+                conditions.append(AuditEventModel.field_name == field_name)
             
-            db_models = query.order_by(desc(AuditEventModel.event_time)).all()
+            query = select(AuditEventModel).where(*conditions).order_by(desc(AuditEventModel.event_time))
+            result = await self.db_session.execute(query)
+            db_models = result.scalars().all()
             return [AuditEvent.from_dict(model.to_dict()) for model in db_models]
             
         except Exception as e:
@@ -427,14 +429,19 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> List[AuditEvent]:
         """Get status change audit events for a specific object"""
         try:
-            db_models = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.object_type == object_type,
                 AuditEventModel.object_id == object_id,
                 AuditEventModel.event_type == 'status_change',
                 AuditEventModel.deleted_at.is_(None)
-            ).order_by(desc(AuditEventModel.event_time)).all()
+            ]
             
+            query = select(AuditEventModel).where(*conditions).order_by(desc(AuditEventModel.event_time))
+            result = await self.db_session.execute(query)
+            db_models = result.scalars().all()
             return [AuditEvent.from_dict(model.to_dict()) for model in db_models]
             
         except Exception as e:
@@ -450,20 +457,24 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> List[AuditEvent]:
         """Get login/logout audit events"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.event_type.in_(['login', 'logout']),
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if actor_id:
-                query = query.filter(AuditEventModel.actor_id == actor_id)
+                conditions.append(AuditEventModel.actor_id == actor_id)
             if start_date:
-                query = query.filter(AuditEventModel.event_time >= start_date)
+                conditions.append(AuditEventModel.event_time >= start_date)
             if end_date:
-                query = query.filter(AuditEventModel.event_time <= end_date)
+                conditions.append(AuditEventModel.event_time <= end_date)
             
-            db_models = query.order_by(desc(AuditEventModel.event_time)).limit(limit).all()
+            query = select(AuditEventModel).where(*conditions).order_by(desc(AuditEventModel.event_time)).limit(limit)
+            result = await self.db_session.execute(query)
+            db_models = result.scalars().all()
             return [AuditEvent.from_dict(model.to_dict()) for model in db_models]
             
         except Exception as e:
@@ -479,18 +490,22 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> List[AuditEvent]:
         """Get audit events by event type"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.event_type == event_type,
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if start_date:
-                query = query.filter(AuditEventModel.event_time >= start_date)
+                conditions.append(AuditEventModel.event_time >= start_date)
             if end_date:
-                query = query.filter(AuditEventModel.event_time <= end_date)
+                conditions.append(AuditEventModel.event_time <= end_date)
             
-            db_models = query.order_by(desc(AuditEventModel.event_time)).limit(limit).all()
+            query = select(AuditEventModel).where(*conditions).order_by(desc(AuditEventModel.event_time)).limit(limit)
+            result = await self.db_session.execute(query)
+            db_models = result.scalars().all()
             return [AuditEvent.from_dict(model.to_dict()) for model in db_models]
             
         except Exception as e:
@@ -506,18 +521,22 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> List[AuditEvent]:
         """Get audit events by IP address"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.ip_address == ip_address,
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if start_date:
-                query = query.filter(AuditEventModel.event_time >= start_date)
+                conditions.append(AuditEventModel.event_time >= start_date)
             if end_date:
-                query = query.filter(AuditEventModel.event_time <= end_date)
+                conditions.append(AuditEventModel.event_time <= end_date)
             
-            db_models = query.order_by(desc(AuditEventModel.event_time)).limit(limit).all()
+            query = select(AuditEventModel).where(*conditions).order_by(desc(AuditEventModel.event_time)).limit(limit)
+            result = await self.db_session.execute(query)
+            db_models = result.scalars().all()
             return [AuditEvent.from_dict(model.to_dict()) for model in db_models]
             
         except Exception as e:
@@ -533,18 +552,22 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> List[AuditEvent]:
         """Get audit events by device ID"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.device_id == device_id,
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if start_date:
-                query = query.filter(AuditEventModel.event_time >= start_date)
+                conditions.append(AuditEventModel.event_time >= start_date)
             if end_date:
-                query = query.filter(AuditEventModel.event_time <= end_date)
+                conditions.append(AuditEventModel.event_time <= end_date)
             
-            db_models = query.order_by(desc(AuditEventModel.event_time)).limit(limit).all()
+            query = select(AuditEventModel).where(*conditions).order_by(desc(AuditEventModel.event_time)).limit(limit)
+            result = await self.db_session.execute(query)
+            db_models = result.scalars().all()
             return [AuditEvent.from_dict(model.to_dict()) for model in db_models]
             
         except Exception as e:
@@ -589,22 +612,23 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> int:
         """Clean up audit events older than retention period"""
         try:
+            from sqlalchemy import update
+            
             cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
             
             # Soft delete old events
-            result = self.db_session.query(AuditEventModel).filter(
+            stmt = update(AuditEventModel).where(
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.event_time < cutoff_date,
                 AuditEventModel.deleted_at.is_(None)
-            ).update({
-                AuditEventModel.deleted_at: datetime.utcnow()
-            })
+            ).values(deleted_at=datetime.utcnow())
             
-            self.db_session.commit()
-            return result
+            result = await self.db_session.execute(stmt)
+            await self.db_session.commit()
+            return result.rowcount
             
         except Exception as e:
-            self.db_session.rollback()
+            await self.db_session.rollback()
             raise AuditEventDeletionError(f"Failed to cleanup old events: {str(e)}")
 
     async def get_audit_trail(
@@ -616,16 +640,20 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> List[AuditEvent]:
         """Get complete audit trail for an object"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.object_type == object_type,
                 AuditEventModel.object_id == object_id
-            )
+            ]
             
             if not include_deleted:
-                query = query.filter(AuditEventModel.deleted_at.is_(None))
+                conditions.append(AuditEventModel.deleted_at.is_(None))
             
-            db_models = query.order_by(asc(AuditEventModel.event_time)).all()
+            query = select(AuditEventModel).where(*conditions).order_by(asc(AuditEventModel.event_time))
+            result = await self.db_session.execute(query)
+            db_models = result.scalars().all()
             return [AuditEvent.from_dict(model.to_dict()) for model in db_models]
             
         except Exception as e:
@@ -640,43 +668,53 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> Dict[str, Any]:
         """Get user activity summary"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            # Build base conditions
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.actor_id == actor_id,
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if start_date:
-                query = query.filter(AuditEventModel.event_time >= start_date)
+                conditions.append(AuditEventModel.event_time >= start_date)
             if end_date:
-                query = query.filter(AuditEventModel.event_time <= end_date)
+                conditions.append(AuditEventModel.event_time <= end_date)
             
-            total_events = query.count()
+            # Get total events
+            total_query = select(func.count(AuditEventModel.id)).where(*conditions)
+            result = await self.db_session.execute(total_query)
+            total_events = result.scalar()
             
             # Get events by type
-            events_by_type = {}
-            type_counts = query.with_entities(
+            type_query = select(
                 AuditEventModel.event_type,
                 func.count(AuditEventModel.id)
-            ).group_by(AuditEventModel.event_type).all()
+            ).where(*conditions).group_by(AuditEventModel.event_type)
             
+            result = await self.db_session.execute(type_query)
+            type_counts = result.all()
             events_by_type = {event_type: count for event_type, count in type_counts}
             
             # Get events by object type
-            events_by_object_type = {}
-            object_type_counts = query.with_entities(
+            object_type_query = select(
                 AuditEventModel.object_type,
                 func.count(AuditEventModel.id)
-            ).group_by(AuditEventModel.object_type).all()
+            ).where(*conditions).group_by(AuditEventModel.object_type)
             
+            result = await self.db_session.execute(object_type_query)
+            object_type_counts = result.all()
             events_by_object_type = {object_type: count for object_type, count in object_type_counts}
             
             # Get last activity
-            last_activity = query.order_by(desc(AuditEventModel.event_time)).first()
+            last_activity_query = select(AuditEventModel).where(*conditions).order_by(desc(AuditEventModel.event_time)).limit(1)
+            result = await self.db_session.execute(last_activity_query)
+            last_activity = result.scalar_one_or_none()
             last_activity_time = last_activity.event_time if last_activity else None
             
             return {
-                "total_events": total_events,
+                "total_events": total_events or 0,
                 "events_by_type": events_by_type,
                 "events_by_object_type": events_by_object_type,
                 "last_activity": last_activity_time.isoformat() if last_activity_time else None,
@@ -694,59 +732,71 @@ class AuditRepositoryImpl(AuditRepository):
     ) -> Dict[str, Any]:
         """Get system activity summary"""
         try:
-            query = self.db_session.query(AuditEventModel).filter(
+            from sqlalchemy import select
+            
+            # Build base conditions
+            conditions = [
                 AuditEventModel.tenant_id == tenant_id,
                 AuditEventModel.deleted_at.is_(None)
-            )
+            ]
             
             if start_date:
-                query = query.filter(AuditEventModel.event_time >= start_date)
+                conditions.append(AuditEventModel.event_time >= start_date)
             if end_date:
-                query = query.filter(AuditEventModel.event_time <= end_date)
+                conditions.append(AuditEventModel.event_time <= end_date)
             
-            total_events = query.count()
+            # Get total events
+            total_query = select(func.count(AuditEventModel.id)).where(*conditions)
+            result = await self.db_session.execute(total_query)
+            total_events = result.scalar()
             
             # Get events by type
-            events_by_type = {}
-            type_counts = query.with_entities(
+            type_query = select(
                 AuditEventModel.event_type,
                 func.count(AuditEventModel.id)
-            ).group_by(AuditEventModel.event_type).all()
+            ).where(*conditions).group_by(AuditEventModel.event_type)
             
+            result = await self.db_session.execute(type_query)
+            type_counts = result.all()
             events_by_type = {event_type: count for event_type, count in type_counts}
             
             # Get events by object type
-            events_by_object_type = {}
-            object_type_counts = query.with_entities(
+            object_type_query = select(
                 AuditEventModel.object_type,
                 func.count(AuditEventModel.id)
-            ).group_by(AuditEventModel.object_type).all()
+            ).where(*conditions).group_by(AuditEventModel.object_type)
             
+            result = await self.db_session.execute(object_type_query)
+            object_type_counts = result.all()
             events_by_object_type = {object_type: count for object_type, count in object_type_counts}
             
             # Get events by date
-            events_by_date = {}
-            date_counts = query.with_entities(
+            date_query = select(
                 func.date(AuditEventModel.event_time),
                 func.count(AuditEventModel.id)
-            ).group_by(func.date(AuditEventModel.event_time)).all()
+            ).where(*conditions).group_by(func.date(AuditEventModel.event_time))
             
+            result = await self.db_session.execute(date_query)
+            date_counts = result.all()
             events_by_date = {str(date): count for date, count in date_counts}
             
             # Get top actors
-            top_actors = query.with_entities(
+            top_actors_query = select(
                 AuditEventModel.actor_id,
                 func.count(AuditEventModel.id)
-            ).filter(
+            ).where(
+                *conditions,
                 AuditEventModel.actor_id.isnot(None)
             ).group_by(AuditEventModel.actor_id).order_by(
                 desc(func.count(AuditEventModel.id))
-            ).limit(10).all()
+            ).limit(10)
             
-            top_actors = [{"actor_id": str(actor_id), "event_count": count} for actor_id, count in top_actors]
+            result = await self.db_session.execute(top_actors_query)
+            top_actors_data = result.all()
+            top_actors = [{"actor_id": str(actor_id), "event_count": count} for actor_id, count in top_actors_data if actor_id]
             
             return {
-                "total_events": total_events,
+                "total_events": total_events or 0,
                 "events_by_type": events_by_type,
                 "events_by_object_type": events_by_object_type,
                 "events_by_date": events_by_date,
