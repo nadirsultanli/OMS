@@ -54,7 +54,7 @@ async def google_callback(
         if not email:
             logger.error("No email received from Google")
             return RedirectResponse(
-                url=f"{google_service.frontend_url}/login?error=no_email",
+                url="https://omsfrontend.netlify.app/login?error=no_email",
                 status_code=302
             )
         
@@ -64,7 +64,7 @@ async def google_callback(
         if not user_data:
             logger.warning(f"Google login failed - user not found: {email}")
             return RedirectResponse(
-                url=f"{google_service.frontend_url}/login?error=user_not_found",
+                url="https://omsfrontend.netlify.app/login?error=user_not_found",
                 status_code=302
             )
         
@@ -129,14 +129,14 @@ async def google_callback(
         except Exception as session_error:
             logger.error(f"Failed to create Supabase session: {str(session_error)}")
             return RedirectResponse(
-                url=f"{google_service.frontend_url}/login?error=session_creation_failed",
+                url="https://omsfrontend.netlify.app/login?error=session_creation_failed",
                 status_code=302
             )
             
     except Exception as e:
         logger.error(f"Google callback error: {str(e)}")
         return RedirectResponse(
-            url=f"{google_service.frontend_url}/login?error=callback_failed",
+            url="https://omsfrontend.netlify.app/login?error=callback_failed",
             status_code=302
         )
 
