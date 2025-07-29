@@ -26,12 +26,15 @@ from app.presentation.api.trips.trip_order_integration import router as trip_ord
 from app.presentation.api.trips.monitoring import router as monitoring_router
 from app.presentation.api.vehicles.vehicle import router as vehicle_router
 from app.presentation.api.vehicles.vehicle_warehouse import router as vehicle_warehouse_router
+from app.presentation.api.audit.audit import router as audit_router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
+from app.core.audit_middleware import AuditMiddleware
 
 # Get configuration from environment
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")
 ENVIRONMENT = config("ENVIRONMENT", default="development")
+AUDIT_ENABLED = config("AUDIT_ENABLED", default="true", cast=bool)
 
 
 @asynccontextmanager
@@ -114,6 +117,10 @@ app = FastAPI(
         {
             "name": "Trips",
             "description": "Trip management, vehicle routing, and delivery operations"
+        },
+        {
+            "name": "Audit",
+            "description": "Audit trail, compliance monitoring, and activity logging"
         }
     ]
 )
@@ -129,6 +136,18 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
+
+# Add audit middleware for automatic request/response logging (if enabled)
+if AUDIT_ENABLED:
+    app.add_middleware(
+        AuditMiddleware,
+        excluded_paths=[
+            "/health", "/docs", "/redoc", "/openapi.json",
+            "/debug", "/logs/test", "/cors-test", "/db/test"
+        ],
+        excluded_methods=["OPTIONS", "HEAD"]
+    )
+    default_logger.info("Audit middleware enabled - automatic request/response logging active")
 
 # Custom exception handler to ensure CORS headers are always included
 @app.exception_handler(StarletteHTTPException)
@@ -177,6 +196,7 @@ app.include_router(trip_order_integration_router, prefix="/api/v1")
 app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(vehicle_router, prefix="/api/v1")
 app.include_router(vehicle_warehouse_router, prefix="/api/v1")
+app.include_router(audit_router, prefix="/api/v1")
 
 
 def custom_openapi():
