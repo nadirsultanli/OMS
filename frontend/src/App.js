@@ -22,6 +22,7 @@ import StockLevels from './pages/StockLevels';
 import StockDocuments from './pages/StockDocuments';
 import Trips from './pages/Trips';
 import Vehicles from './pages/Vehicles';
+import Audit from './pages/Audit';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import authService from './services/authService';
@@ -225,6 +226,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Vehicles />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/audit"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Audit />
                   </Layout>
                 </ProtectedRoute>
               }

@@ -16,7 +16,8 @@ import {
   Route,
   FileText,
   Archive,
-  TrendingUp
+  TrendingUp,
+  Shield
 } from 'lucide-react';
 import { UserAvatar } from './ui/UserAvatar';
 import authService from '../services/authService';
@@ -49,7 +50,8 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
     { path: '/warehouses', label: 'Warehouses', icon: Warehouse },
     { path: '/stock', label: 'Stock Dashboard', icon: TrendingUp },
     { path: '/stock-levels', label: 'Stock Levels', icon: Archive },
-    { path: '/stock-documents', label: 'Stock Documents', icon: ArrowLeftRight }
+    { path: '/stock-documents', label: 'Stock Documents', icon: ArrowLeftRight },
+    { path: '/audit', label: 'Audit', icon: Shield }
   ];
 
   // Determine if sidebar should be expanded
