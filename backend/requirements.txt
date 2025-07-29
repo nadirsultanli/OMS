@@ -17,4 +17,6 @@ asyncpg
 psycopg2-binary
 geoalchemy2[shapely]
 shapely
-greenlet
+greenletgoogle-auth
+google-auth-oauthlib
+google-auth-httplib2
