@@ -21,3 +21,5 @@ greenlet
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
+
+stripe>=7.0.0

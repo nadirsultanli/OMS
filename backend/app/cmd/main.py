@@ -28,6 +28,7 @@ from app.presentation.api.vehicles.vehicle import router as vehicle_router
 from app.presentation.api.vehicles.vehicle_warehouse import router as vehicle_warehouse_router
 from app.presentation.api.audit.audit import router as audit_router
 from app.presentation.api.deliveries.delivery import router as delivery_router
+from app.presentation.api.stripe.stripe import router as stripe_router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
 from app.core.audit_middleware import AuditMiddleware
@@ -130,6 +131,10 @@ app = FastAPI(
         {
             "name": "Audit",
             "description": "Audit trail, compliance monitoring, and activity logging"
+        },
+        {
+            "name": "Stripe Billing",
+            "description": "Stripe billing integration, tenant management, and subscription operations"
         }
     ]
 )
@@ -210,6 +215,7 @@ app.include_router(vehicle_router, prefix="/api/v1")
 app.include_router(vehicle_warehouse_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(delivery_router, prefix="/api/v1")
+app.include_router(stripe_router, prefix="/api/v1")
 
 
 def custom_openapi():

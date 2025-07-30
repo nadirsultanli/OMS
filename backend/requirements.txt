@@ -22,3 +22,6 @@ google-auth
 google-auth-oauthlib
 google-auth-httplib2
 # Google OAuth dependencies added
+
+# Stripe integration dependencies
+stripe>=7.0.0

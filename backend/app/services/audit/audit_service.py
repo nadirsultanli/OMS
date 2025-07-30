@@ -19,6 +19,10 @@ from app.domain.exceptions.audit_exceptions import (
     AuditEventPermissionError
 )
 from app.domain.entities.users import User
+from app.services.audit.edge_audit_service import edge_audit_service
+from app.infrastucture.logs.logger import get_logger
+
+logger = get_logger("audit_service")
 
 
 class AuditService:
@@ -610,4 +614,134 @@ class AuditService:
             return await self.audit_repository.create_bulk(audit_events)
             
         except Exception as e:
-            raise AuditEventCreationError(f"Failed to create bulk audit events: {str(e)}") 
+            raise AuditEventCreationError(f"Failed to create bulk audit events: {str(e)}")
+    
+    async def log_high_volume_events(
+        self,
+        events_data: List[Dict[str, Any]],
+        use_edge_function: bool = True,
+        current_user: Optional[User] = None
+    ) -> Dict[str, Any]:
+        """
+        High-volume audit logging with smart routing:
+        - Edge Function (fire-and-forget) for >1k TPS scenarios
+        - Direct database (with response) for standard scenarios
+        """
+        try:
+            # Validate permissions for each event's tenant
+            for event_data in events_data:
+                tenant_id = event_data.get("tenant_id")
+                if current_user and current_user.tenant_id != tenant_id:
+                    raise AuditEventPermissionError(f"Access denied to tenant {tenant_id}")
+            
+            # Route to appropriate logging method based on volume and configuration
+            if use_edge_function and edge_audit_service.is_enabled() and len(events_data) > 50:
+                # Use edge function for high-volume fire-and-forget logging
+                try:
+                    result = await edge_audit_service.log_events_with_response(
+                        events_data, 
+                        timeout=5.0
+                    )
+                    
+                    if result.get('success'):
+                        return {
+                            "success": True,
+                            "method": "edge_function",
+                            "created_count": result.get('created_count', 0),
+                            "message": f"High-volume logging via edge function: {result.get('message', '')}",
+                            "performance": result.get('performance', {})
+                        }
+                    else:
+                        # Fallback to direct database if edge function fails
+                        logger.warning(f"Edge function failed, falling back to direct database: {result.get('error')}")
+                        
+                except Exception as edge_error:
+                    logger.warning(f"Edge function error, falling back to direct database: {str(edge_error)}")
+            
+            # Fallback to direct database logging
+            audit_events = await self.create_bulk_audit_events(events_data, current_user)
+            
+            return {
+                "success": True,
+                "method": "direct_database", 
+                "created_count": len(audit_events),
+                "message": f"Direct database logging completed for {len(audit_events)} events",
+                "created_event_ids": [event.id if hasattr(event, 'id') else i+1 for i, event in enumerate(audit_events)]
+            }
+            
+        except Exception as e:
+            raise AuditEventCreationError(f"Failed to log high-volume events: {str(e)}")
+    
+    async def log_event_fire_and_forget(
+        self,
+        tenant_id: UUID,
+        actor_id: Optional[UUID],
+        actor_type: AuditActorType,
+        object_type: AuditObjectType,
+        object_id: Optional[UUID],
+        event_type: AuditEventType,
+        field_name: Optional[str] = None,
+        old_value: Optional[Dict[str, Any]] = None,
+        new_value: Optional[Dict[str, Any]] = None,
+        request: Optional[Request] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """
+        Fire-and-forget audit logging for high-throughput scenarios
+        Returns immediately without waiting for database confirmation
+        """
+        try:
+            # Extract request metadata
+            ip_address = None
+            device_id = None
+            session_id = None
+            
+            if request:
+                if "x-forwarded-for" in request.headers:
+                    ip_address = request.headers["x-forwarded-for"].split(",")[0].strip()
+                elif "x-real-ip" in request.headers:
+                    ip_address = request.headers["x-real-ip"]
+                else:
+                    ip_address = request.client.host if request.client else None
+                
+                device_id = request.headers.get("user-agent", "unknown")
+                session_id = request.headers.get("x-session-id")
+            
+            # Try edge function first (preferred for fire-and-forget)
+            if edge_audit_service.is_enabled():
+                return await edge_audit_service.log_audit_event_async(
+                    tenant_id=tenant_id,
+                    actor_id=actor_id,
+                    actor_type=actor_type,
+                    object_type=object_type,
+                    object_id=object_id,
+                    event_type=event_type,
+                    field_name=field_name,
+                    old_value=str(old_value) if old_value else None,
+                    new_value=str(new_value) if new_value else None,
+                    context=context,
+                    ip_address=ip_address,
+                    device_id=device_id,
+                    session_id=session_id
+                )
+            else:
+                # Fallback: queue for background processing (if available)
+                # For now, just log to standard audit system
+                await self.log_event(
+                    tenant_id=tenant_id,
+                    actor_id=actor_id,
+                    actor_type=actor_type,
+                    object_type=object_type,
+                    object_id=object_id,
+                    event_type=event_type,
+                    field_name=field_name,
+                    old_value=old_value,
+                    new_value=new_value,
+                    request=request,
+                    context=context
+                )
+                return True
+                
+        except Exception as e:
+            logger.warning(f"Fire-and-forget audit logging failed: {str(e)}")
+            return False 
