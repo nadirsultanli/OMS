@@ -27,6 +27,7 @@ from app.presentation.api.trips.monitoring import router as monitoring_router
 from app.presentation.api.vehicles.vehicle import router as vehicle_router
 from app.presentation.api.vehicles.vehicle_warehouse import router as vehicle_warehouse_router
 from app.presentation.api.audit.audit import router as audit_router
+from app.presentation.api.deliveries.delivery import router as delivery_router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
 from app.core.audit_middleware import AuditMiddleware
@@ -123,6 +124,10 @@ app = FastAPI(
             "description": "Trip management, vehicle routing, and delivery operations"
         },
         {
+            "name": "Deliveries",
+            "description": "Delivery operations and edge-case workflows (damaged cylinders, lost empties, mixed-size loads)"
+        },
+        {
             "name": "Audit",
             "description": "Audit trail, compliance monitoring, and activity logging"
         }
@@ -204,6 +209,7 @@ app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(vehicle_router, prefix="/api/v1")
 app.include_router(vehicle_warehouse_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
+app.include_router(delivery_router, prefix="/api/v1")
 
 
 def custom_openapi():

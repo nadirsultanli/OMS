@@ -30,6 +30,8 @@ class VariantResponse(BaseModel):
     gross_weight_kg: Optional[Decimal]
     deposit: Optional[Decimal]
     inspection_date: Optional[str]
+    unit_weight_kg: Optional[Decimal]
+    unit_volume_m3: Optional[Decimal]
     # Bulk gas specific attributes
     unit_of_measure: str
     is_variable_quantity: bool

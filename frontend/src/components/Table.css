@@ -360,6 +360,19 @@
   box-shadow: 0 1px 3px rgba(107, 114, 128, 0.2);
 }
 
+/* Capacity action button */
+.action-btn.capacity {
+  background: #f0f9ff;
+  color: #0369a1;
+  border-color: #bae6fd;
+}
+
+.action-btn.capacity:hover:not(:disabled) {
+  background: #bae6fd;
+  border-color: #7dd3fc;
+  box-shadow: 0 1px 3px rgba(3, 105, 161, 0.2);
+}
+
 /* ============================================
    RESPONSIVE DESIGN
    ============================================ */

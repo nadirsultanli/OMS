@@ -221,8 +221,8 @@ const MixedLoadCapacityTest = () => {
                     {testResults.data.orderCapacities.map((orderCap, index) => (
                       <div key={index} className="order-capacity-item">
                         <span className="order-id">Order: {orderCap.orderId}</span>
-                        <span className="order-weight">{orderCap.total_weight_kg.toFixed(2)} kg</span>
-                        <span className="order-volume">{orderCap.total_volume_m3.toFixed(3)} m³</span>
+                        <span className="order-weight">{typeof orderCap.total_weight_kg === 'number' ? orderCap.total_weight_kg.toFixed(2) : '0.00'} kg</span>
+                        <span className="order-volume">{typeof orderCap.total_volume_m3 === 'number' ? orderCap.total_volume_m3.toFixed(3) : '0.000'} m³</span>
                       </div>
                     ))}
                   </div>
@@ -237,11 +237,11 @@ const MixedLoadCapacityTest = () => {
                     </div>
                     <div className="summary-item">
                       <span className="label">Total Weight:</span>
-                      <span className="value weight">{testResults.data.total_weight_kg.toFixed(2)} kg</span>
+                      <span className="value weight">{typeof testResults.data.total_weight_kg === 'number' ? testResults.data.total_weight_kg.toFixed(2) : '0.00'} kg</span>
                     </div>
                     <div className="summary-item">
                       <span className="label">Total Volume:</span>
-                      <span className="value volume">{testResults.data.total_volume_m3.toFixed(3)} m³</span>
+                      <span className="value volume">{typeof testResults.data.total_volume_m3 === 'number' ? testResults.data.total_volume_m3.toFixed(3) : '0.000'} m³</span>
                     </div>
                     <div className="summary-item">
                       <span className="label">Line Details:</span>
@@ -275,8 +275,8 @@ const MixedLoadCapacityTest = () => {
                                 <td>{line.qty_ordered}</td>
                                 <td>{line.gross_weight_kg} kg</td>
                                 <td>{line.unit_volume_m3} m³</td>
-                                <td>{line.line_weight_kg.toFixed(2)} kg</td>
-                                <td>{line.line_volume_m3.toFixed(3)} m³</td>
+                                <td>{typeof line.line_weight_kg === 'number' ? line.line_weight_kg.toFixed(2) : '0.00'} kg</td>
+                                <td>{typeof line.line_volume_m3 === 'number' ? line.line_volume_m3.toFixed(3) : '0.000'} m³</td>
                               </tr>
                             ))}
                           </tbody>

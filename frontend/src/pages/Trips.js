@@ -21,6 +21,7 @@ import userService from '../services/userService';
 import authService from '../services/authService';
 import TripDetailView from './TripDetailView';
 import TripsTable from '../components/TripsTable';
+import LoadCapacityModal from '../components/LoadCapacityModal';
 import './Trips.css';
 import '../components/Table.css';
 
@@ -42,7 +43,9 @@ const Trips = () => {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showTripDetails, setShowTripDetails] = useState(false);
   const [showTripDetailView, setShowTripDetailView] = useState(false);
+  const [showCapacityModal, setShowCapacityModal] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
+  const [selectedTripOrders, setSelectedTripOrders] = useState([]);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
 
@@ -265,6 +268,38 @@ const Trips = () => {
   const handleViewTrip = (trip) => {
     setSelectedTrip(trip);
     setShowTripDetailView(true);
+  };
+
+  const handleCalculateCapacity = async (trip) => {
+    try {
+      setSelectedTrip(trip);
+      
+      console.log('Calculating capacity for trip:', trip);
+      console.log('Available vehicles:', vehicles);
+      console.log('Trip vehicle_id:', trip.vehicle_id);
+      
+      // Fetch trip orders for capacity calculation
+      const result = await tripService.getTripWithStops(trip.id);
+      if (result.success) {
+        const tripOrders = result.data.orders || [];
+        
+        // If we have order IDs, fetch the actual order data
+        if (tripOrders.length > 0 && tripOrders[0].id) {
+          // The orders are already in the correct format for capacity calculation
+          setSelectedTripOrders(tripOrders);
+        } else {
+          // Fallback: create order objects from IDs if needed
+          setSelectedTripOrders(tripOrders.map(orderId => ({ id: orderId })));
+        }
+        
+        setShowCapacityModal(true);
+      } else {
+        setMessage({ type: 'error', text: 'Failed to fetch trip orders for capacity calculation' });
+      }
+    } catch (error) {
+      console.error('Capacity calculation error:', error);
+      setMessage({ type: 'error', text: 'Failed to calculate capacity' });
+    }
   };
 
   const handleStartTrip = async (tripId) => {
@@ -538,6 +573,7 @@ const Trips = () => {
           onCompleteTrip={handleCompleteTrip}
           onDeleteTrip={handleDeleteTrip}
           onStatusUpdate={handleStatusUpdate}
+          onCalculateCapacity={handleCalculateCapacity}
         />
       )}
 
@@ -622,6 +658,20 @@ const Trips = () => {
             setSelectedTrip(null);
             fetchTrips(); // Refresh trips after any changes
           }}
+        />
+      )}
+
+      {showCapacityModal && selectedTrip && (
+        <LoadCapacityModal
+          isOpen={showCapacityModal}
+          onClose={() => {
+            setShowCapacityModal(false);
+            setSelectedTrip(null);
+            setSelectedTripOrders([]);
+          }}
+          trip={selectedTrip}
+          orders={selectedTripOrders}
+          vehicle={vehicles.find(v => v.id === selectedTrip.vehicle_id)}
         />
       )}
     </div>

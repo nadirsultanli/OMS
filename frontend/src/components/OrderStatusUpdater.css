@@ -1,0 +1,12 @@
+.order-status-updater {
+  position: relative;
+  display: inline-block;
+}
+
+.status-update-btn:hover {
+  background-color: #f8f9fa !important;
+}
+
+.status-dropdown button:hover {
+  background-color: #f8f9fa !important;
+} 

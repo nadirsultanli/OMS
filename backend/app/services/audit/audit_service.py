@@ -542,4 +542,72 @@ class AuditService:
                 object_id=object_id
             )
         except Exception as e:
-            raise AuditEventQueryError(f"Failed to get status changes: {str(e)}") 
+            raise AuditEventQueryError(f"Failed to get status changes: {str(e)}")
+    
+    async def create_audit_event(
+        self,
+        event_dict: Dict[str, Any],
+        current_user: Optional[User] = None,
+    ) -> AuditEvent:
+        """Create an audit event from dictionary data - wrapper for bulk operations"""
+        try:
+            return await self.log_event(
+                tenant_id=event_dict.get("tenant_id"),
+                actor_id=event_dict.get("actor_id"),
+                actor_type=event_dict.get("actor_type", AuditActorType.USER),
+                object_type=event_dict.get("object_type"),
+                object_id=event_dict.get("object_id"),
+                event_type=event_dict.get("event_type"),
+                field_name=event_dict.get("field_name"),
+                old_value={"field": event_dict.get("old_value")} if event_dict.get("old_value") else None,
+                new_value={"field": event_dict.get("new_value")} if event_dict.get("new_value") else None,
+                context={
+                    "ip_address": event_dict.get("ip_address"),
+                    "device_id": event_dict.get("device_id"),
+                    "session_id": event_dict.get("session_id"),
+                    **(event_dict.get("context") or {})
+                }
+            )
+        except Exception as e:
+            raise AuditEventCreationError(f"Failed to create audit event: {str(e)}")
+    
+    async def create_bulk_audit_events(
+        self,
+        events_data: List[Dict[str, Any]],
+        current_user: Optional[User] = None,
+    ) -> List[AuditEvent]:
+        """Create multiple audit events efficiently with Supabase batch insert"""
+        try:
+            # Validate permissions for each event's tenant
+            for event_data in events_data:
+                tenant_id = event_data.get("tenant_id")
+                if current_user and current_user.tenant_id != tenant_id:
+                    raise AuditEventPermissionError(f"Access denied to tenant {tenant_id}")
+            
+            # Convert to AuditEvent entities
+            audit_events = []
+            for event_data in events_data:
+                audit_event = AuditEvent.create(
+                    tenant_id=event_data.get("tenant_id"),
+                    actor_id=event_data.get("actor_id"),
+                    actor_type=event_data.get("actor_type", AuditActorType.USER),
+                    object_type=event_data.get("object_type"),
+                    object_id=event_data.get("object_id"),
+                    event_type=event_data.get("event_type"),
+                    field_name=event_data.get("field_name"),
+                    old_value={"field": event_data.get("old_value")} if event_data.get("old_value") else None,
+                    new_value={"field": event_data.get("new_value")} if event_data.get("new_value") else None,
+                    ip_address=event_data.get("ip_address"),
+                    device_id=event_data.get("device_id"),
+                    context={
+                        "session_id": event_data.get("session_id"),
+                        **(event_data.get("context") or {})
+                    }
+                )
+                audit_events.append(audit_event)
+            
+            # Use repository bulk create method
+            return await self.audit_repository.create_bulk(audit_events)
+            
+        except Exception as e:
+            raise AuditEventCreationError(f"Failed to create bulk audit events: {str(e)}") 

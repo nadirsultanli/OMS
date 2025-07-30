@@ -491,3 +491,22 @@ async def get_truck_inventory(
     except Exception as e:
         default_logger.error(f"Failed to get truck inventory: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/estimate-volume-for-gas-type", status_code=200)
+async def estimate_volume_for_gas_type(
+    request: dict = ...,  # Contains order_id
+    current_user: User = Depends(get_current_user),
+    delivery_service: DeliveryService = Depends(get_delivery_service)
+):
+    """Estimate volume for order lines with gas_type but no variant_id"""
+    try:
+        order_id = request.get("order_id")
+        if not order_id:
+            raise HTTPException(status_code=400, detail="order_id is required")
+        
+        result = await delivery_service.estimate_volume_for_gas_type(UUID(order_id))
+        return result
+        
+    except Exception as e:
+        default_logger.error(f"Failed to estimate volume for gas type: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")

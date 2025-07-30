@@ -10,6 +10,9 @@ from app.domain.entities.users import User
 from app.services.audit.audit_service import AuditService
 from app.services.dependencies.audit import get_audit_service
 from app.services.dependencies.auth import get_current_user
+from app.infrastucture.logs.logger import get_logger
+
+logger = get_logger("audit_api")
 from app.presentation.schemas.audit.input_schemas import (
     AuditFilterSchema,
     AuditTrailRequestSchema,
@@ -26,7 +29,8 @@ from app.presentation.schemas.audit.input_schemas import (
     StatusChangesRequestSchema,
     LoginEventSchema,
     LogoutEventSchema,
-    BusinessEventSchema
+    BusinessEventSchema,
+    BulkAuditEventsRequestSchema
 )
 from app.presentation.schemas.audit.output_schemas import (
     AuditEventResponseSchema,
@@ -45,7 +49,8 @@ from app.presentation.schemas.audit.output_schemas import (
     AuditSearchResponseSchema,
     AuditEventDetailResponseSchema,
     AuditDashboardResponseSchema,
-    AuditComplianceResponseSchema
+    AuditComplianceResponseSchema,
+    BulkAuditEventsResponseSchema
 )
 
 router = APIRouter(prefix="/audit", tags=["Audit"])
@@ -56,6 +61,13 @@ async def get_audit_events(
     tenant_id: UUID = Query(..., description="Tenant ID"),
     limit: int = Query(100, ge=1, le=1000, description="Number of events to return"),
     offset: int = Query(0, ge=0, description="Number of events to skip"),
+    # Object filtering parameters
+    object_type: Optional[AuditObjectType] = Query(None, description="Filter by object type"),
+    object_id: Optional[str] = Query(None, description="Filter by object ID"),
+    actor_id: Optional[UUID] = Query(None, description="Filter by actor ID"),
+    event_type: Optional[AuditEventType] = Query(None, description="Filter by event type"),
+    start_date: Optional[datetime] = Query(None, description="Filter events after this date"),
+    end_date: Optional[datetime] = Query(None, description="Filter events before this date"),
     current_user: Annotated[User, Depends(get_current_user)] = None,
     audit_service: Annotated[AuditService, Depends(get_audit_service)] = None,
 ):
@@ -65,6 +77,12 @@ async def get_audit_events(
         from app.domain.entities.audit_events import AuditFilter
         filter_criteria = AuditFilter(
             tenant_id=tenant_id,
+            object_type=object_type,
+            object_id=object_id,
+            actor_id=actor_id,
+            event_type=event_type,
+            start_date=start_date,
+            end_date=end_date,
             limit=limit,
             offset=offset
         )
@@ -726,4 +744,97 @@ async def get_audit_compliance(
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/events", response_model=BulkAuditEventsResponseSchema)
+async def create_bulk_audit_events(
+    request: BulkAuditEventsRequestSchema,
+    http_request: Request,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    audit_service: Annotated[AuditService, Depends(get_audit_service)] = None,
+):
+    """Create multiple audit events in bulk (up to 500 events)"""
+    try:
+        # Extract IP address and device info from request
+        ip_address = http_request.client.host if http_request.client else None
+        device_id = http_request.headers.get("User-Agent", "Unknown")
+        
+        # Convert schema data to dictionary format
+        events_data = []
+        for event_data in request.events:
+            event_dict = {
+                "tenant_id": event_data.tenant_id,
+                "actor_id": event_data.actor_id,
+                "actor_type": event_data.actor_type,
+                "object_type": event_data.object_type,
+                "object_id": event_data.object_id,
+                "event_type": event_data.event_type,
+                "field_name": event_data.field_name,
+                "old_value": event_data.old_value,
+                "new_value": event_data.new_value,
+                "context": event_data.context,
+                "ip_address": event_data.ip_address or ip_address,
+                "device_id": event_data.device_id or device_id,
+                "session_id": event_data.session_id
+            }
+            events_data.append(event_dict)
+        
+        try:
+            # Try bulk creation first (more efficient for Supabase)
+            created_events = await audit_service.create_bulk_audit_events(
+                events_data=events_data,
+                current_user=current_user
+            )
+            
+            created_event_ids = [event.id if hasattr(event, 'id') else i+1 for i, event in enumerate(created_events)]
+            
+            return BulkAuditEventsResponseSchema(
+                success=True,
+                created_count=len(created_events),
+                failed_count=0,
+                errors=None,
+                created_event_ids=created_event_ids,
+                message=f"Successfully created {len(created_events)} audit events using bulk insert"
+            )
+            
+        except Exception as bulk_error:
+            # Fallback to individual creation if bulk fails
+            logger.warning(f"Bulk creation failed, falling back to individual creation: {str(bulk_error)}")
+            
+            created_events = []
+            failed_events = []
+            errors = []
+            
+            for event_dict in events_data:
+                try:
+                    event = await audit_service.create_audit_event(
+                        event_dict=event_dict,
+                        current_user=current_user
+                    )
+                    created_events.append(event.id if hasattr(event, 'id') else len(created_events) + 1)
+                    
+                except Exception as event_error:
+                    failed_events.append(event_dict)
+                    errors.append(f"Failed to create event: {str(event_error)}")
+            
+            success = len(failed_events) == 0
+            created_count = len(created_events)
+            failed_count = len(failed_events)
+            
+            if success:
+                message = f"Successfully created {created_count} audit events (individual insert fallback)"
+            else:
+                message = f"Created {created_count} events, {failed_count} failed (individual insert fallback)"
+            
+            return BulkAuditEventsResponseSchema(
+                success=success,
+                created_count=created_count,
+                failed_count=failed_count,
+                errors=errors if errors else None,
+                created_event_ids=created_events if created_events else None,
+                message=message
+            )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk audit events creation failed: {str(e)}") 

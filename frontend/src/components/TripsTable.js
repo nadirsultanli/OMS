@@ -7,7 +7,8 @@ import {
   Edit2,
   Play,
   CheckCircle,
-  Trash2
+  Trash2,
+  Scale
 } from 'lucide-react';
 import TripStatusUpdater from './TripStatusUpdater';
 import './Table.css';
@@ -22,7 +23,8 @@ const TripsTable = ({
   onStartTrip,
   onCompleteTrip,
   onDeleteTrip,
-  onStatusUpdate
+  onStatusUpdate,
+  onCalculateCapacity
 }) => {
   // Helper functions
   const formatDate = (dateString) => {
@@ -191,6 +193,17 @@ const TripsTable = ({
                       >
                         <Package size={16} />
                       </button>
+                      
+                      {/* Calculate Capacity button - for trips with orders */}
+                      {trip.order_count > 0 && (
+                        <button 
+                          className="action-btn capacity"
+                          onClick={() => onCalculateCapacity && onCalculateCapacity(trip)}
+                          title="Calculate Load Capacity"
+                        >
+                          <Scale size={16} />
+                        </button>
+                      )}
                       
                       {/* Edit button - for draft/planned */}
                       {(trip.trip_status?.toLowerCase() === 'draft' || trip.trip_status?.toLowerCase() === 'planned') && (

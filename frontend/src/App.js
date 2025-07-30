@@ -23,7 +23,6 @@ import StockDocuments from './pages/StockDocuments';
 import Trips from './pages/Trips';
 import Vehicles from './pages/Vehicles';
 import Audit from './pages/Audit';
-import MixedLoadCapacityTest from './pages/MixedLoadCapacityTest';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import authService from './services/authService';
@@ -241,16 +240,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/mixed-load-capacity-test"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <MixedLoadCapacityTest />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
+
           <Route 
             path="/price-lists" 
             element={

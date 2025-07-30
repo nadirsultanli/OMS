@@ -48,6 +48,8 @@ class VariantRepositoryImpl(VariantRepository):
             gross_weight_kg=model.gross_weight_kg,
             deposit=model.deposit,
             inspection_date=model.inspection_date,
+            unit_weight_kg=getattr(model, 'unit_weight_kg', None),
+            unit_volume_m3=getattr(model, 'unit_volume_m3', None),
             active=model.active,
             # Audit fields
             created_at=model.created_at,
@@ -84,6 +86,8 @@ class VariantRepositoryImpl(VariantRepository):
             gross_weight_kg=entity.gross_weight_kg,
             deposit=entity.deposit,
             inspection_date=entity.inspection_date,
+            unit_weight_kg=entity.unit_weight_kg,
+            unit_volume_m3=entity.unit_volume_m3,
             active=entity.active,
             # Audit fields
             created_at=entity.created_at,

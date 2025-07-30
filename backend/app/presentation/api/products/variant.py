@@ -13,7 +13,10 @@ from app.presentation.schemas.variants.input_schemas import (
     CreateGasServiceRequest,
     CreateDepositRequest,
     CreateBundleRequest,
-    CreateCompleteSetRequest
+    CreateCompleteSetRequest,
+    CreateBulkGasRequest,
+    BulkOrderValidationRequest,
+    BulkPricingCalculationRequest
 )
 from app.presentation.schemas.variants.output_schemas import (
     VariantResponse, 
@@ -24,7 +27,10 @@ from app.presentation.schemas.variants.output_schemas import (
     BusinessValidationResponse,
     DepositImpactResponse,
     VariantRelationshipsResponse,
-    AtomicVariantSetResponse
+    AtomicVariantSetResponse,
+    BulkGasValidationResponse,
+    BulkPricingResponse,
+    BulkGasResponse
 )
 from app.services.dependencies.products import get_variant_service, get_lpg_business_service
 from app.core.auth_utils import current_user
@@ -526,5 +532,170 @@ async def create_complete_variant_set(
         )
     except VariantAlreadyExistsError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# Bulk Gas Specific Endpoints
+@router.post("/bulk-gas/", response_model=BulkGasResponse, status_code=status.HTTP_201_CREATED)
+async def create_bulk_gas_variant(
+    request: CreateBulkGasRequest,
+    variant_service: VariantService = Depends(get_variant_service),
+    user: User = current_user
+):
+    """
+    Create a bulk gas variant (PROP-BULK).
+    Bulk gas is measured in KG and allows decimal quantities.
+    """
+    try:
+        created_by = UUID(str(user.id)) if user else None
+        
+        variant = await variant_service.create_bulk_gas_variant(
+            tenant_id=request.tenant_id,
+            product_id=request.product_id,
+            sku=request.sku,
+            propane_density_kg_per_liter=float(request.propane_density_kg_per_liter),
+            max_tank_capacity_kg=float(request.max_tank_capacity_kg) if request.max_tank_capacity_kg else None,
+            min_order_quantity=float(request.min_order_quantity) if request.min_order_quantity else None,
+            default_price=float(request.default_price) if request.default_price else None,
+            created_by=created_by
+        )
+        
+        # Calculate volume info for response
+        sample_kg = request.min_order_quantity or 100  # Use min order or 100kg for demo
+        volume_calculations = variant.get_bulk_pricing_info(sample_kg)
+        
+        capacity_info = {
+            "max_tank_capacity_kg": float(variant.max_tank_capacity_kg) if variant.max_tank_capacity_kg else None,
+            "min_order_quantity_kg": float(variant.min_order_quantity) if variant.min_order_quantity else None,
+            "density_kg_per_liter": float(variant.propane_density_kg_per_liter) if variant.propane_density_kg_per_liter else None
+        }
+        
+        return BulkGasResponse(
+            variant=VariantResponse(**variant.to_dict()),
+            volume_calculations=volume_calculations,
+            capacity_info=capacity_info
+        )
+    except VariantAlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/bulk-gas/validate-order", response_model=BulkGasValidationResponse)
+async def validate_bulk_gas_order(
+    request: BulkOrderValidationRequest,
+    variant_service: VariantService = Depends(get_variant_service)
+):
+    """
+    Validate a bulk gas order quantity against tank capacity and business rules.
+    """
+    try:
+        variant = await variant_service.get_variant_by_sku(request.tenant_id, request.sku)
+        
+        if not variant.is_bulk_gas():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Variant is not a bulk gas variant"
+            )
+        
+        # Validate the order quantity
+        validation_result = variant.validate_bulk_order_quantity(request.quantity_kg)
+        
+        # Calculate tank utilization if tank capacity is provided
+        tank_utilization = None
+        if request.tank_capacity_kg and request.tank_capacity_kg > 0:
+            tank_utilization = float((request.quantity_kg / request.tank_capacity_kg) * 100)
+        
+        return BulkGasValidationResponse(
+            valid=validation_result["valid"],
+            errors=validation_result.get("errors", []),
+            warnings=validation_result.get("warnings", []),
+            quantity_kg=request.quantity_kg,
+            volume_liters=validation_result.get("volume_liters"),
+            tank_utilization_percent=tank_utilization
+        )
+    except VariantNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/bulk-gas/calculate-pricing", response_model=BulkPricingResponse)
+async def calculate_bulk_gas_pricing(
+    request: BulkPricingCalculationRequest,
+    variant_service: VariantService = Depends(get_variant_service)
+):
+    """
+    Calculate pricing information for bulk gas orders including volume conversions.
+    """
+    try:
+        variant = await variant_service.get_variant_by_sku(request.tenant_id, request.sku)
+        
+        if not variant.is_bulk_gas():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Variant is not a bulk gas variant"
+            )
+        
+        # Get bulk pricing info
+        pricing_info = variant.get_bulk_pricing_info(request.quantity_kg)
+        
+        # Calculate total price if unit price provided
+        total_price = None
+        if request.unit_price_per_kg:
+            total_price = request.quantity_kg * request.unit_price_per_kg
+        
+        return BulkPricingResponse(
+            quantity_kg=request.quantity_kg,
+            volume_liters=pricing_info.get("volume_liters"),
+            unit_of_measure=pricing_info["unit_of_measure"],
+            density_kg_per_liter=pricing_info.get("density_kg_per_liter"),
+            is_variable_quantity=pricing_info["is_variable_quantity"],
+            min_order_quantity=pricing_info.get("min_order_quantity"),
+            max_tank_capacity=pricing_info.get("max_tank_capacity"),
+            unit_price_per_kg=request.unit_price_per_kg,
+            total_price=total_price
+        )
+    except VariantNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/bulk-gas/{variant_id}", response_model=BulkGasResponse)
+async def get_bulk_gas_variant(
+    variant_id: str,
+    variant_service: VariantService = Depends(get_variant_service)
+):
+    """
+    Get detailed information about a bulk gas variant including calculations.
+    """
+    try:
+        variant = await variant_service.get_variant_by_id(UUID(variant_id))
+        
+        if not variant.is_bulk_gas():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Variant is not a bulk gas variant"
+            )
+        
+        # Use minimum order or 100kg for demonstration calculations
+        demo_quantity = variant.min_order_quantity or 100
+        volume_calculations = variant.get_bulk_pricing_info(demo_quantity)
+        
+        capacity_info = {
+            "max_tank_capacity_kg": float(variant.max_tank_capacity_kg) if variant.max_tank_capacity_kg else None,
+            "min_order_quantity_kg": float(variant.min_order_quantity) if variant.min_order_quantity else None,
+            "density_kg_per_liter": float(variant.propane_density_kg_per_liter) if variant.propane_density_kg_per_liter else None
+        }
+        
+        return BulkGasResponse(
+            variant=VariantResponse(**variant.to_dict()),
+            volume_calculations=volume_calculations,
+            capacity_info=capacity_info
+        )
+    except VariantNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

@@ -365,7 +365,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 if object_id is None and len(parts) >= 4:
                     # Some endpoints might use non-UUID IDs
                     potential_id = parts[3]
-                    if potential_id and potential_id not in ['', 'new', 'create', 'list']:
+                    # Exclude action endpoints and common non-ID paths
+                    excluded_paths = ['', 'new', 'create', 'list', 'estimate-volume-for-gas-type', 'calculate-mixed-load-capacity']
+                    if potential_id and potential_id not in excluded_paths:
                         # This could be a valid ID (non-UUID)
                         object_id = potential_id
                 

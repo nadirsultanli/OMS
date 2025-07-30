@@ -29,8 +29,10 @@ class TripStopResponse(BaseModel):
     location: Optional[List[float]] = Field(None, description="GPS coordinates [longitude, latitude]")
     arrival_time: Optional[datetime] = Field(None, description="Actual arrival time")
     departure_time: Optional[datetime] = Field(None, description="Actual departure time")
-    delivery_status: str = Field(..., description="pending, delivered, failed, or partial")
-    notes: Optional[str] = Field(None, description="Stop-specific notes")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    created_by: Optional[UUID] = Field(None, description="User who created the stop")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    updated_by: Optional[UUID] = Field(None, description="User who last updated")
     
     class Config:
         from_attributes = True

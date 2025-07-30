@@ -187,4 +187,14 @@ class AuditComplianceResponseSchema(BaseModel):
     data_integrity: Dict[str, Any]
     security_events_count: int
     business_events_count: int
-    recommendations: List[str] 
+    recommendations: List[str]
+
+
+class BulkAuditEventsResponseSchema(BaseModel):
+    """Schema for bulk audit events response"""
+    success: bool = Field(..., description="Whether the bulk operation was successful")
+    created_count: int = Field(..., description="Number of events successfully created")
+    failed_count: int = Field(default=0, description="Number of events that failed to create")
+    errors: Optional[List[str]] = Field(default=None, description="List of error messages if any")
+    created_event_ids: Optional[List[int]] = Field(default=None, description="IDs of successfully created events")
+    message: str = Field(..., description="Summary message of the operation") 

@@ -3,30 +3,14 @@ import axios from 'axios';
 // Get API URL based on environment
 const getApiUrl = () => {
   const environment = process.env.REACT_APP_ENVIRONMENT || 'development';
-  // Prefer explicit env variables if set
-  let url = environment === 'production'
-    ? process.env.REACT_APP_API_URL_PROD 
-    : process.env.REACT_APP_API_URL_DEV || 'http://localhost:8000';
-
-  // Fallback for empty string
-  if (!url) {
-    url = 'http://localhost:8000';
+  
+  // For production (Netlify), always use Railway URL
+  if (environment === 'production' || window.location.hostname.includes('netlify.app')) {
+    return 'https://aware-endurance-production.up.railway.app/api/v1';
   }
-
-  // Force HTTPS for Railway production URLs
-  if (url.includes('railway.app') && url.startsWith('http://')) {
-    url = url.replace('http://', 'https://');
-  }
-
-  // Ensure the URL ends with /api/v1
-  if (!url.endsWith('/api/v1')) {
-    // Remove trailing slash if present
-    if (url.endsWith('/')) {
-      url = url.slice(0, -1);
-    }
-    url = `${url}/api/v1`;
-  }
-  return url;
+  
+  // For development, use localhost
+  return 'http://localhost:8000/api/v1';
 };
 
 // Create axios instance
@@ -35,7 +19,14 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Add timeout and retry configuration
+  timeout: 10000,
 });
+
+// Debug logging
+console.log('API Base URL:', getApiUrl());
+console.log('Environment:', process.env.REACT_APP_ENVIRONMENT);
+console.log('Hostname:', window.location.hostname);
 
 // Request interceptor to add auth token
 api.interceptors.request.use(

@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from app.domain.entities.audit_events import AuditActorType, AuditObjectType, AuditEventType
 
@@ -119,4 +119,34 @@ class BusinessEventSchema(BaseModel):
     object_type: AuditObjectType = Field(..., description="Type of object")
     object_id: Optional[UUID] = None
     event_type: AuditEventType = Field(..., description="Type of business event")
-    context: Optional[Dict[str, Any]] = None 
+    context: Optional[Dict[str, Any]] = None
+
+
+class BulkAuditEventSchema(BaseModel):
+    """Schema for individual audit event in bulk request"""
+    tenant_id: UUID = Field(..., description="Tenant ID")
+    actor_id: Optional[UUID] = None
+    actor_type: AuditActorType = Field(default=AuditActorType.USER)
+    object_type: AuditObjectType = Field(..., description="Type of object")
+    object_id: Optional[UUID] = None
+    event_type: AuditEventType = Field(..., description="Type of event")
+    field_name: Optional[str] = None
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+    ip_address: Optional[str] = None
+    device_id: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+class BulkAuditEventsRequestSchema(BaseModel):
+    """Schema for bulk audit events request"""
+    events: List[BulkAuditEventSchema] = Field(..., description="List of audit events to create")
+    
+    @validator('events')
+    def validate_events_count(cls, v):
+        if len(v) == 0:
+            raise ValueError("At least one event is required")
+        if len(v) > 500:
+            raise ValueError("Maximum 500 events allowed per request")
+        return v 

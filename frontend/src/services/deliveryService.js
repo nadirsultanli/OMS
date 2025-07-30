@@ -27,6 +27,27 @@ class DeliveryService {
   }
 
   /**
+   * Estimate volume for order lines with null variant_id but gas_type
+   * This handles cases where order lines don't have variants assigned
+   */
+  async estimateVolumeForGasType(orderId) {
+    try {
+      const response = await apiClient.post(`${this.baseURL}/estimate-volume-for-gas-type`, {
+        order_id: orderId
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Failed to estimate volume for gas type:', error);
+      const errorDetail = error.response?.data?.detail;
+      return {
+        success: false,
+        error: typeof errorDetail === 'string' ? errorDetail : 
+               (typeof errorDetail === 'object' ? JSON.stringify(errorDetail) : error.message)
+      };
+    }
+  }
+
+  /**
    * Mark a cylinder as damaged during delivery
    */
   async markDamagedCylinder(deliveryId, orderLineId, damageNotes, photos = null, actorId = null) {
@@ -250,15 +271,18 @@ class DeliveryService {
   formatCapacityData(capacityData) {
     if (!capacityData) return null;
 
+    const totalWeight = typeof capacityData.total_weight_kg === 'number' ? capacityData.total_weight_kg : 0;
+    const totalVolume = typeof capacityData.total_volume_m3 === 'number' ? capacityData.total_volume_m3 : 0;
+
     return {
       orderId: capacityData.order_id,
-      totalWeight: capacityData.total_weight_kg,
-      totalVolume: capacityData.total_volume_m3,
+      totalWeight: totalWeight,
+      totalVolume: totalVolume,
       lineDetails: capacityData.line_details || [],
       calculationMethod: capacityData.calculation_method,
       hasData: capacityData.line_details && capacityData.line_details.length > 0,
-      weightFormatted: `${capacityData.total_weight_kg.toFixed(2)} kg`,
-      volumeFormatted: `${capacityData.total_volume_m3.toFixed(3)} m³`
+      weightFormatted: `${totalWeight.toFixed(2)} kg`,
+      volumeFormatted: `${totalVolume.toFixed(3)} m³`
     };
   }
 
@@ -271,15 +295,25 @@ class DeliveryService {
       let totalVolume = 0;
       const orderCapacities = [];
 
-      for (const orderId of orderIds) {
+      for (const order of orderIds) {
+        // Handle both order objects and order IDs
+        const orderId = typeof order === 'object' ? order.id : order;
+        
+        if (!orderId) {
+          console.warn('Skipping order with no ID:', order);
+          continue;
+        }
+
         const result = await this.calculateMixedLoadCapacity(orderId);
         if (result.success) {
-          totalWeight += result.data.total_weight_kg;
-          totalVolume += result.data.total_volume_m3;
+          totalWeight += result.data.total_weight_kg || 0;
+          totalVolume += result.data.total_volume_m3 || 0;
           orderCapacities.push({
-            orderId,
+            order_id: orderId,
             ...result.data
           });
+        } else {
+          console.warn(`Failed to calculate capacity for order ${orderId}:`, result.error);
         }
       }
 

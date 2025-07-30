@@ -155,10 +155,10 @@ const MixedLoadCapacityDisplay = ({
                 </div>
                 <div className="line-specs">
                   <span className="line-weight">
-                    Weight: {line.line_weight_kg.toFixed(2)} kg
+                    Weight: {typeof line.line_weight_kg === 'number' ? line.line_weight_kg.toFixed(2) : '0.00'} kg
                   </span>
                   <span className="line-volume">
-                    Volume: {line.line_volume_m3.toFixed(3)} m³
+                    Volume: {typeof line.line_volume_m3 === 'number' ? line.line_volume_m3.toFixed(3) : '0.000'} m³
                   </span>
                 </div>
                 <div className="line-unit-info">

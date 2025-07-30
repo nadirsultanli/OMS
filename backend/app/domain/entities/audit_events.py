@@ -17,6 +17,7 @@ class AuditObjectType(str, Enum):
     CUSTOMER = "customer"
     TRIP = "trip"
     STOCK_DOC = "stock_doc"
+    STOCK_LEVEL = "stock_level"
     PRODUCT = "product"
     USER = "user"
     TENANT = "tenant"

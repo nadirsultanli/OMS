@@ -51,8 +51,7 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
     { path: '/stock', label: 'Stock Dashboard', icon: TrendingUp },
     { path: '/stock-levels', label: 'Stock Levels', icon: Archive },
     { path: '/stock-documents', label: 'Stock Documents', icon: ArrowLeftRight },
-    { path: '/audit', label: 'Audit', icon: Shield },
-    { path: '/mixed-load-capacity-test', label: 'Capacity Test', icon: TrendingUp }
+    { path: '/audit', label: 'Audit', icon: Shield }
   ];
 
   // Determine if sidebar should be expanded

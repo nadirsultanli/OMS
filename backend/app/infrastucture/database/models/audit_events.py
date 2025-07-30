@@ -25,7 +25,7 @@ class AuditEventModel(Base):
     actor_type = Column(Enum('user', 'service', name='audit_actor_type'), nullable=False, default="user")
     
     # Object information
-    object_type = Column(Enum('order', 'customer', 'trip', 'stock_doc', 'product', 'user', 'tenant', 'price_list', 'variant', 'warehouse', 'vehicle', 'address', 'delivery', 'other', name='audit_object_type'), nullable=False, index=True)
+    object_type = Column(Enum('order', 'customer', 'trip', 'stock_doc', 'stock_level', 'product', 'user', 'tenant', 'price_list', 'variant', 'warehouse', 'vehicle', 'address', 'delivery', 'other', name='audit_object_type'), nullable=False, index=True)
     object_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     
     # Event details
