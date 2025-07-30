@@ -1,265 +1,310 @@
-from typing import List, Optional, Dict, Any
-from uuid import UUID
-from datetime import datetime
+import logging
+from typing import Optional, List, Dict, Any
 from decimal import Decimal
-from app.domain.entities.deliveries import Delivery, DeliveryLine, DeliveryStatus
-from app.domain.entities.truck_inventory import TruckInventory
-from app.infrastucture.logs.logger import default_logger
+from datetime import datetime, timedelta
+from uuid import UUID
+
+from app.domain.entities.deliveries import Delivery, DeliveryStatus
+from app.domain.entities.orders import Order, OrderLine
+from app.domain.entities.variants import Variant
+from app.domain.entities.stock_docs import StockDoc, StockDocType
+from app.domain.entities.audit_events import AuditEvent, AuditEventType, AuditObjectType
+from app.domain.repositories.delivery_repository import DeliveryRepository
+from app.domain.repositories.order_repository import OrderRepository
+from app.domain.repositories.variant_repository import VariantRepository
+from app.domain.repositories.stock_doc_repository import StockDocRepository
+from app.domain.repositories.audit_repository import AuditRepository
+from app.domain.repositories.stock_level_repository import StockLevelRepository
+from app.infrastucture.logs.logger import get_logger
+
+logger = get_logger(__name__)
 
 class DeliveryService:
-    """Service for handling delivery operations during trip execution"""
+    """Service for handling delivery operations and edge-case workflows"""
     
-    def __init__(self):
-        pass
-    
-    async def create_delivery(
+    def __init__(
         self,
-        trip_id: UUID,
-        order_id: UUID,
+        delivery_repo: DeliveryRepository,
+        order_repo: OrderRepository,
+        variant_repo: VariantRepository,
+        stock_doc_repo: StockDocRepository,
+        audit_repo: AuditRepository,
+        stock_level_repo: StockLevelRepository
+    ):
+        self.delivery_repo = delivery_repo
+        self.order_repo = order_repo
+        self.variant_repo = variant_repo
+        self.stock_doc_repo = stock_doc_repo
+        self.audit_repo = audit_repo
+        self.stock_level_repo = stock_level_repo
+
+    async def mark_damaged_cylinder(
+        self,
+        delivery_id: UUID,
+        order_line_id: UUID,
+        damage_notes: str,
+        photos: Optional[List[str]] = None,
+        actor_id: Optional[UUID] = None
+    ) -> Delivery:
+        """
+        Edge Case 1: Damaged Cylinder in Field
+        Driver marks qty as 0 delivered, notes damaged; triggers variance workflow
+        """
+        try:
+            # Get delivery and order line
+            delivery = await self.delivery_repo.get_by_id(delivery_id)
+            order_line = await self.order_repo.get_order_line_by_id(str(order_line_id))
+            
+            if not delivery or not order_line:
+                raise ValueError("Delivery or order line not found")
+            
+            # Mark as 0 delivered with damage notes
+            delivery.notes = f"{delivery.notes or ''}\nDAMAGED CYLINDER: {damage_notes}"
+            delivery.status = DeliveryStatus.FAILED
+            delivery.failed_reason = "Damaged cylinder in field"
+            
+            if photos:
+                delivery.photos = photos
+            
+            # Update delivery
+            updated_delivery = await self.delivery_repo.update(delivery)
+            
+            # Create variance stock document for scrap decision
+            await self._create_damage_variance_doc(
+                order_line, damage_notes, actor_id
+            )
+            
+            # Audit the damage event
+            await self._audit_damage_event(
+                delivery_id, order_line_id, damage_notes, actor_id
+            )
+            
+            logger.info(f"Damaged cylinder marked for delivery {delivery_id}")
+            return updated_delivery
+            
+        except Exception as e:
+            logger.error(f"Error marking damaged cylinder: {str(e)}")
+            raise
+
+    async def handle_lost_empty_cylinder(
+        self,
         customer_id: UUID,
-        stop_id: UUID,
-        created_by: UUID
-    ) -> Delivery:
-        """Create a new delivery for an order"""
+        variant_id: UUID,
+        days_overdue: int = 30,
+        actor_id: Optional[UUID] = None
+    ) -> bool:
+        """
+        Edge Case 2: Lost Empty Logic
+        Customer fails to return; OMS flips EMPTY credit line to Deposit charge after X days
+        """
         try:
-            delivery = Delivery.create(
-                trip_id=trip_id,
-                order_id=order_id,
-                customer_id=customer_id,
-                stop_id=stop_id,
-                created_by=created_by
+            # Find the EMPTY_RETURN order line for this customer/variant
+            empty_return_line = await self._find_empty_return_line(
+                customer_id, variant_id
             )
             
-            default_logger.info(
-                f"Delivery created",
-                delivery_id=str(delivery.id),
-                trip_id=str(trip_id),
-                order_id=str(order_id)
-            )
+            if not empty_return_line:
+                logger.warning(f"No empty return line found for customer {customer_id}, variant {variant_id}")
+                return False
             
-            return delivery
+            # Check if overdue
+            order = await self.order_repo.get_order_by_id(str(empty_return_line.order_id))
+            if not order:
+                return False
+                
+            days_since_order = (datetime.now() - order.created_at).days
             
-        except Exception as e:
-            default_logger.error(f"Failed to create delivery: {str(e)}")
-            raise
-    
-    async def mark_arrived(
-        self,
-        delivery: Delivery,
-        gps_location: Optional[tuple] = None,
-        updated_by: Optional[UUID] = None
-    ) -> Delivery:
-        """Mark delivery as arrived at customer location"""
-        try:
-            delivery.mark_arrived(gps_location=gps_location, updated_by=updated_by)
-            
-            default_logger.info(
-                f"Delivery marked as arrived",
-                delivery_id=str(delivery.id),
-                gps_location=gps_location
-            )
-            
-            return delivery
-            
-        except Exception as e:
-            default_logger.error(f"Failed to mark delivery as arrived: {str(e)}")
-            raise
-    
-    async def record_delivery(
-        self,
-        delivery: Delivery,
-        delivery_lines: List[Dict[str, Any]],
-        truck_inventory_updates: List[TruckInventory],
-        customer_signature: Optional[str] = None,
-        photos: Optional[List[str]] = None,
-        notes: Optional[str] = None,
-        updated_by: Optional[UUID] = None
-    ) -> Delivery:
-        """Record actual delivery with quantities and proof"""
-        try:
-            # Create delivery lines
-            for line_data in delivery_lines:
-                delivery_line = DeliveryLine.create(
-                    delivery_id=delivery.id,
-                    order_line_id=UUID(line_data["order_line_id"]),
-                    product_id=UUID(line_data["product_id"]),
-                    variant_id=UUID(line_data["variant_id"]),
-                    ordered_qty=Decimal(str(line_data["ordered_qty"])),
-                    delivered_qty=Decimal(str(line_data["delivered_qty"])),
-                    empties_collected=Decimal(str(line_data.get("empties_collected", "0"))),
-                    notes=line_data.get("notes")
-                )
-                delivery.add_delivery_line(delivery_line)
-            
-            # Update truck inventory based on deliveries
-            for truck_inv in truck_inventory_updates:
-                # Validate delivery quantities against truck inventory
-                delivered_qty = sum(
-                    line.delivered_qty for line in delivery.lines
-                    if line.product_id == truck_inv.product_id and line.variant_id == truck_inv.variant_id
+            if days_since_order >= days_overdue:
+                # Flip EMPTY_RETURN to CYLINDER_DEPOSIT
+                await self._flip_empty_to_deposit(empty_return_line, actor_id)
+                
+                # Audit the lost empty event
+                await self._audit_lost_empty_event(
+                    customer_id, variant_id, days_since_order, actor_id
                 )
                 
-                if delivered_qty > truck_inv.get_remaining_qty():
-                    raise ValueError(
-                        f"Cannot deliver {delivered_qty} of {truck_inv.product_id}, "
-                        f"only {truck_inv.get_remaining_qty()} remaining on truck"
-                    )
-                
-                # Update truck inventory
-                truck_inv.deliver_quantity(delivered_qty, updated_by)
-                
-                # Update empties collected
-                empties_collected = sum(
-                    line.empties_collected for line in delivery.lines
-                    if line.product_id == truck_inv.product_id and line.variant_id == truck_inv.variant_id
-                )
-                
-                if empties_collected > 0:
-                    truck_inv.collect_empties(empties_collected, updated_by)
+                logger.info(f"Lost empty cylinder converted to deposit for customer {customer_id}")
+                return True
             
-            # Calculate and set delivery status
-            delivery.status = delivery.calculate_status()
-            
-            # Complete delivery with proof
-            delivery.complete_delivery(
-                customer_signature=customer_signature,
-                photos=photos,
-                notes=notes,
-                updated_by=updated_by
-            )
-            
-            default_logger.info(
-                f"Delivery recorded",
-                delivery_id=str(delivery.id),
-                status=delivery.status.value,
-                lines_count=len(delivery.lines),
-                total_delivered=sum(line.delivered_qty for line in delivery.lines)
-            )
-            
-            return delivery
+            return False
             
         except Exception as e:
-            default_logger.error(f"Failed to record delivery: {str(e)}")
+            logger.error(f"Error handling lost empty cylinder: {str(e)}")
             raise
-    
-    async def fail_delivery(
+
+    async def calculate_mixed_size_load_capacity(
         self,
-        delivery: Delivery,
-        reason: str,
-        notes: Optional[str] = None,
-        photos: Optional[List[str]] = None,
-        updated_by: Optional[UUID] = None
-    ) -> Delivery:
-        """Mark delivery as failed with reason"""
-        try:
-            delivery.fail_delivery(
-                reason=reason,
-                notes=notes,
-                photos=photos,
-                updated_by=updated_by
-            )
-            
-            default_logger.info(
-                f"Delivery marked as failed",
-                delivery_id=str(delivery.id),
-                reason=reason
-            )
-            
-            return delivery
-            
-        except Exception as e:
-            default_logger.error(f"Failed to mark delivery as failed: {str(e)}")
-            raise
-    
-    async def get_delivery_summary(self, delivery: Delivery) -> Dict[str, Any]:
-        """Get comprehensive delivery summary"""
-        return {
-            "delivery": delivery.to_dict(),
-            "status": delivery.status.value,
-            "total_ordered": float(sum(line.ordered_qty for line in delivery.lines)),
-            "total_delivered": float(sum(line.delivered_qty for line in delivery.lines)),
-            "total_empties_collected": float(sum(line.empties_collected for line in delivery.lines)),
-            "completion_rate": self._calculate_completion_rate(delivery),
-            "has_signature": delivery.customer_signature is not None,
-            "has_photos": len(delivery.photos) > 0,
-            "duration_minutes": self._calculate_duration_minutes(delivery)
-        }
-    
-    def _calculate_completion_rate(self, delivery: Delivery) -> float:
-        """Calculate delivery completion rate as percentage"""
-        if not delivery.lines:
-            return 0.0
-        
-        total_ordered = sum(line.ordered_qty for line in delivery.lines)
-        total_delivered = sum(line.delivered_qty for line in delivery.lines)
-        
-        if total_ordered == 0:
-            return 0.0
-        
-        return float((total_delivered / total_ordered) * 100)
-    
-    def _calculate_duration_minutes(self, delivery: Delivery) -> Optional[int]:
-        """Calculate delivery duration in minutes"""
-        if not delivery.arrival_time or not delivery.completion_time:
-            return None
-        
-        duration = delivery.completion_time - delivery.arrival_time
-        return int(duration.total_seconds() / 60)
-    
-    async def validate_delivery_against_truck_inventory(
-        self,
-        delivery_lines: List[Dict[str, Any]],
-        truck_inventory: List[TruckInventory]
+        order_id: UUID
     ) -> Dict[str, Any]:
-        """Validate proposed delivery against available truck inventory"""
-        validation_results = {
-            "is_valid": True,
-            "validation_messages": [],
-            "line_validations": []
-        }
-        
-        # Group truck inventory by product/variant
-        truck_inv_map = {}
-        for inv in truck_inventory:
-            key = (inv.product_id, inv.variant_id)
-            truck_inv_map[key] = inv
-        
-        # Validate each delivery line
-        for line_data in delivery_lines:
-            product_id = UUID(line_data["product_id"])
-            variant_id = UUID(line_data["variant_id"])
-            requested_qty = Decimal(str(line_data["delivered_qty"]))
+        """
+        Edge Case 3: Mixed-size Load Capacity
+        Capacity calc uses SUM(qty × variant.gross_kg)
+        """
+        try:
+            # Get all order lines
+            order_lines = await self.order_repo.get_order_lines_by_order(str(order_id))
             
-            key = (product_id, variant_id)
-            line_validation = {
-                "product_id": str(product_id),
-                "variant_id": str(variant_id),
-                "requested_qty": float(requested_qty),
-                "is_valid": True,
-                "messages": []
+            total_weight_kg = Decimal('0')
+            total_volume_m3 = Decimal('0')
+            line_details = []
+            
+            for line in order_lines:
+                if line.variant_id:
+                    variant = await self.variant_repo.get_by_id(line.variant_id)
+                    if variant:
+                        # Calculate weight: qty × gross_weight_kg
+                        line_weight = line.qty_ordered * (variant.gross_weight_kg or Decimal('0'))
+                        line_volume = line.qty_ordered * (variant.unit_volume_m3 or Decimal('0'))
+                        
+                        total_weight_kg += line_weight
+                        total_volume_m3 += line_volume
+                        
+                        line_details.append({
+                            'variant_sku': variant.sku,
+                            'qty_ordered': line.qty_ordered,
+                            'gross_weight_kg': variant.gross_weight_kg,
+                            'unit_volume_m3': variant.unit_volume_m3,
+                            'line_weight_kg': line_weight,
+                            'line_volume_m3': line_volume
+                        })
+            
+            return {
+                'order_id': str(order_id),
+                'total_weight_kg': total_weight_kg,
+                'total_volume_m3': total_volume_m3,
+                'line_details': line_details,
+                'calculation_method': 'SUM(qty × variant.gross_kg)'
             }
             
-            if key not in truck_inv_map:
-                line_validation["is_valid"] = False
-                line_validation["messages"].append("Product not loaded on truck")
-                validation_results["is_valid"] = False
-            else:
-                truck_inv = truck_inv_map[key]
-                available_qty = truck_inv.get_remaining_qty()
-                line_validation["available_qty"] = float(available_qty)
-                
-                if requested_qty > available_qty:
-                    line_validation["is_valid"] = False
-                    line_validation["messages"].append(
-                        f"Requested {requested_qty} exceeds available {available_qty}"
-                    )
-                    validation_results["is_valid"] = False
-            
-            validation_results["line_validations"].append(line_validation)
-        
-        if not validation_results["is_valid"]:
-            validation_results["validation_messages"].append(
-                "One or more delivery lines exceed available truck inventory"
+        except Exception as e:
+            logger.error(f"Error calculating mixed size load capacity: {str(e)}")
+            raise
+
+    async def _create_damage_variance_doc(
+        self,
+        order_line: OrderLine,
+        damage_notes: str,
+        actor_id: Optional[UUID] = None
+    ) -> StockDoc:
+        """Create variance stock document for damaged cylinder scrap decision"""
+        try:
+            # Create variance document
+            variance_doc = StockDoc(
+                tenant_id=order_line.order.tenant_id,
+                doc_no=f"VAR-DAMAGE-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                doc_type=StockDocType.ADJ_VARIANCE,
+                source_wh_id=None,  # Field damage
+                dest_wh_id=None,
+                notes=f"Damaged cylinder variance: {damage_notes}",
+                ref_doc_id=order_line.order_id,
+                ref_doc_type="order_line"
             )
-        
-        return validation_results
+            
+            created_doc = await self.stock_doc_repo.create(variance_doc)
+            logger.info(f"Created damage variance document {created_doc.doc_no}")
+            return created_doc
+            
+        except Exception as e:
+            logger.error(f"Error creating damage variance doc: {str(e)}")
+            raise
+
+    async def _find_empty_return_line(
+        self,
+        customer_id: UUID,
+        variant_id: UUID
+    ) -> Optional[OrderLine]:
+        """Find EMPTY_RETURN order line for customer/variant"""
+        try:
+            # Get customer's orders - we need tenant_id, but we don't have it here
+            # For now, we'll need to get it from the first order or pass it as parameter
+            # This is a limitation of the current implementation
+            raise NotImplementedError("get_orders_by_customer requires tenant_id which is not available in this context")
+            
+            for order in customer_orders:
+                order_lines = await self.order_repo.get_order_lines_by_order(str(order.id))
+                
+                for line in order_lines:
+                    if (line.variant_id == variant_id and 
+                        line.component_type == 'EMPTY_RETURN' and
+                        line.qty_delivered > 0):
+                        return line
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error finding empty return line: {str(e)}")
+            raise
+
+    async def _flip_empty_to_deposit(
+        self,
+        empty_return_line: OrderLine,
+        actor_id: Optional[UUID] = None
+    ) -> bool:
+        """Flip EMPTY_RETURN component to CYLINDER_DEPOSIT"""
+        try:
+            # Update component type
+            empty_return_line.component_type = 'CYLINDER_DEPOSIT'
+            empty_return_line.updated_by = actor_id
+            empty_return_line.updated_at = datetime.now()
+            
+            # Update the order line
+            await self.order_repo.update_order_line(str(empty_return_line.id), empty_return_line)
+            
+            logger.info(f"Flipped empty return to deposit for order line {empty_return_line.id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error flipping empty to deposit: {str(e)}")
+            raise
+
+    async def _audit_damage_event(
+        self,
+        delivery_id: UUID,
+        order_line_id: UUID,
+        damage_notes: str,
+        actor_id: Optional[UUID] = None
+    ) -> None:
+        """Audit damaged cylinder event"""
+        try:
+            audit_event = AuditEvent(
+                tenant_id=None,  # Will be set from context
+                actor_id=actor_id,
+                actor_type="user",
+                object_type=AuditObjectType.DELIVERY,
+                object_id=delivery_id,
+                event_type=AuditEventType.DELIVERY_FAILED,
+                field_name="damage_notes",
+                new_value={"damage_notes": damage_notes, "order_line_id": str(order_line_id)},
+                context={"damage_type": "cylinder_damage", "requires_scrap_decision": True}
+            )
+            
+            await self.audit_repo.create(audit_event)
+            
+        except Exception as e:
+            logger.error(f"Error auditing damage event: {str(e)}")
+
+    async def _audit_lost_empty_event(
+        self,
+        customer_id: UUID,
+        variant_id: UUID,
+        days_overdue: int,
+        actor_id: Optional[UUID] = None
+    ) -> None:
+        """Audit lost empty cylinder event"""
+        try:
+            audit_event = AuditEvent(
+                tenant_id=None,  # Will be set from context
+                actor_id=actor_id,
+                actor_type="service",
+                object_type=AuditObjectType.CUSTOMER,
+                object_id=customer_id,
+                event_type=AuditEventType.STATUS_CHANGE,
+                field_name="empty_return_status",
+                new_value={"variant_id": str(variant_id), "days_overdue": days_overdue, "action": "converted_to_deposit"},
+                context={"lost_empty_logic": True, "automatic_conversion": True}
+            )
+            
+            await self.audit_repo.create(audit_event)
+            
+        except Exception as e:
+            logger.error(f"Error auditing lost empty event: {str(e)}")

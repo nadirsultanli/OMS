@@ -6,6 +6,7 @@ import customerService from '../services/customerService';
 import variantService from '../services/variantService';
 import authService from '../services/authService';
 import OrderStatusManager from '../components/OrderStatusManager';
+import MixedLoadCapacityDisplay from '../components/MixedLoadCapacityDisplay';
 
 const OrderDetailView = () => {
   const { orderId } = useParams();
@@ -432,6 +433,18 @@ const OrderDetailView = () => {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Mixed Load Capacity */}
+        <div className="info-card">
+          <h3>Delivery Capacity</h3>
+          <MixedLoadCapacityDisplay 
+            orderId={order.id} 
+            showDetails={true}
+            onCapacityCalculated={(capacityData) => {
+              console.log('Capacity calculated:', capacityData);
+            }}
+          />
         </div>
       </div>
 
