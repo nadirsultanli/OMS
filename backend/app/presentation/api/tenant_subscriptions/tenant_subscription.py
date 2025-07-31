@@ -464,6 +464,53 @@ async def get_current_user_subscription(
         )
         raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
+@router.get("/debug/current", response_model=dict)
+async def debug_current_user_subscription(
+    current_user: User = Depends(get_current_user)
+):
+    """Debug endpoint to test database connection and subscription lookup"""
+    try:
+        from app.infrastucture.database.connection import get_supabase_client_sync
+        
+        logger.info(f"Debug endpoint called for user: {current_user.id}, tenant: {current_user.tenant_id}")
+        
+        client = get_supabase_client_sync()
+        
+        # Test 1: Basic query
+        result1 = client.table('tenant_subscriptions').select('count').execute()
+        logger.info(f"Total subscriptions in DB: {result1.count if hasattr(result1, 'count') else 'unknown'}")
+        
+        # Test 2: Query by tenant_id
+        result2 = client.table('tenant_subscriptions')\
+            .select('*')\
+            .eq('tenant_id', str(current_user.tenant_id))\
+            .execute()
+        
+        logger.info(f"Subscriptions for tenant {current_user.tenant_id}: {len(result2.data) if result2.data else 0}")
+        
+        # Test 3: Query with status filter
+        result3 = client.table('tenant_subscriptions')\
+            .select('*')\
+            .eq('tenant_id', str(current_user.tenant_id))\
+            .in_('subscription_status', ['active', 'trial'])\
+            .execute()
+        
+        logger.info(f"Active/trial subscriptions for tenant {current_user.tenant_id}: {len(result3.data) if result3.data else 0}")
+        
+        return {
+            "user_id": str(current_user.id),
+            "tenant_id": str(current_user.tenant_id),
+            "total_subscriptions": len(result2.data) if result2.data else 0,
+            "active_subscriptions": len(result3.data) if result3.data else 0,
+            "subscription_data": result3.data if result3.data else []
+        }
+        
+    except Exception as e:
+        import traceback
+        logger.error(f"Debug endpoint error: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
 @router.get("/{subscription_id}", response_model=TenantSubscriptionResponse)
 async def get_tenant_subscription(
     subscription_id: str,
