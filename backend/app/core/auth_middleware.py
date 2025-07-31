@@ -30,7 +30,9 @@ EXCLUDED_PATHS = {
     "/api/v1/verification/send-verification-email",
     "/api/v1/verification/verify-email",
     "/api/v1/stripe/webhooks",
-    "/api/v1/stripe/webhooks/"
+    "/api/v1/stripe/webhooks/",
+    "/api/v1/subscriptions/webhook/stripe",
+    "/api/v1/subscriptions/webhook/stripe/"
 }
 
 
