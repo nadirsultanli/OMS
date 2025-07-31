@@ -240,6 +240,7 @@ class TenantSubscriptionService:
             
             # Check if Stripe is configured
             if not stripe or not settings.stripe_secret_key:
+                print(f"Stripe not configured: stripe={stripe}, secret_key={'set' if settings.stripe_secret_key else 'not set'}")
                 # Fallback to database-only update
                 return await self._upgrade_subscription_database_only(
                     current_subscription, new_plan, billing_cycle, updated_by
@@ -254,6 +255,17 @@ class TenantSubscriptionService:
             # Create or get Stripe price for the new plan
             stripe_price = await self._create_or_get_stripe_price(new_plan, billing_cycle)
             
+            # Store stripe_customer_id if it's new
+            if not tenant_info.get('stripe_customer_id'):
+                from app.infrastucture.database.connection import get_supabase_client_sync
+                client = get_supabase_client_sync()
+                
+                # Update the subscription with stripe_customer_id
+                client.table('tenant_subscriptions')\
+                    .update({'stripe_customer_id': stripe_customer['id']})\
+                    .eq('id', str(current_subscription.id))\
+                    .execute()
+            
             # Create Stripe checkout session for upgrade
             checkout_session = await self._create_upgrade_checkout_session(
                 stripe_customer['id'],
@@ -267,7 +279,7 @@ class TenantSubscriptionService:
             return {
                 'subscription': current_subscription.to_dict(),
                 'stripe_customer_id': stripe_customer['id'],
-                'stripe_subscription_id': current_subscription.stripe_subscription_id,
+                'stripe_subscription_id': current_subscription.stripe_subscription_id or '',
                 'payment_url': checkout_session['url'],
                 'checkout_session_id': checkout_session['id']
             }
@@ -508,21 +520,43 @@ class TenantSubscriptionService:
         
         try:
             client = get_supabase_client_sync()
-            result = client.table('tenants').select('*').eq('id', str(tenant_id)).execute()
             
-            if not result.data:
+            # Get tenant info
+            tenant_result = client.table('tenants').select('*').eq('id', str(tenant_id)).execute()
+            
+            if not tenant_result.data:
                 raise InvalidTenantSubscriptionDataException(f"Tenant {tenant_id} not found")
             
-            return result.data[0]
+            tenant_info = tenant_result.data[0]
+            
+            # Also get any existing stripe_customer_id from subscriptions
+            sub_result = client.table('tenant_subscriptions')\
+                .select('stripe_customer_id')\
+                .eq('tenant_id', str(tenant_id))\
+                .not_.is_('stripe_customer_id', 'null')\
+                .limit(1)\
+                .execute()
+            
+            if sub_result.data and sub_result.data[0].get('stripe_customer_id'):
+                tenant_info['stripe_customer_id'] = sub_result.data[0]['stripe_customer_id']
+            
+            return tenant_info
         except Exception as e:
             raise InvalidTenantSubscriptionDataException(f"Failed to get tenant info: {str(e)}")
     
     async def _create_or_get_stripe_customer(self, tenant_info: Dict[str, Any]) -> Dict[str, Any]:
         """Create or retrieve Stripe customer"""
         try:
-            # Search for existing customer by metadata
-            # Note: Stripe doesn't support filtering by metadata in list, so we'll create new each time
-            # In production, you might want to store stripe_customer_id in your tenant table
+            # First check if we have a stripe_customer_id stored
+            if tenant_info.get('stripe_customer_id'):
+                try:
+                    # Try to retrieve existing customer
+                    customer = stripe.Customer.retrieve(tenant_info['stripe_customer_id'])
+                    if not customer.get('deleted', False):
+                        return customer
+                except stripe.error.StripeError:
+                    # Customer not found or error, create new one
+                    pass
             
             # Create new customer
             customer_params = {
@@ -537,6 +571,9 @@ class TenantSubscriptionService:
                 customer_params['email'] = tenant_info['email']
             
             customer = stripe.Customer.create(**customer_params)
+            
+            # Store the customer ID in the subscription
+            # This would need to be persisted in your database
             return customer
             
         except Exception as e:
