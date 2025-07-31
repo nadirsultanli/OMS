@@ -27,7 +27,7 @@ export const UserAvatar = ({ user, size = 'medium', className = '' }) => {
     return colors[Math.abs(hash) % colors.length];
   };
 
-  const displayName = user?.name || user?.email || 'User';
+  const displayName = user?.full_name || user?.fullname || user?.email || 'User';
   const initials = getInitials(displayName);
   const backgroundColor = getAvatarColor(displayName);
 

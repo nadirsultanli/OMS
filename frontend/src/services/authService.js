@@ -53,7 +53,7 @@ class AuthService {
         tenant_id: tenant_id,
         email: userEmail,
         role,
-        name: full_name
+        fullname: full_name
       }));
       
       return {
@@ -63,7 +63,7 @@ class AuthService {
           tenant_id: tenant_id,
           email: userEmail,
           role,
-          name: full_name
+          fullname: full_name
         }
       };
     } catch (error) {

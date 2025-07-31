@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { UserAvatar } from './ui/UserAvatar';
 import authService from '../services/authService';
+import api from '../services/api';
 import './CollapsibleSidebar.css';
 
 const CollapsibleSidebar = ({ onExpandChange }) => {
@@ -36,9 +37,10 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showScrollbar, setShowScrollbar] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const expandTimeout = useRef(null);
   const location = useLocation();
-  const user = authService.getCurrentUser();
 
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -59,6 +61,25 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
     { path: '/stock-documents', label: 'Stock Documents', icon: ArrowLeftRight },
     { path: '/audit', label: 'Audit', icon: Shield }
   ];
+
+  // Fetch user data from API
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await api.get('/auth/me');
+        setUser(response.data);
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        // Fallback to localStorage if API fails
+        const fallbackUser = authService.getCurrentUser();
+        setUser(fallbackUser);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   // Determine if sidebar should be expanded
   const shouldExpand = isPinned || isHovering;
@@ -255,15 +276,22 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
             {/* User Avatar - Always visible */}
             <div className="user-info">
               <UserAvatar 
-                name={user?.name || user?.email || 'User'} 
+                user={user}
                 size="sm" 
                 className="user-avatar"
               />
 
+              {/* User Name - shown when expanded */}
+              {(isExpanded || isMobileOpen) && (
+                <div className="user-name">
+                  {user?.full_name || user?.email}
+                </div>
+              )}
+
               {/* Tooltip - shown when collapsed on desktop */}
               {!isExpanded && !isMobileOpen && (
                 <div className="user-tooltip">
-                  {user?.name || user?.email}
+                  {user?.full_name || user?.email}
                 </div>
               )}
             </div>

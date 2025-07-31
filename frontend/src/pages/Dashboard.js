@@ -13,6 +13,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import authService from '../services/authService';
+import api from '../services/api';
 import customerService from '../services/customerService';
 import orderService from '../services/orderService';
 import stockService from '../services/stockService';
@@ -21,7 +22,7 @@ import vehicleService from '../services/vehicleService';
 import './Dashboard.css';
 
 const Dashboard = () => {
-  const user = authService.getCurrentUser();
+  const [user, setUser] = useState(null);
   const [dashboardData, setDashboardData] = useState({
     customers: { total: 0, loading: true },
     orders: { total: 0, pending: 0, completed: 0, loading: true },
@@ -29,6 +30,23 @@ const Dashboard = () => {
     trips: { active: 0, pending: 0, loading: true },
     vehicles: { total: 0, active: 0, loading: true }
   });
+
+  // Fetch user data from API
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await api.get('/auth/me');
+        setUser(response.data);
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        // Fallback to localStorage if API fails
+        const fallbackUser = authService.getCurrentUser();
+        setUser(fallbackUser);
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   useEffect(() => {
     loadDashboardData();
@@ -201,7 +219,7 @@ const Dashboard = () => {
       
       <div className="dashboard-content">
         <div className="welcome-section">
-          <h2>Welcome back, {user?.name || user?.email}!</h2>
+          <h2>Welcome back, {user?.full_name || user?.email}!</h2>
           <p>Here's an overview of your LPG Order Management System.</p>
         </div>
 
@@ -321,9 +339,9 @@ const Dashboard = () => {
             <div className="info-item">
               <strong>Role:</strong> {user?.role || 'User'}
             </div>
-            {user?.name && (
+            {user?.full_name && (
               <div className="info-item">
-                <strong>Name:</strong> {user.name}
+                <strong>Name:</strong> {user.full_name}
               </div>
             )}
             <div className="info-item">

@@ -77,7 +77,7 @@ const AuthCallback = () => {
       localStorage.setItem('user', JSON.stringify({
         id: userId,
         email: email,
-        name: name,
+        fullname: name,
         role: role,
         tenant_id: tenantId
       }));

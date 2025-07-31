@@ -151,7 +151,7 @@ class SupabaseAuthService {
         id: userData.id,
         email: userData.email,
         role: userData.role,
-        name: userData.full_name
+        fullname: userData.full_name
       }));
     }
   }

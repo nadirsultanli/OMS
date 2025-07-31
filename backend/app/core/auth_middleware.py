@@ -28,7 +28,9 @@ EXCLUDED_PATHS = {
     "/api/v1/auth/google/validate-token",
     "/api/v1/auth/google/test",
     "/api/v1/verification/send-verification-email",
-    "/api/v1/verification/verify-email"
+    "/api/v1/verification/verify-email",
+    "/api/v1/stripe/webhooks",
+    "/api/v1/stripe/webhooks/"
 }
 
 
@@ -43,6 +45,12 @@ async def conditional_auth(
     """
     # Check if this path is excluded from authentication
     if request.url.path in EXCLUDED_PATHS:
+        return None
+    
+    # Check if this is a webhook endpoint (any path containing /webhooks)
+    # Handle both with and without trailing slash
+    normalized_path = request.url.path.rstrip('/')
+    if "/webhooks" in normalized_path or normalized_path.endswith("/webhooks"):
         return None
     
     # For all other paths, require authentication
