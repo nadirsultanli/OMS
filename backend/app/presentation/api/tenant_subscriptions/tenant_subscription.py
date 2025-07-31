@@ -424,10 +424,8 @@ async def get_current_user_subscription(
                 logger.info(f"Alternative query result: {len(result.data) if result.data else 0} records found")
                 
                 if result.data:
-                    # Use the repository to map the data
-                    from app.infrastucture.database.repositories.tenant_subscription_repository import TenantSubscriptionRepositoryImpl
-                    repo = TenantSubscriptionRepositoryImpl()
-                    subscription = repo._map_dict_to_subscription_entity(result.data[0])
+                    # Use the existing repository to map the data
+                    subscription = tenant_subscription_service.tenant_subscription_repository._map_dict_to_subscription_entity(result.data[0])
                     logger.info(f"Found subscription via alternative method: {subscription.id}")
                 else:
                     logger.info(
