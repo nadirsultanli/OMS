@@ -714,24 +714,8 @@ async def get_tenant_usage_summary(
             
         plan = plan_result.data
         
-        # Get current usage from subscription or create sample data for demo
-        current_usage = subscription.get('current_usage')
-        
-        # If no usage data exists, create sample data for demonstration
-        if not current_usage or not any(current_usage.values()):
-            import random
-            current_usage = {
-                'orders_this_month': random.randint(450, 850),  # Sample data
-                'active_drivers': random.randint(8, 45),        # Sample data  
-                'storage_used_gb': random.randint(25, 85),      # Sample data
-                'api_requests_today': random.randint(1200, 8500) # Sample data
-            }
-            
-            # Update the subscription with sample usage data
-            client.table('tenant_subscriptions')\
-                .update({'current_usage': current_usage})\
-                .eq('id', subscription['id'])\
-                .execute()
+        # Get real usage data from database
+        current_usage = await get_real_usage_data(client, tenant_id)
         
         # Calculate usage percentages and format for frontend
         usage_data = {}
@@ -995,4 +979,57 @@ async def handle_subscription_deleted(subscription_data: dict, service: TenantSu
         subscription_id = subscription_data.get('id')
         logger.info(f"Subscription {subscription_id} deleted")
     except Exception as e:
-        logger.error(f"Error handling subscription deleted: {str(e)}") 
+        logger.error(f"Error handling subscription deleted: {str(e)}")
+
+async def get_real_usage_data(client, tenant_id: str) -> dict:
+    """Get real usage data from database tables"""
+    try:
+        from datetime import datetime, timezone
+        current_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # 1. Get orders count for current month
+        orders_result = client.table('orders')\
+            .select('id', count='exact')\
+            .eq('tenant_id', tenant_id)\
+            .gte('created_at', current_month.isoformat())\
+            .execute()
+        orders_this_month = orders_result.count or 0
+        
+        # 2. Get active drivers count (drivers with active trips or recent activity)
+        drivers_result = client.table('users')\
+            .select('id', count='exact')\
+            .eq('tenant_id', tenant_id)\
+            .eq('role', 'driver')\
+            .eq('status', 'active')\
+            .execute()
+        active_drivers = drivers_result.count or 0
+        
+        # 3. Calculate storage used (based on file uploads or data size)
+        # For now, we'll use a placeholder - you can implement actual storage calculation
+        storage_used_gb = 25  # Placeholder - implement based on your storage system
+        
+        # 4. Get API requests count for today (from audit logs)
+        api_requests_result = client.table('audit_events')\
+            .select('id', count='exact')\
+            .eq('tenant_id', tenant_id)\
+            .gte('created_at', today.isoformat())\
+            .execute()
+        api_requests_today = api_requests_result.count or 0
+        
+        return {
+            'orders_this_month': orders_this_month,
+            'active_drivers': active_drivers,
+            'storage_used_gb': storage_used_gb,
+            'api_requests_today': api_requests_today
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting real usage data: {str(e)}")
+        # Fallback to zero values if there's an error
+        return {
+            'orders_this_month': 0,
+            'active_drivers': 0,
+            'storage_used_gb': 0,
+            'api_requests_today': 0
+        } 
