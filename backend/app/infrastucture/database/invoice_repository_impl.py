@@ -1,6 +1,6 @@
 from typing import List, Optional
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime
 
 from app.domain.repositories.invoice_repository import InvoiceRepository
 from app.domain.entities.invoices import Invoice, InvoiceStatus, InvoiceType
