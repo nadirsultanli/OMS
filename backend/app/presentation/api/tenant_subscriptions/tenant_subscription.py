@@ -392,16 +392,42 @@ async def get_current_user_subscription(
 ):
     """Get current user's subscription"""
     try:
+        logger.info(
+            "Getting current user subscription",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id)
+        )
+        
         subscription = await tenant_subscription_service.get_tenant_subscription_by_tenant_id(current_user.tenant_id)
+        
         if not subscription:
+            logger.info(
+                "No active subscription found for user",
+                user_id=str(current_user.id),
+                tenant_id=str(current_user.tenant_id)
+            )
             raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="No active subscription found")
-        return TenantSubscriptionResponse(**subscription.to_dict())
-    except Exception as e:
-        logger.error(
-            "Failed to get current user subscription",
+        
+        logger.info(
+            "Found active subscription for user",
             user_id=str(current_user.id),
             tenant_id=str(current_user.tenant_id),
-            error=str(e)
+            subscription_id=str(subscription.id)
+        )
+        
+        return TenantSubscriptionResponse(**subscription.to_dict())
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404)
+        raise
+    except Exception as e:
+        import traceback
+        logger.error(
+            "Failed to get current user subscription - unexpected error",
+            user_id=str(current_user.id) if current_user else "unknown",
+            tenant_id=str(current_user.tenant_id) if current_user else "unknown",
+            error=str(e),
+            traceback=traceback.format_exc()
         )
         raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 

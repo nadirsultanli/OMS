@@ -209,22 +209,33 @@ class TenantSubscriptionRepositoryImpl(TenantSubscriptionRepository):
     async def get_active_subscription_by_tenant(self, tenant_id: UUID) -> Optional[TenantSubscription]:
         """Get active subscription for a tenant"""
         from app.infrastucture.database.connection import get_supabase_client_sync
+        from app.infrastucture.logs.logger import default_logger as logger
         
         try:
+            logger.info(f"Getting active subscription for tenant: {tenant_id}")
+            
             client = get_supabase_client_sync()
             result = client.table('tenant_subscriptions')\
                 .select('*')\
                 .eq('tenant_id', str(tenant_id))\
                 .in_('subscription_status', ['active', 'trial'])\
-                .is_('ended_at', 'NULL')\
+                .is_('ended_at', 'null')\
                 .execute()
             
+            logger.info(f"Supabase query result: {len(result.data) if result.data else 0} records found")
+            
             if not result.data:
+                logger.info(f"No active subscription found for tenant: {tenant_id}")
                 return None
             
-            return self._map_dict_to_subscription_entity(result.data[0])
+            subscription = self._map_dict_to_subscription_entity(result.data[0])
+            logger.info(f"Successfully mapped subscription: {subscription.id}")
+            return subscription
             
         except Exception as e:
+            import traceback
+            logger.error(f"Error getting active subscription for tenant {tenant_id}: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             # If there's an error, return None (no active subscription found)
             return None
     
