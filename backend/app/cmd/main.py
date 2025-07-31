@@ -29,6 +29,9 @@ from app.presentation.api.vehicles.vehicle_warehouse import router as vehicle_wa
 from app.presentation.api.audit.audit import router as audit_router
 from app.presentation.api.deliveries.delivery import router as delivery_router
 from app.presentation.api.stripe.stripe import router as stripe_router
+from app.presentation.api.invoices.invoice import router as invoice_router
+from app.presentation.api.payments.payment import router as payment_router
+from app.presentation.api.tenant_subscriptions.tenant_subscription import router as subscription_router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
 from app.core.audit_middleware import AuditMiddleware
@@ -135,6 +138,18 @@ app = FastAPI(
         {
             "name": "Stripe Billing",
             "description": "Stripe billing integration, tenant management, and subscription operations"
+        },
+        {
+            "name": "Invoices",
+            "description": "Invoice management, generation, and payment tracking operations"
+        },
+        {
+            "name": "Payments",
+            "description": "Payment processing, refunds, and payment cycle management operations"
+        },
+        {
+            "name": "Subscriptions",
+            "description": "Tenant-level subscription management, plan limits, and usage tracking for Circl OMS platform"
         }
     ]
 )
@@ -216,6 +231,9 @@ app.include_router(vehicle_warehouse_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(delivery_router, prefix="/api/v1")
 app.include_router(stripe_router, prefix="/api/v1")
+app.include_router(invoice_router, prefix="/api/v1")
+app.include_router(payment_router, prefix="/api/v1")
+app.include_router(subscription_router, prefix="/api/v1")
 
 
 def custom_openapi():

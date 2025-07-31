@@ -47,15 +47,14 @@ class Payment:
     
     # Financial details
     amount: Decimal
-    currency: str = 'EUR'
+    payment_date: date
     
     # References
+    customer_id: Optional[UUID] = None
     invoice_id: Optional[UUID] = None
     order_id: Optional[UUID] = None
-    customer_id: Optional[UUID] = None
     
     # Payment details
-    payment_date: date
     processed_date: Optional[date] = None
     reference_number: Optional[str] = None
     external_transaction_id: Optional[str] = None
@@ -67,6 +66,9 @@ class Payment:
     # Additional information
     description: Optional[str] = None
     notes: Optional[str] = None
+    
+    # Financial details with defaults
+    currency: str = 'EUR'
     
     # Audit fields
     created_at: datetime = field(default_factory=datetime.utcnow)

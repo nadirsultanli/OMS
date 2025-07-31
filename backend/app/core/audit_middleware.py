@@ -198,14 +198,33 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 
                 # Create audit event data
                 current_time = datetime.utcnow()
+                
+                # Validate tenant_id is a proper UUID
+                tenant_id_str = str(current_user.tenant_id)
+                actor_id_str = str(current_user.id)
+                object_id_str = str(object_id) if object_id else None
+                
+                # Validate UUIDs before inserting
+                from uuid import UUID
+                try:
+                    UUID(tenant_id_str)
+                    UUID(actor_id_str)
+                    if object_id_str:
+                        UUID(object_id_str)
+                    default_logger.info(f"✅ UUID validation passed - tenant: {tenant_id_str}, actor: {actor_id_str}, object: {object_id_str}")
+                except ValueError as e:
+                    default_logger.error(f"❌ UUID validation failed: {str(e)}")
+                    default_logger.error(f"   tenant_id: {tenant_id_str}, actor_id: {actor_id_str}, object_id: {object_id_str}")
+                    return
+                
                 event_data = {
-                    "tenant_id": str(current_user.tenant_id),
+                    "tenant_id": tenant_id_str,
                     "event_time": current_time.isoformat(),
                     "created_at": current_time.isoformat(),
-                    "actor_id": str(current_user.id),
+                    "actor_id": actor_id_str,
                     "actor_type": "user",
                     "object_type": object_type.value if hasattr(object_type, 'value') else str(object_type),
-                    "object_id": str(object_id) if object_id else None,
+                    "object_id": object_id_str,
                     "event_type": event_type.value if hasattr(event_type, 'value') else str(event_type),
                     "field_name": None,
                     "old_value": None,
@@ -340,6 +359,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     "PRICE-LISTS": AuditObjectType.PRICE_LIST,
                     "DELIVERIES": AuditObjectType.DELIVERY,
                     "TENANTS": AuditObjectType.TENANT,
+                    "SUBSCRIPTIONS": AuditObjectType.OTHER,
+                    "STRIPE": AuditObjectType.OTHER,
                     "AUDIT": AuditObjectType.OTHER
                 }
                 
@@ -350,26 +371,43 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 
                 # Try to extract object ID
                 object_id = None
-                if len(parts) >= 4:
-                    # Try to find UUID in any part after the resource name
+                
+                # Special handling for stripe endpoints
+                if resource == "STRIPE":
+                    # For stripe endpoints, look for UUIDs in the path after "stripe"
+                    # e.g., /api/v1/stripe/tenants/{tenant_id}/... or /api/v1/stripe/subscriptions/{sub_id}/...
                     from uuid import UUID
-                    for i in range(3, len(parts)):
+                    for i in range(3, len(parts)):  # Start after "stripe"
                         try:
                             # Try to parse as UUID
                             object_id = UUID(parts[i])
                             break  # Found a valid UUID, stop looking
                         except (ValueError, TypeError):
                             continue
-                
-                # If no UUID found but there's a potential ID, try to extract it
-                if object_id is None and len(parts) >= 4:
-                    # Some endpoints might use non-UUID IDs
-                    potential_id = parts[3]
-                    # Exclude action endpoints and common non-ID paths
-                    excluded_paths = ['', 'new', 'create', 'list', 'estimate-volume-for-gas-type', 'calculate-mixed-load-capacity']
-                    if potential_id and potential_id not in excluded_paths:
-                        # This could be a valid ID (non-UUID)
-                        object_id = potential_id
+                    # If no UUID found in stripe endpoints, leave object_id as None
+                    default_logger.info(f"   Stripe endpoint - extracted UUID: {object_id}")
+                else:
+                    # Standard object ID extraction for other endpoints
+                    if len(parts) >= 4:
+                        # Try to find UUID in any part after the resource name
+                        from uuid import UUID
+                        for i in range(3, len(parts)):
+                            try:
+                                # Try to parse as UUID
+                                object_id = UUID(parts[i])
+                                break  # Found a valid UUID, stop looking
+                            except (ValueError, TypeError):
+                                continue
+                    
+                    # If no UUID found but there's a potential ID, try to extract it
+                    if object_id is None and len(parts) >= 4:
+                        # Some endpoints might use non-UUID IDs
+                        potential_id = parts[3]
+                        # Exclude action endpoints and common non-ID paths
+                        excluded_paths = ['', 'new', 'create', 'list', 'estimate-volume-for-gas-type', 'calculate-mixed-load-capacity', 'tenants', 'exceeding-limits', 'renewal-needed', 'plans', 'usage', 'summary']
+                        if potential_id and potential_id not in excluded_paths:
+                            # This could be a valid ID (non-UUID)
+                            object_id = potential_id
                 
                 default_logger.info(f"   Extracted object ID: {object_id}")
                 default_logger.info(f"   Final result: {object_type}, {object_id}")

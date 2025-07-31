@@ -28,7 +28,7 @@ from app.presentation.schemas.stripe.output_schemas import (
 )
 
 logger = get_logger("stripe_api")
-router = APIRouter(prefix="/api/v1/stripe", tags=["Stripe Billing"])
+router = APIRouter(prefix="/stripe", tags=["Stripe Billing"])
 
 # Tenant Management Endpoints
 @router.post("/tenants", response_model=TenantResponse, status_code=201)
@@ -339,23 +339,6 @@ async def get_platform_billing_summary(
             detail="Failed to get platform billing summary"
         )
 
-@router.get("/tenants/exceeding-limits")
-async def get_tenants_exceeding_limits(
-    current_user: User = Depends(get_current_user),
-    stripe_service: StripeService = Depends(get_stripe_service)
-):
-    """Get tenants exceeding their plan limits"""
-    try:
-        tenants = await stripe_service.get_tenants_exceeding_limits()
-        return {"tenants": tenants}
-        
-    except Exception as e:
-        logger.error(f"Error getting tenants exceeding limits: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get tenants exceeding limits"
-        )
-
 @router.get("/subscriptions/renewal-needed")
 async def get_subscriptions_needing_renewal(
     days_ahead: int = 7,
@@ -386,7 +369,81 @@ async def get_subscriptions_needing_renewal(
             detail="Failed to get subscriptions needing renewal"
         )
 
+@router.get("/tenants/exceeding-limits")
+async def get_tenants_exceeding_limits(
+    current_user: User = Depends(get_current_user),
+    stripe_service: StripeService = Depends(get_stripe_service)
+):
+    """Get tenants exceeding their plan limits"""
+    try:
+        tenants = await stripe_service.get_tenants_exceeding_limits()
+        return {"tenants": tenants}
+        
+    except Exception as e:
+        logger.error(f"Error getting tenants exceeding limits: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get tenants exceeding limits"
+        )
+
 # Webhook Endpoint
+@router.post("/create-checkout-session")
+async def create_checkout_session(
+    request: Request,
+    stripe_service: StripeService = Depends(get_stripe_service)
+):
+    """Create a Stripe Checkout session for invoice payment"""
+    try:
+        body = await request.json()
+        invoice_id = body.get('invoice_id')
+        amount = body.get('amount')
+        success_url = body.get('success_url', 'http://localhost:3000/invoices')
+        cancel_url = body.get('cancel_url', 'http://localhost:3000/invoices')
+        
+        if not invoice_id or not amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invoice_id and amount are required"
+            )
+        
+        # Create checkout session using Stripe
+        import stripe
+        stripe.api_key = stripe_service.stripe_secret_key
+        
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'Invoice Payment',
+                        'description': f'Payment for invoice {invoice_id}',
+                    },
+                    'unit_amount': amount,  # Amount in cents
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=success_url + '?success=true',
+            cancel_url=cancel_url + '?canceled=true',
+            metadata={
+                'invoice_id': str(invoice_id),
+                'type': 'invoice_payment'
+            }
+        )
+        
+        return {
+            "checkout_url": checkout_session.url,
+            "session_id": checkout_session.id
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating checkout session: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create checkout session"
+        )
+
 @router.post("/webhooks")
 async def stripe_webhook(
     request: Request,

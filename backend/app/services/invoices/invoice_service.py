@@ -2,6 +2,12 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from uuid import UUID
+import io
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
 
 from app.domain.entities.invoices import Invoice, InvoiceLine, InvoiceStatus, InvoiceType
 from app.domain.entities.orders import Order, OrderLine, OrderStatus
@@ -125,6 +131,317 @@ class InvoiceService:
         # Save the invoice
         return await self.invoice_repository.create_invoice(invoice)
 
+    async def generate_invoice_pdf(self, invoice: Invoice) -> bytes:
+        """Generate professional PDF content for an invoice with Circl Technologies branding"""
+        # Create a buffer to store the PDF
+        buffer = io.BytesIO()
+        
+        # Create the PDF document with margins
+        doc = SimpleDocTemplate(
+            buffer, 
+            pagesize=A4,
+            leftMargin=1*inch,
+            rightMargin=1*inch,
+            topMargin=1*inch,
+            bottomMargin=1*inch
+        )
+        story = []
+        
+        # Get styles
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        company_style = ParagraphStyle(
+            'CompanyStyle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=5,
+            alignment=1,  # Center
+            textColor=colors.HexColor('#1e40af')  # Blue color
+        )
+        
+        tagline_style = ParagraphStyle(
+            'TaglineStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            spaceAfter=20,
+            alignment=1,  # Center
+            textColor=colors.HexColor('#6b7280')  # Gray color
+        )
+        
+        invoice_title_style = ParagraphStyle(
+            'InvoiceTitle',
+            parent=styles['Heading1'],
+            fontSize=28,
+            spaceAfter=30,
+            alignment=1,  # Center
+            textColor=colors.HexColor('#1f2937')  # Dark gray
+        )
+        
+        section_style = ParagraphStyle(
+            'SectionStyle',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=10,
+            textColor=colors.HexColor('#374151')  # Medium gray
+        )
+        
+        # Header with company branding
+        story.append(Paragraph("CIRCL TECHNOLOGIES", company_style))
+        story.append(Paragraph("Innovative Solutions for Tomorrow", tagline_style))
+        
+        # Company information
+        company_info = [
+            "123 Innovation Drive, Tech Park",
+            "Dublin, Ireland D01 1234",
+            "Phone: +353 1 234 5678",
+            "Email: info@circl.team",
+            "Website: www.circl.team",
+            "VAT Number: IE1234567A"
+        ]
+        
+        for info in company_info:
+            story.append(Paragraph(info, styles['Normal']))
+        
+        story.append(Spacer(1, 30))
+        
+        # Invoice title and number
+        story.append(Paragraph(f"INVOICE #{invoice.invoice_no}", invoice_title_style))
+        
+        # Invoice details in a table
+        invoice_details_data = [
+            ['Invoice Date:', invoice.invoice_date.strftime('%B %d, %Y')],
+            ['Due Date:', invoice.due_date.strftime('%B %d, %Y')],
+            ['Invoice Status:', invoice.invoice_status.value.upper()],
+            ['Currency:', invoice.currency]
+        ]
+        
+        invoice_details_table = Table(invoice_details_data, colWidths=[2*inch, 3*inch])
+        invoice_details_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        story.append(invoice_details_table)
+        story.append(Spacer(1, 20))
+        
+        # Bill To section
+        story.append(Paragraph("BILL TO:", section_style))
+        story.append(Paragraph(invoice.customer_name, styles['Normal']))
+        story.append(Paragraph(invoice.customer_address, styles['Normal']))
+        if invoice.customer_tax_id:
+            story.append(Paragraph(f"Tax ID: {invoice.customer_tax_id}", styles['Normal']))
+        
+        story.append(Spacer(1, 20))
+        
+
+        
+        # Invoice lines table
+        if invoice.invoice_lines:
+            # Prepare table data with better formatting
+            table_data = [
+                ['Item', 'Description', 'Qty', 'Unit Price', 'Tax Rate', 'Tax Amount', 'Line Total']
+            ]
+            
+            for i, line in enumerate(invoice.invoice_lines, 1):
+                table_data.append([
+                    str(i),
+                    line.description,
+                    str(line.quantity),
+                    f"€{line.unit_price:.2f}",
+                    f"{line.tax_rate:.1f}%",
+                    f"€{line.tax_amount:.2f}",
+                    f"€{line.gross_amount:.2f}"
+                ])
+            
+            # Create table with better styling
+            table = Table(table_data, colWidths=[0.5*inch, 2.5*inch, 0.6*inch, 1*inch, 0.8*inch, 1*inch, 1.2*inch])
+            table.setStyle(TableStyle([
+                # Header styling
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 12),
+                
+                # Data rows styling
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8fafc')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+                ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+                ('ALIGN', (1, 1), (1, -1), 'LEFT'),  # Description left-aligned
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 1), (-1, -1), 8),
+            ]))
+            
+            story.append(table)
+            story.append(Spacer(1, 20))
+            
+            # Summary table
+            summary_data = [
+                ['', ''],
+                ['Subtotal:', f"€{invoice.subtotal:.2f}"],
+                ['Tax Total:', f"€{invoice.total_tax:.2f}"],
+                ['', ''],
+                ['Total Amount:', f"€{invoice.total_amount:.2f}"],
+                ['Amount Paid:', f"€{invoice.paid_amount:.2f}"],
+                ['', ''],
+                ['Balance Due:', f"€{invoice.balance_due:.2f}"]
+            ]
+            
+            summary_table = Table(summary_data, colWidths=[4*inch, 2*inch])
+            summary_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('FONTNAME', (0, -3), (1, -3), 'Helvetica-Bold'),  # Total Amount
+                ('FONTNAME', (0, -1), (1, -1), 'Helvetica-Bold'),  # Balance Due
+                ('FONTSIZE', (0, -3), (1, -3), 16),  # Larger font for total
+                ('FONTSIZE', (0, -1), (1, -1), 16),  # Larger font for balance
+                ('TEXTCOLOR', (0, -3), (1, -3), colors.HexColor('#1e40af')),  # Blue for total
+                ('TEXTCOLOR', (0, -1), (1, -1), colors.HexColor('#dc2626')),  # Red for balance due
+                ('BACKGROUND', (0, -3), (1, -3), colors.HexColor('#eff6ff')),  # Light blue background for total
+                ('BACKGROUND', (0, -1), (1, -1), colors.HexColor('#fef2f2')),  # Light red background for balance
+                ('GRID', (0, -3), (1, -3), 1, colors.HexColor('#1e40af')),  # Border for total
+                ('GRID', (0, -1), (1, -1), 1, colors.HexColor('#dc2626')),  # Border for balance
+            ]))
+            
+            story.append(summary_table)
+            story.append(Spacer(1, 30))
+        
+        # Summary table (always show, even without invoice lines)
+        if not invoice.invoice_lines:
+            summary_data = [
+                ['', ''],
+                ['Subtotal:', f"€{invoice.subtotal:.2f}"],
+                ['Tax Total:', f"€{invoice.total_tax:.2f}"],
+                ['', ''],
+                ['Total Amount:', f"€{invoice.total_amount:.2f}"],
+                ['Amount Paid:', f"€{invoice.paid_amount:.2f}"],
+                ['', ''],
+                ['Balance Due:', f"€{invoice.balance_due:.2f}"]
+            ]
+            
+            summary_table = Table(summary_data, colWidths=[4*inch, 2*inch])
+            summary_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('FONTNAME', (0, -3), (1, -3), 'Helvetica-Bold'),  # Total Amount
+                ('FONTNAME', (0, -1), (1, -1), 'Helvetica-Bold'),  # Balance Due
+                ('FONTSIZE', (0, -3), (1, -3), 16),  # Larger font for total
+                ('FONTSIZE', (0, -1), (1, -1), 16),  # Larger font for balance
+                ('TEXTCOLOR', (0, -3), (1, -3), colors.HexColor('#1e40af')),  # Blue for total
+                ('TEXTCOLOR', (0, -1), (1, -1), colors.HexColor('#dc2626')),  # Red for balance due
+                ('BACKGROUND', (0, -3), (1, -3), colors.HexColor('#eff6ff')),  # Light blue background for total
+                ('BACKGROUND', (0, -1), (1, -1), colors.HexColor('#fef2f2')),  # Light red background for balance
+                ('GRID', (0, -3), (1, -3), 1, colors.HexColor('#1e40af')),  # Border for total
+                ('GRID', (0, -1), (1, -1), 1, colors.HexColor('#dc2626')),  # Border for balance
+            ]))
+            
+            story.append(summary_table)
+            story.append(Spacer(1, 30))
+        
+        # Payment information with professional styling
+        story.append(Paragraph("PAYMENT INFORMATION", section_style))
+        
+        payment_info_data = [
+            ['Bank:', 'AIB Bank'],
+            ['Account Name:', 'Circl Technologies Ltd'],
+            ['Account Number:', '12345678'],
+            ['IBAN:', 'IE64AIBK12345678901234'],
+            ['BIC:', 'AIBKIE2D'],
+            ['Reference:', invoice.invoice_no]
+        ]
+        
+        payment_table = Table(payment_info_data, colWidths=[2*inch, 4*inch])
+        payment_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f3f4f6')),  # Light gray background for labels
+        ]))
+        
+        story.append(payment_table)
+        story.append(Spacer(1, 25))
+        
+        # Terms and conditions
+        if invoice.payment_terms:
+            story.append(Paragraph("PAYMENT TERMS", section_style))
+            story.append(Paragraph(invoice.payment_terms, styles['Normal']))
+            story.append(Spacer(1, 20))
+        
+        # Notes
+        if invoice.notes:
+            story.append(Paragraph("NOTES", section_style))
+            story.append(Paragraph(invoice.notes, styles['Normal']))
+            story.append(Spacer(1, 20))
+        
+        # Professional footer with styling
+        story.append(Spacer(1, 40))
+        
+        # Add a separator line
+        separator = Table([['']], colWidths=[6*inch])
+        separator.setStyle(TableStyle([
+            ('LINEABOVE', (0, 0), (0, 0), 1, colors.HexColor('#e5e7eb')),
+        ]))
+        story.append(separator)
+        story.append(Spacer(1, 20))
+        
+        footer_style = ParagraphStyle(
+            'FooterStyle',
+            parent=styles['Normal'],
+            fontSize=10,
+            alignment=1,  # Center
+            textColor=colors.HexColor('#6b7280'),  # Gray color
+            fontName='Helvetica'
+        )
+        
+        footer_bold_style = ParagraphStyle(
+            'FooterBoldStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            alignment=1,  # Center
+            textColor=colors.HexColor('#1e40af'),  # Blue color
+            fontName='Helvetica-Bold'
+        )
+        
+        story.append(Paragraph("Thank you for your business!", footer_bold_style))
+        story.append(Paragraph("Circl Technologies - Innovative Solutions for Tomorrow", footer_style))
+        story.append(Paragraph("For any questions, please contact us at info@circl.team", footer_style))
+        
+        # Build the PDF
+        doc.build(story)
+        
+        # Get the PDF content
+        pdf_content = buffer.getvalue()
+        buffer.close()
+        
+        return pdf_content
+
     def _generate_line_description(self, order_line: OrderLine) -> str:
         """Generate a description for an invoice line based on order line"""
         base_description = f"Product {order_line.variant_id}"  # Would get product name from service
@@ -176,14 +493,20 @@ class InvoiceService:
 
         # Add invoice lines
         for line_data in invoice_lines_data:
+            # Convert Pydantic model to dict if needed
+            if hasattr(line_data, 'dict'):
+                line_dict = line_data.dict()
+            else:
+                line_dict = line_data
+                
             invoice_line = InvoiceLine.create(
                 invoice_id=invoice.id,
-                description=line_data['description'],
-                quantity=Decimal(str(line_data['quantity'])),
-                unit_price=Decimal(str(line_data['unit_price'])),
-                tax_code=line_data.get('tax_code', 'TX_STD'),
-                tax_rate=Decimal(str(line_data.get('tax_rate', '23.00'))),
-                **{k: v for k, v in line_data.items() if k not in ['description', 'quantity', 'unit_price', 'tax_code', 'tax_rate']}
+                description=line_dict['description'],
+                quantity=Decimal(str(line_dict['quantity'])),
+                unit_price=Decimal(str(line_dict['unit_price'])),
+                tax_code=line_dict.get('tax_code', 'TX_STD'),
+                tax_rate=Decimal(str(line_dict.get('tax_rate', '23.00'))),
+                **{k: v for k, v in line_dict.items() if k not in ['description', 'quantity', 'unit_price', 'tax_code', 'tax_rate']}
             )
             invoice.add_line(invoice_line)
 

@@ -72,6 +72,25 @@ async def create_customer(
         )
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
+@router.get("/", response_model=CustomerListResponse)
+async def get_customers(
+    limit: int = Query(100, ge=1, le=1000), 
+    offset: int = Query(0, ge=0),
+    status: Optional[str] = Query(None, description="Filter by status (active, pending, rejected, inactive)"),
+    customer_type: Optional[str] = Query(None, description="Filter by customer type (cash, credit)"),
+    search: Optional[str] = Query(None, description="Search in name, email, or phone"),
+    customer_service: CustomerService = Depends(get_customer_service)
+):
+    customers, total = await customer_service.get_customers_with_filters(
+        limit=limit,
+        offset=offset,
+        status=status,
+        customer_type=customer_type,
+        search=search
+    )
+    customer_responses = [CustomerResponse(**customer.to_dict()) for customer in customers]
+    return CustomerListResponse(customers=customer_responses, total=total, limit=limit, offset=offset)
+
 @router.get("/{customer_id}", response_model=CustomerResponse)
 async def get_customer(
     customer_id: str, 
@@ -120,24 +139,7 @@ async def get_customer(
         )
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
-@router.get("/", response_model=CustomerListResponse)
-async def get_customers(
-    limit: int = Query(100, ge=1, le=1000), 
-    offset: int = Query(0, ge=0),
-    status: Optional[str] = Query(None, description="Filter by status (active, pending, rejected, inactive)"),
-    customer_type: Optional[str] = Query(None, description="Filter by customer type (cash, credit)"),
-    search: Optional[str] = Query(None, description="Search in name, email, or phone"),
-    customer_service: CustomerService = Depends(get_customer_service)
-):
-    customers, total = await customer_service.get_customers_with_filters(
-        limit=limit,
-        offset=offset,
-        status=status,
-        customer_type=customer_type,
-        search=search
-    )
-    customer_responses = [CustomerResponse(**customer.to_dict()) for customer in customers]
-    return CustomerListResponse(customers=customer_responses, total=total, limit=limit, offset=offset)
+
 
 @router.put("/{customer_id}", response_model=CustomerResponse)
 async def update_customer(

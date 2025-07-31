@@ -5,14 +5,14 @@ from datetime import date
 from app.domain.repositories.payment_repository import PaymentRepository
 from app.domain.entities.payments import Payment, PaymentStatus, PaymentMethod
 from app.infrastucture.database.repositories.supabase_repository import SupabaseRepository
+from app.infrastucture.database.connection import db_connection
 
 
 class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     """Implementation of PaymentRepository using Supabase"""
 
     def __init__(self):
-        super().__init__()
-        self.table_name = "payments"
+        super().__init__("payments", None)  # entity_class will be None since we handle conversion manually
 
     async def create_payment(self, payment: Payment) -> Payment:
         """Create a new payment"""
@@ -183,38 +183,40 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     ) -> List[Payment]:
         """Search payments with filters"""
         try:
-            query = self.supabase.table(self.table_name).select("*")
+            def build_query(client):
+                query = client.table(self.table_name).select("*")
+                
+                # Apply filters
+                query = query.eq("tenant_id", str(tenant_id))
+                
+                if payment_no:
+                    query = query.ilike("payment_no", f"%{payment_no}%")
+                
+                if status:
+                    query = query.eq("payment_status", status.value)
+                
+                if method:
+                    query = query.eq("payment_method", method.value)
+                
+                if customer_id:
+                    query = query.eq("customer_id", str(customer_id))
+                
+                if from_date:
+                    query = query.gte("payment_date", from_date.isoformat())
+                
+                if to_date:
+                    query = query.lte("payment_date", to_date.isoformat())
+                
+                # Apply pagination and ordering
+                query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
+                
+                return query
             
-            # Apply filters
-            query = query.eq("tenant_id", str(tenant_id))
-            
-            if payment_no:
-                query = query.ilike("payment_no", f"%{payment_no}%")
-            
-            if status:
-                query = query.eq("payment_status", status.value)
-            
-            if method:
-                query = query.eq("payment_method", method.value)
-            
-            if customer_id:
-                query = query.eq("customer_id", str(customer_id))
-            
-            if from_date:
-                query = query.gte("payment_date", from_date.isoformat())
-            
-            if to_date:
-                query = query.lte("payment_date", to_date.isoformat())
-            
-            # Apply pagination and ordering
-            query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
-            
-            result = await query.execute()
+            result = await db_connection.execute_query(lambda client: build_query(client).execute())
             
             return [self._dict_to_payment(payment_data) for payment_data in result.data or []]
             
         except Exception as e:
-            self.logger.error(f"Error searching payments: {e}")
             return []
 
     async def get_next_payment_number(self, tenant_id: UUID, prefix: str) -> str:

@@ -1,24 +1,42 @@
 import React from 'react';
+import './UserAvatar.css';
 
-export const UserAvatar = ({ name, size = 'md', className = '' }) => {
-  const initials = name
-    ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : 'U';
-
-  const sizeClasses = {
-    sm: 'h-8 w-8 text-sm',
-    md: 'h-10 w-10 text-base',
-    lg: 'h-12 w-12 text-lg'
+export const UserAvatar = ({ user, size = 'medium', className = '' }) => {
+  const getInitials = (name) => {
+    if (!name) return '?';
+    return name
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
+  const getAvatarColor = (name) => {
+    if (!name) return '#6b7280';
+    
+    const colors = [
+      '#3b82f6', '#ef4444', '#10b981', '#f59e0b', 
+      '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'
+    ];
+    
+    const hash = name.split('').reduce((acc, char) => {
+      return char.charCodeAt(0) + ((acc << 5) - acc);
+    }, 0);
+    
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  const displayName = user?.name || user?.email || 'User';
+  const initials = getInitials(displayName);
+  const backgroundColor = getAvatarColor(displayName);
+
   return (
-    <div className={`
-      ${sizeClasses[size]} 
-      bg-gradient-to-br from-blue-500 to-blue-600 
-      rounded-full flex items-center justify-center 
-      text-white font-semibold shadow-lg
-      ${className}
-    `}>
+    <div 
+      className={`user-avatar user-avatar-${size} ${className}`}
+      style={{ backgroundColor }}
+      title={displayName}
+    >
       {initials}
     </div>
   );

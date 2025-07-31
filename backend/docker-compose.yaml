@@ -10,7 +10,13 @@ services:
       - "8000:8000"
     environment:
       - ENVIRONMENT=development
-      - LOG_LEVEL=DEBUG
+      - LOG_LEVEL=INFO  # Reduced from DEBUG for better performance
+      - WORKERS=4  # Multi-worker setup for better concurrency
+      - MAX_REQUESTS=1000
+      - MAX_REQUESTS_JITTER=100
+      - STRIPE_SECRET_KEY=your_stripe_secret_key_here
+      - STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key_here
+      - STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
     env_file:
       - .env
     volumes:
@@ -20,6 +26,12 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   # celery-worker:
   #   build:

@@ -11,5 +11,5 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 # Copy app code
 COPY . .
 
-# Run FastAPI with uvicorn in development mode
-CMD ["uvicorn", "app.cmd.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"] 
+# Run FastAPI with uvicorn in optimized mode
+CMD ["uvicorn", "app.cmd.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"] 

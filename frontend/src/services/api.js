@@ -20,7 +20,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   // Add timeout and retry configuration
-  timeout: 10000,
+  timeout: 30000, // Increased from 10000 to 30000 for better performance
 });
 
 // Debug logging

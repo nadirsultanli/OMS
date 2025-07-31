@@ -17,7 +17,10 @@ import {
   FileText,
   Archive,
   TrendingUp,
-  Shield
+  Shield,
+  CreditCard,
+  Receipt,
+  Repeat
 } from 'lucide-react';
 import { UserAvatar } from './ui/UserAvatar';
 import authService from '../services/authService';
@@ -47,6 +50,9 @@ const CollapsibleSidebar = ({ onExpandChange }) => {
     { path: '/products', label: 'Products', icon: Package },
     { path: '/variants', label: 'Variants', icon: Package },
     { path: '/price-lists', label: 'Price Lists', icon: DollarSign },
+    { path: '/invoices', label: 'Invoices', icon: Receipt },
+    { path: '/payments', label: 'Payments', icon: CreditCard },
+    { path: '/subscriptions', label: 'Subscriptions', icon: Repeat },
     { path: '/warehouses', label: 'Warehouses', icon: Warehouse },
     { path: '/stock', label: 'Stock Dashboard', icon: TrendingUp },
     { path: '/stock-levels', label: 'Stock Levels', icon: Archive },

@@ -203,4 +203,9 @@ async def init_direct_database() -> None:
         default_logger.warning("DATABASE_URL not found in environment variables")
         return
     direct_db_connection.configure(url)
-    await direct_db_connection.test_connection() 
+    await direct_db_connection.test_connection()
+
+
+def get_database() -> Client:
+    """Get Supabase client instance synchronously (backwards compatibility)"""
+    return get_supabase_client_sync() 

@@ -56,7 +56,7 @@ class MixedSizeLoadCapacityResponse(BaseModel):
     calculation_method: str = Field(..., description="Method used for calculation")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "order_id": "123e4567-e89b-12d3-a456-426614174000",
                 "total_weight_kg": 1250.5,

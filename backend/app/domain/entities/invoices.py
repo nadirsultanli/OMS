@@ -71,6 +71,7 @@ class InvoiceLine:
         return InvoiceLine(
             id=uuid4(),
             invoice_id=invoice_id,
+            order_line_id=kwargs.get('order_line_id'),
             description=description,
             quantity=quantity,
             unit_price=unit_price,
@@ -80,7 +81,7 @@ class InvoiceLine:
             tax_amount=tax_amount,
             net_amount=net_amount,
             gross_amount=gross_amount,
-            **kwargs
+            **{k: v for k, v in kwargs.items() if k != 'order_line_id'}
         )
 
     def recalculate_totals(self):
@@ -105,15 +106,17 @@ class Invoice:
     customer_id: UUID
     customer_name: str
     customer_address: str
+    
+    # Dates (required fields must come before optional ones)
+    invoice_date: date
+    due_date: date
+    
+    # Optional fields
     customer_tax_id: Optional[str] = None
     
     # Order reference
     order_id: Optional[UUID] = None
     order_no: Optional[str] = None
-    
-    # Dates
-    invoice_date: date
-    due_date: date
     delivery_date: Optional[date] = None
     
     # Financial totals
@@ -227,9 +230,9 @@ class Invoice:
         """Check if invoice can be edited"""
         return self.invoice_status in [InvoiceStatus.DRAFT]
 
-    def to_dict(self) -> dict:
+    def to_dict(self, include_lines: bool = True) -> dict:
         """Convert invoice to dictionary"""
-        return {
+        result = {
             'id': str(self.id),
             'tenant_id': str(self.tenant_id),
             'invoice_no': self.invoice_no,
@@ -252,7 +255,16 @@ class Invoice:
             'currency': self.currency,
             'payment_terms': self.payment_terms,
             'notes': self.notes,
-            'invoice_lines': [
+            'created_at': self.created_at.isoformat(),
+            'created_by': str(self.created_by) if self.created_by else None,
+            'updated_at': self.updated_at.isoformat(),
+            'updated_by': str(self.updated_by) if self.updated_by else None,
+            'sent_at': self.sent_at.isoformat() if self.sent_at else None,
+            'paid_at': self.paid_at.isoformat() if self.paid_at else None
+        }
+        
+        if include_lines:
+            result['invoice_lines'] = [
                 {
                     'id': str(line.id),
                     'description': line.description,
@@ -269,10 +281,7 @@ class Invoice:
                     'component_type': line.component_type
                 }
                 for line in self.invoice_lines
-            ],
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
-            'sent_at': self.sent_at.isoformat() if self.sent_at else None,
-            'paid_at': self.paid_at.isoformat() if self.paid_at else None,
-            'is_overdue': self.is_overdue()
-        }
+            ]
+            result['is_overdue'] = self.is_overdue()
+        
+        return result

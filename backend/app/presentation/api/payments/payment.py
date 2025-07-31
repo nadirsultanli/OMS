@@ -34,7 +34,7 @@ logger = get_logger("payments_api")
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
 
-@router.post("/", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
 async def create_payment(
     request: CreatePaymentRequest,
     payment_service: PaymentService = Depends(get_payment_service),
@@ -152,21 +152,7 @@ async def create_invoice_payment(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
-@router.get("/{payment_id}", response_model=PaymentResponse)
-async def get_payment(
-    payment_id: str,
-    payment_service: PaymentService = Depends(get_payment_service),
-    current_user: User = Depends(get_current_user)
-):
-    """Get payment by ID"""
-    try:
-        payment = await payment_service.get_payment_by_id(current_user, payment_id)
-        return PaymentResponse(**payment.to_dict())
-    except PaymentNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
-
-@router.get("/", response_model=PaymentListResponse)
+@router.get("", response_model=PaymentListResponse)
 async def search_payments(
     payment_no: Optional[str] = Query(None, description="Filter by payment number"),
     status: Optional[PaymentStatus] = Query(None, description="Filter by status"),
@@ -208,6 +194,20 @@ async def search_payments(
             error_type=type(e).__name__
         )
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+@router.get("/{payment_id}", response_model=PaymentResponse)
+async def get_payment(
+    payment_id: str,
+    payment_service: PaymentService = Depends(get_payment_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Get payment by ID"""
+    try:
+        payment = await payment_service.get_payment_by_id(current_user, payment_id)
+        return PaymentResponse(**payment.to_dict())
+    except PaymentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get("/invoice/{invoice_id}/payments", response_model=PaymentListResponse)
