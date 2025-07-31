@@ -45,6 +45,7 @@ const Subscriptions = () => {
             if (err.response?.status === 404) {
                 // No subscription found, that's okay
                 setSubscription(null);
+                setUsage(null); // Clear usage data when no subscription exists
             } else {
                 console.error('Error fetching current subscription:', err);
             }
@@ -186,7 +187,7 @@ const Subscriptions = () => {
             )}
 
             {/* Usage Summary */}
-            {usage && (
+            {subscription && usage && (
                 <div className="usage-summary">
                     <h2>Usage Summary</h2>
                     <div className="usage-grid">
