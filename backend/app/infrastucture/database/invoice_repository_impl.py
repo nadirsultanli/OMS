@@ -586,7 +586,7 @@ class InvoiceRepositoryImpl(InvoiceRepository):
     def _parse_datetime(self, datetime_str: str) -> datetime:
         """Parse datetime string with proper error handling for various formats"""
         if not datetime_str:
-            return datetime.utcnow()
+            return datetime.now()
         
         try:
             # Handle 'Z' suffix
@@ -603,7 +603,7 @@ class InvoiceRepositoryImpl(InvoiceRepository):
             except:
                 # Fallback to current time if all parsing fails
                 self.logger.warning(f"Failed to parse datetime: {datetime_str}, using current time")
-                return datetime.utcnow()
+                return datetime.now()
 
     def _dict_to_invoice(self, invoice_data: dict) -> Invoice:
         """Convert dictionary to Invoice entity"""
@@ -632,8 +632,8 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                     product_code=line_data.get('product_code'),
                     variant_sku=line_data.get('variant_sku'),
                     component_type=line_data.get('component_type', 'STANDARD'),
-                                    created_at=self._parse_datetime(line_data.get('created_at')) if line_data.get('created_at') else datetime.utcnow(),
-                updated_at=self._parse_datetime(line_data.get('updated_at')) if line_data.get('updated_at') else datetime.utcnow()
+                                    created_at=self._parse_datetime(line_data.get('created_at')) if line_data.get('created_at') else datetime.now(),
+                updated_at=self._parse_datetime(line_data.get('updated_at')) if line_data.get('updated_at') else datetime.now()
                 )
                 lines.append(line)
             except Exception as e:
@@ -667,9 +667,9 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                 currency=invoice_data.get('currency', 'EUR'),
                 payment_terms=invoice_data.get('payment_terms'),
                 notes=invoice_data.get('notes'),
-                created_at=self._parse_datetime(invoice_data.get('created_at')) if invoice_data.get('created_at') else datetime.utcnow(),
+                created_at=self._parse_datetime(invoice_data.get('created_at')) if invoice_data.get('created_at') else datetime.now(),
                 created_by=UUID(invoice_data['created_by']) if invoice_data.get('created_by') else None,
-                updated_at=self._parse_datetime(invoice_data.get('updated_at')) if invoice_data.get('updated_at') else datetime.utcnow(),
+                updated_at=self._parse_datetime(invoice_data.get('updated_at')) if invoice_data.get('updated_at') else datetime.now(),
                 updated_by=UUID(invoice_data['updated_by']) if invoice_data.get('updated_by') else None,
                 sent_at=self._parse_datetime(invoice_data.get('sent_at')) if invoice_data.get('sent_at') else None,
                 paid_at=self._parse_datetime(invoice_data.get('paid_at')) if invoice_data.get('paid_at') else None

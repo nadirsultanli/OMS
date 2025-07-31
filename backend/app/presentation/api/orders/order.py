@@ -383,7 +383,7 @@ async def get_order_by_number(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get order")
 
 
-@router.get("", response_model=OrderSummaryListResponse)
+@router.get("/", response_model=OrderSummaryListResponse)
 async def get_orders(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
