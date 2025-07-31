@@ -215,19 +215,32 @@ class TenantSubscriptionRepositoryImpl(TenantSubscriptionRepository):
             logger.info(f"Getting active subscription for tenant: {tenant_id}")
             
             client = get_supabase_client_sync()
-            result = client.table('tenant_subscriptions')\
-                .select('*')\
-                .eq('tenant_id', str(tenant_id))\
-                .in_('subscription_status', ['active', 'trial'])\
-                .is_('ended_at', 'null')\
-                .execute()
+            logger.info(f"Supabase client obtained successfully")
             
+            # Build query step by step for debugging
+            query = client.table('tenant_subscriptions').select('*')
+            logger.info(f"Initial query built")
+            
+            query = query.eq('tenant_id', str(tenant_id))
+            logger.info(f"Added tenant_id filter: {str(tenant_id)}")
+            
+            query = query.in_('subscription_status', ['active', 'trial'])
+            logger.info(f"Added subscription_status filter: ['active', 'trial']")
+            
+            query = query.is_('ended_at', 'null')
+            logger.info(f"Added ended_at filter: null")
+            
+            logger.info(f"Executing Supabase query...")
+            result = query.execute()
+            
+            logger.info(f"Supabase query completed. Result data: {result.data}")
             logger.info(f"Supabase query result: {len(result.data) if result.data else 0} records found")
             
             if not result.data:
                 logger.info(f"No active subscription found for tenant: {tenant_id}")
                 return None
             
+            logger.info(f"First subscription data: {result.data[0]}")
             subscription = self._map_dict_to_subscription_entity(result.data[0])
             logger.info(f"Successfully mapped subscription: {subscription.id}")
             return subscription
@@ -561,33 +574,49 @@ class TenantSubscriptionRepositoryImpl(TenantSubscriptionRepository):
         from uuid import UUID
         from datetime import datetime, date
         from decimal import Decimal
+        from app.infrastucture.logs.logger import default_logger as logger
         
-        return TenantSubscription(
-            id=UUID(sub_data['id']),
-            tenant_id=UUID(sub_data['tenant_id']),
-            plan_id=UUID(sub_data['plan_id']),
-            plan_name=sub_data['plan_name'],
-            plan_tier=PlanTier(sub_data['plan_tier']),
-            billing_cycle=BillingCycle(sub_data['billing_cycle']),
-            base_amount=Decimal(str(sub_data['base_amount'])),
-            currency=sub_data.get('currency', 'EUR'),
-            start_date=date.fromisoformat(sub_data['start_date'].split('T')[0]) if sub_data.get('start_date') else date.today(),
-            current_period_start=datetime.fromisoformat(sub_data['current_period_start'].replace('Z', '+00:00')) if sub_data.get('current_period_start') else datetime.utcnow(),
-            current_period_end=datetime.fromisoformat(sub_data['current_period_end'].replace('Z', '+00:00')) if sub_data.get('current_period_end') else datetime.utcnow(),
-            stripe_customer_id=sub_data.get('stripe_customer_id'),
-            stripe_subscription_id=sub_data.get('stripe_subscription_id'),
-            trial_start=datetime.fromisoformat(sub_data['trial_start'].replace('Z', '+00:00')) if sub_data.get('trial_start') else None,
-            trial_end=datetime.fromisoformat(sub_data['trial_end'].replace('Z', '+00:00')) if sub_data.get('trial_end') else None,
-            subscription_status=TenantSubscriptionStatus(sub_data.get('subscription_status', 'active')),
-            cancel_at_period_end=sub_data.get('cancel_at_period_end', False),
-            canceled_at=datetime.fromisoformat(sub_data['canceled_at'].replace('Z', '+00:00')) if sub_data.get('canceled_at') else None,
-            ended_at=datetime.fromisoformat(sub_data['ended_at'].replace('Z', '+00:00')) if sub_data.get('ended_at') else None,
-            current_usage=sub_data.get('current_usage', {}),
-            created_at=datetime.fromisoformat(sub_data['created_at'].replace('Z', '+00:00')) if sub_data.get('created_at') else datetime.utcnow(),
-            updated_at=datetime.fromisoformat(sub_data['updated_at'].replace('Z', '+00:00')) if sub_data.get('updated_at') else datetime.utcnow(),
-            created_by=UUID(sub_data['created_by']) if sub_data.get('created_by') else None,
-            updated_by=UUID(sub_data['updated_by']) if sub_data.get('updated_by') else None
-        )
+        try:
+            logger.info(f"Mapping subscription data: {sub_data}")
+            logger.info(f"Subscription status from DB: '{sub_data.get('subscription_status')}' (type: {type(sub_data.get('subscription_status'))})")
+            logger.info(f"Plan tier from DB: '{sub_data.get('plan_tier')}' (type: {type(sub_data.get('plan_tier'))})")
+            
+            subscription = TenantSubscription(
+                id=UUID(sub_data['id']),
+                tenant_id=UUID(sub_data['tenant_id']),
+                plan_id=UUID(sub_data['plan_id']),
+                plan_name=sub_data['plan_name'],
+                plan_tier=PlanTier(sub_data['plan_tier']),
+                billing_cycle=BillingCycle(sub_data['billing_cycle']),
+                base_amount=Decimal(str(sub_data['base_amount'])),
+                currency=sub_data.get('currency', 'EUR'),
+                start_date=date.fromisoformat(sub_data['start_date'].split('T')[0]) if sub_data.get('start_date') else date.today(),
+                current_period_start=datetime.fromisoformat(sub_data['current_period_start'].replace('Z', '+00:00')) if sub_data.get('current_period_start') else datetime.utcnow(),
+                current_period_end=datetime.fromisoformat(sub_data['current_period_end'].replace('Z', '+00:00')) if sub_data.get('current_period_end') else datetime.utcnow(),
+                stripe_customer_id=sub_data.get('stripe_customer_id'),
+                stripe_subscription_id=sub_data.get('stripe_subscription_id'),
+                trial_start=datetime.fromisoformat(sub_data['trial_start'].replace('Z', '+00:00')) if sub_data.get('trial_start') else None,
+                trial_end=datetime.fromisoformat(sub_data['trial_end'].replace('Z', '+00:00')) if sub_data.get('trial_end') else None,
+                subscription_status=TenantSubscriptionStatus(sub_data.get('subscription_status', 'active')),
+                cancel_at_period_end=sub_data.get('cancel_at_period_end', False),
+                canceled_at=datetime.fromisoformat(sub_data['canceled_at'].replace('Z', '+00:00')) if sub_data.get('canceled_at') else None,
+                ended_at=datetime.fromisoformat(sub_data['ended_at'].replace('Z', '+00:00')) if sub_data.get('ended_at') else None,
+                current_usage=sub_data.get('current_usage', {}),
+                created_at=datetime.fromisoformat(sub_data['created_at'].replace('Z', '+00:00')) if sub_data.get('created_at') else datetime.utcnow(),
+                updated_at=datetime.fromisoformat(sub_data['updated_at'].replace('Z', '+00:00')) if sub_data.get('updated_at') else datetime.utcnow(),
+                created_by=UUID(sub_data['created_by']) if sub_data.get('created_by') else None,
+                updated_by=UUID(sub_data['updated_by']) if sub_data.get('updated_by') else None
+            )
+            
+            logger.info(f"Successfully created subscription entity: {subscription.id}")
+            return subscription
+            
+        except Exception as e:
+            import traceback
+            logger.error(f"Error mapping subscription data: {str(e)}")
+            logger.error(f"Subscription data: {sub_data}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     def _map_subscription_model_to_entity(self, model: TenantSubscriptionModel) -> TenantSubscription:
         """Map subscription model to entity"""
