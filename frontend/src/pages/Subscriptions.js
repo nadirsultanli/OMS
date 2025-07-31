@@ -191,23 +191,54 @@ const Subscriptions = () => {
                 <div className="usage-summary">
                     <h2>Usage Summary</h2>
                     <div className="usage-grid">
-                        {Object.entries(usage.usage).map(([key, data]) => (
-                            <Card key={key} className="usage-card">
-                                <h4>{key.charAt(0).toUpperCase() + key.slice(1)}</h4>
-                                <div className="usage-stats">
-                                    <span className="usage-current">{data.current}</span>
-                                    <span className="usage-separator">/</span>
-                                    <span className="usage-limit">{data.limit}</span>
-                                </div>
-                                <div className="usage-bar">
-                                    <div 
-                                        className={`usage-progress usage-${getUsageColor(data.percentage)}`}
-                                        style={{ width: `${data.percentage}%` }}
-                                    ></div>
-                                </div>
-                                <span className="usage-percentage">{data.percentage.toFixed(1)}%</span>
-                            </Card>
-                        ))}
+                        {Object.entries(usage.usage).map(([key, data]) => {
+                            const getUsageLabel = (key) => {
+                                switch(key) {
+                                    case 'orders': return 'Orders This Month';
+                                    case 'drivers': return 'Active Drivers';
+                                    case 'storage': return 'Storage Used';
+                                    case 'api_requests': return 'API Requests Today';
+                                    default: return key.charAt(0).toUpperCase() + key.slice(1);
+                                }
+                            };
+                            
+                            const getUsageUnit = (key) => {
+                                switch(key) {
+                                    case 'storage': return 'GB';
+                                    case 'api_requests': return 'requests';
+                                    default: return '';
+                                }
+                            };
+                            
+                            const formatUsageValue = (value, key) => {
+                                switch(key) {
+                                    case 'api_requests':
+                                        return value.toLocaleString();
+                                    case 'storage':
+                                        return `${value} GB`;
+                                    default:
+                                        return value;
+                                }
+                            };
+                            
+                            return (
+                                <Card key={key} className="usage-card">
+                                    <h4>{getUsageLabel(key)}</h4>
+                                    <div className="usage-stats">
+                                        <span className="usage-current">{formatUsageValue(data.current, key)}</span>
+                                        <span className="usage-separator">/</span>
+                                        <span className="usage-limit">{formatUsageValue(data.limit, key)}</span>
+                                    </div>
+                                    <div className="usage-bar">
+                                        <div 
+                                            className={`usage-progress usage-${getUsageColor(data.percentage)}`}
+                                            style={{ width: `${data.percentage}%` }}
+                                        ></div>
+                                    </div>
+                                    <span className="usage-percentage">{data.percentage.toFixed(1)}%</span>
+                                </Card>
+                            );
+                        })}
                     </div>
                 </div>
             )}

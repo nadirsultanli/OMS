@@ -397,8 +397,9 @@ async def create_checkout_session(
         body = await request.json()
         invoice_id = body.get('invoice_id')
         amount = body.get('amount')
-        success_url = body.get('success_url', 'http://localhost:3000/invoices')
-        cancel_url = body.get('cancel_url', 'http://localhost:3000/invoices')
+        from app.core.config import settings
+        success_url = body.get('success_url', f'{settings.frontend_url}/invoices')
+        cancel_url = body.get('cancel_url', f'{settings.frontend_url}/invoices')
         
         if not invoice_id or not amount:
             raise HTTPException(

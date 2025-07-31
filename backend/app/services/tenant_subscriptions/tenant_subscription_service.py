@@ -710,8 +710,8 @@ class TenantSubscriptionService:
                     'quantity': 1,
                 }],
                 mode='subscription',
-                success_url=f"{settings.allowed_origins[0]}/subscriptions?success=true&session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"{settings.allowed_origins[0]}/subscriptions?canceled=true",
+                success_url=f"{settings.frontend_url}/subscriptions?success=true&session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{settings.frontend_url}/subscriptions?canceled=true",
                 metadata={
                     'tenant_id': str(current_subscription.tenant_id),
                     'subscription_id': str(current_subscription.id),

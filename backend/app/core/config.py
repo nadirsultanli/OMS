@@ -37,6 +37,9 @@ class Settings:
         # CORS settings
         self.allowed_origins: list = env_config("ALLOWED_ORIGINS", default="http://localhost:3000,http://localhost:8080", cast=lambda x: x.split(","))
         
+        # Frontend URL for redirects (production URL)
+        self.frontend_url: str = env_config("FRONTEND_URL", default=self.allowed_origins[0] if self.allowed_origins else "http://localhost:3000")
+        
         # Stripe settings
         self.stripe_secret_key: Optional[str] = env_config("STRIPE_SECRET_KEY", default=None)
         self.stripe_publishable_key: Optional[str] = env_config("STRIPE_PUBLISHABLE_KEY", default=None)
