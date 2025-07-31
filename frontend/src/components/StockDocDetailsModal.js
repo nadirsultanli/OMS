@@ -4,6 +4,7 @@ import vehicleService from '../services/vehicleService';
 import tripService from '../services/tripService';
 import productService from '../services/productService';
 import warehouseService from '../services/warehouseService';
+import authService from '../services/authService';
 import { extractErrorMessage } from '../utils/errorUtils';
 import './StockDocDetailsModal.css';
 
@@ -15,6 +16,7 @@ const StockDocDetailsModal = ({ isOpen, onClose, selectedDoc }) => {
   const [trips, setTrips] = useState({});
   const [vehicles, setVehicles] = useState({});
   const [warehouses, setWarehouses] = useState({});
+  const [extractedVehicleId, setExtractedVehicleId] = useState(null);
 
   useEffect(() => {
     if (isOpen && selectedDoc) {
@@ -40,6 +42,8 @@ const StockDocDetailsModal = ({ isOpen, onClose, selectedDoc }) => {
   
   const loadRelatedData = async (doc) => {
     try {
+      const tenantId = authService.getCurrentTenantId();
+      
       // Load products for variants
       if (doc.stock_doc_lines?.length > 0) {
         const variantIds = doc.stock_doc_lines
@@ -90,16 +94,19 @@ const StockDocDetailsModal = ({ isOpen, onClose, selectedDoc }) => {
           }
         }
         
-        // Extract vehicle ID from notes
-        const vehicleMatch = doc.notes.match(/vehicle\s+([a-f0-9-]+)/i);
+        // Extract vehicle ID from notes - improved regex to catch more patterns
+        const vehicleMatch = doc.notes.match(/(?:vehicle|truck|load\s+vehicle)\s+([a-f0-9-]+)/i);
         if (vehicleMatch) {
           const vehicleId = vehicleMatch[1];
+          setExtractedVehicleId(vehicleId);
           try {
-            const vehicles = await vehicleService.getVehicles();
-            if (vehicles.success) {
-              const vehicle = vehicles.data.results?.find(v => v.id === vehicleId);
-              if (vehicle) {
-                setVehicles(prev => ({ ...prev, [vehicleId]: vehicle }));
+            if (tenantId) {
+              const vehicles = await vehicleService.getVehicles(tenantId, { limit: 100 });
+              if (vehicles.success) {
+                const vehicle = vehicles.data.results?.find(v => v.id === vehicleId);
+                if (vehicle) {
+                  setVehicles(prev => ({ ...prev, [vehicleId]: vehicle }));
+                }
               }
             }
           } catch (err) {
@@ -109,17 +116,43 @@ const StockDocDetailsModal = ({ isOpen, onClose, selectedDoc }) => {
       }
       
       // Load warehouse names
-      const warehouseIds = [doc.from_warehouse_id, doc.to_warehouse_id].filter(id => id);
+      const warehouseIds = [doc.source_wh_id, doc.dest_wh_id].filter(id => id);
+      
       if (warehouseIds.length > 0) {
-        const warehousesResult = await warehouseService.getWarehouses();
-        if (warehousesResult.warehouses) {
-          const warehouseMap = {};
-          warehousesResult.warehouses.forEach(wh => {
-            if (warehouseIds.includes(wh.id)) {
-              warehouseMap[wh.id] = wh;
-            }
-          });
-          setWarehouses(warehouseMap);
+        try {
+          const warehousesResult = await warehouseService.getWarehouses();
+          
+          if (warehousesResult.success && warehousesResult.data?.warehouses) {
+            const warehouseMap = {};
+            warehousesResult.data.warehouses.forEach(wh => {
+              if (warehouseIds.includes(wh.id)) {
+                warehouseMap[wh.id] = wh;
+              }
+            });
+            setWarehouses(warehouseMap);
+          } else if (warehousesResult.warehouses) {
+            // Handle alternative response format
+            const warehouseMap = {};
+            warehousesResult.warehouses.forEach(wh => {
+              if (warehouseIds.includes(wh.id)) {
+                warehouseMap[wh.id] = wh;
+              }
+            });
+            setWarehouses(warehouseMap);
+          } else if (Array.isArray(warehousesResult)) {
+            // Handle direct array response
+            const warehouseMap = {};
+            warehousesResult.forEach(wh => {
+              if (warehouseIds.includes(wh.id)) {
+                warehouseMap[wh.id] = wh;
+              }
+            });
+            setWarehouses(warehouseMap);
+          } else {
+            console.warn('Unexpected warehouses response format:', warehousesResult);
+          }
+        } catch (err) {
+          console.error('Failed to load warehouses:', err);
         }
       }
     } catch (err) {
@@ -165,19 +198,35 @@ const StockDocDetailsModal = ({ isOpen, onClose, selectedDoc }) => {
   const getWarehouseName = (warehouseId) => {
     if (!warehouseId) return '-';
     const warehouse = warehouses[warehouseId];
-    return warehouse ? `${warehouse.code} - ${warehouse.name}` : 'Loading...';
+    if (warehouse) {
+      return `${warehouse.code} - ${warehouse.name}`;
+    }
+    // If warehouse is not found but we have the ID, show loading
+    return 'Loading...';
   };
 
   const getToEntityName = (doc) => {
     // For truck transfers, show truck information
     if (doc.doc_type === 'ISS_LOAD' || doc.doc_type === 'TRF_TRUCK' || doc.doc_type === 'LOAD_MOB') {
+      // First check if there's a direct vehicle_id on the document
       if (doc.vehicle_id && vehicles[doc.vehicle_id]) {
-        return `Truck: ${vehicles[doc.vehicle_id].plate_number}`;
+        return `Truck: ${vehicles[doc.vehicle_id].plate_number || vehicles[doc.vehicle_id].plate}`;
       }
+      
+      // Then check if we extracted a vehicle ID from notes
+      if (extractedVehicleId && vehicles[extractedVehicleId]) {
+        return `Truck: ${vehicles[extractedVehicleId].plate_number || vehicles[extractedVehicleId].plate}`;
+      }
+      
+      // If we have an extracted vehicle ID but no vehicle data yet, show loading
+      if (extractedVehicleId) {
+        return 'Truck: Loading...';
+      }
+      
       return 'Truck (Not specified)';
     }
     // For warehouse transfers and other types, show warehouse
-    return getWarehouseName(doc.to_warehouse_id);
+    return getWarehouseName(doc.dest_wh_id);
   };
 
   const getProductName = (line) => {
@@ -283,7 +332,7 @@ const StockDocDetailsModal = ({ isOpen, onClose, selectedDoc }) => {
                 <div className="detail-grid">
                   <div className="detail-item">
                     <label>From Warehouse:</label>
-                    <span>{getWarehouseName(selectedDoc.from_warehouse_id)}</span>
+                    <span>{getWarehouseName(selectedDoc.source_wh_id)}</span>
                   </div>
                   <div className="detail-item">
                     <label>To Entity:</label>

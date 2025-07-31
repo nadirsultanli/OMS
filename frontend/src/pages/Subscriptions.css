@@ -1,0 +1,444 @@
+.subscriptions-container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.subscriptions-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.subscriptions-header h1 {
+    font-size: 2.5rem;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.subscriptions-header p {
+    font-size: 1.1rem;
+    color: #6b7280;
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    gap: 1rem;
+}
+
+/* Current Subscription */
+.current-subscription {
+    margin-bottom: 3rem;
+}
+
+.current-subscription h2 {
+    font-size: 1.5rem;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.subscription-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.subscription-info {
+    padding: 1.5rem;
+}
+
+.subscription-details h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+}
+
+.subscription-price {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.subscription-dates {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.trial-info {
+    display: block;
+    margin-top: 0.5rem;
+    font-weight: 600;
+}
+
+/* Usage Summary */
+.usage-summary {
+    margin-bottom: 3rem;
+}
+
+.usage-summary h2 {
+    font-size: 1.5rem;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.usage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.usage-card {
+    padding: 1.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+}
+
+.usage-card h4 {
+    font-size: 1rem;
+    color: #374151;
+    margin-bottom: 1rem;
+    text-transform: capitalize;
+}
+
+.usage-stats {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.usage-current {
+    color: #059669;
+}
+
+.usage-separator {
+    margin: 0 0.5rem;
+    color: #6b7280;
+}
+
+.usage-limit {
+    color: #374151;
+}
+
+.usage-bar {
+    width: 100%;
+    height: 8px;
+    background-color: #f3f4f6;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.usage-progress {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.usage-success {
+    background-color: #10b981;
+}
+
+.usage-warning {
+    background-color: #f59e0b;
+}
+
+.usage-danger {
+    background-color: #ef4444;
+}
+
+.usage-percentage {
+    font-size: 0.875rem;
+    color: #6b7280;
+    text-align: center;
+    display: block;
+}
+
+/* Plans Section */
+.plans-section {
+    margin-bottom: 3rem;
+}
+
+.plans-section h2 {
+    font-size: 1.5rem;
+    color: #1f2937;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.plans-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+}
+
+.plan-card {
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 2rem;
+    background: white;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.plan-card:hover {
+    border-color: #3b82f6;
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.plan-card.selected {
+    border-color: #10b981;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+}
+
+.plan-card.selected::before {
+    content: "✓ Selected";
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: #10b981;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.plan-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.plan-header h3 {
+    font-size: 1.5rem;
+    color: #1f2937;
+    margin: 0;
+}
+
+.plan-tier {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+}
+
+.plan-price {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.price-amount {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.price-period {
+    font-size: 1rem;
+    color: #6b7280;
+}
+
+.plan-description {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.plan-features {
+    margin-bottom: 1.5rem;
+}
+
+.plan-features h4 {
+    font-size: 1rem;
+    color: #374151;
+    margin-bottom: 0.75rem;
+}
+
+.plan-features ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.plan-features li {
+    padding: 0.5rem 0;
+    color: #6b7280;
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+.plan-features li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #10b981;
+    font-weight: 600;
+}
+
+.plan-limits {
+    margin-bottom: 1.5rem;
+}
+
+.plan-limits h4 {
+    font-size: 1rem;
+    color: #374151;
+    margin-bottom: 0.75rem;
+}
+
+.limits-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.limit-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: #f9fafb;
+    border-radius: 6px;
+}
+
+.limit-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.limit-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.select-plan-btn {
+    width: 100%;
+    padding: 0.75rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+/* Subscribe Section */
+.subscribe-section {
+    margin-top: 2rem;
+}
+
+.subscribe-card {
+    text-align: center;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+    border: 2px solid #10b981;
+}
+
+.subscribe-card h3 {
+    font-size: 1.5rem;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.subscribe-card p {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+}
+
+.subscribe-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Upgrade Section */
+.upgrade-section {
+    margin-top: 2rem;
+}
+
+.upgrade-card {
+    text-align: center;
+    padding: 2rem;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid #f59e0b;
+}
+
+.upgrade-card h3 {
+    font-size: 1.5rem;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.upgrade-card p {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+}
+
+.upgrade-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .subscriptions-container {
+        padding: 1rem;
+    }
+    
+    .subscriptions-header h1 {
+        font-size: 2rem;
+    }
+    
+    .plans-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .usage-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .limits-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .subscribe-actions,
+    .upgrade-actions {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .plan-card {
+        padding: 1.5rem;
+    }
+    
+    .price-amount {
+        font-size: 2rem;
+    }
+    
+    .subscription-info {
+        padding: 1rem;
+    }
+} 

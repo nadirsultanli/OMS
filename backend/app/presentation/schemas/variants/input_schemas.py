@@ -30,6 +30,14 @@ class CreateVariantRequest(BaseModel):
     gross_weight_kg: Optional[Decimal] = None
     deposit: Optional[Decimal] = None
     inspection_date: Optional[date] = None
+    unit_weight_kg: Optional[Decimal] = None
+    unit_volume_m3: Optional[Decimal] = None
+    # Bulk gas specific attributes
+    unit_of_measure: str = "PCS"
+    is_variable_quantity: bool = False
+    propane_density_kg_per_liter: Optional[Decimal] = None
+    max_tank_capacity_kg: Optional[Decimal] = None
+    min_order_quantity: Optional[Decimal] = None
     active: bool = True
     created_by: Optional[str] = None
 
@@ -54,6 +62,14 @@ class UpdateVariantRequest(BaseModel):
     gross_weight_kg: Optional[Decimal] = None
     deposit: Optional[Decimal] = None
     inspection_date: Optional[date] = None
+    unit_weight_kg: Optional[Decimal] = None
+    unit_volume_m3: Optional[Decimal] = None
+    # Bulk gas specific attributes
+    unit_of_measure: Optional[str] = None
+    is_variable_quantity: Optional[bool] = None
+    propane_density_kg_per_liter: Optional[Decimal] = None
+    max_tank_capacity_kg: Optional[Decimal] = None
+    min_order_quantity: Optional[Decimal] = None
     active: Optional[bool] = None
 
 class CreateCylinderVariantsRequest(BaseModel):
@@ -126,3 +142,28 @@ class ExchangeCalculationRequest(BaseModel):
     gas_sku: str
     order_quantity: int
     returned_empties: int = 0
+
+class CreateBulkGasRequest(BaseModel):
+    """Request to create a bulk gas variant"""
+    tenant_id: str
+    product_id: str
+    sku: str = "PROP-BULK"
+    propane_density_kg_per_liter: Decimal = Decimal("0.51")
+    max_tank_capacity_kg: Optional[Decimal] = None
+    min_order_quantity: Optional[Decimal] = None
+    default_price: Optional[Decimal] = None
+    created_by: Optional[str] = None
+
+class BulkOrderValidationRequest(BaseModel):
+    """Request schema for bulk gas order validation"""
+    tenant_id: str
+    sku: str
+    quantity_kg: Decimal
+    tank_capacity_kg: Optional[Decimal] = None
+
+class BulkPricingCalculationRequest(BaseModel):
+    """Request schema for bulk gas pricing calculations"""
+    tenant_id: str
+    sku: str
+    quantity_kg: Decimal
+    unit_price_per_kg: Optional[Decimal] = None

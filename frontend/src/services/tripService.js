@@ -80,7 +80,25 @@ const tripService = {
   getTripWithStops: async (tripId) => {
     try {
       const response = await api.get(`/trips/${tripId}/with-stops`);
-      return { success: true, data: transformTripData(response.data) };
+      
+      // Handle new response structure with trip and stops
+      if (response.data.trip && response.data.stops) {
+        // Extract order IDs from stops for capacity calculation
+        const orderIds = response.data.stops
+          .filter(stop => stop.order_id)
+          .map(stop => stop.order_id);
+        
+        return { 
+          success: true, 
+          data: {
+            ...transformTripData(response.data.trip),
+            orders: orderIds.map(id => ({ id })) // Convert to order objects for compatibility
+          }
+        };
+      } else {
+        // Fallback to old structure
+        return { success: true, data: transformTripData(response.data) };
+      }
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
     }

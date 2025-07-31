@@ -21,6 +21,7 @@ import userService from '../services/userService';
 import authService from '../services/authService';
 import TripDetailView from './TripDetailView';
 import TripsTable from '../components/TripsTable';
+import LoadCapacityModal from '../components/LoadCapacityModal';
 import './Trips.css';
 import '../components/Table.css';
 
@@ -42,7 +43,9 @@ const Trips = () => {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showTripDetails, setShowTripDetails] = useState(false);
   const [showTripDetailView, setShowTripDetailView] = useState(false);
+  const [showCapacityModal, setShowCapacityModal] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
+  const [selectedTripOrders, setSelectedTripOrders] = useState([]);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
 
@@ -267,6 +270,38 @@ const Trips = () => {
     setShowTripDetailView(true);
   };
 
+  const handleCalculateCapacity = async (trip) => {
+    try {
+      setSelectedTrip(trip);
+      
+      console.log('Calculating capacity for trip:', trip);
+      console.log('Available vehicles:', vehicles);
+      console.log('Trip vehicle_id:', trip.vehicle_id);
+      
+      // Fetch trip orders for capacity calculation
+      const result = await tripService.getTripWithStops(trip.id);
+      if (result.success) {
+        const tripOrders = result.data.orders || [];
+        
+        // If we have order IDs, fetch the actual order data
+        if (tripOrders.length > 0 && tripOrders[0].id) {
+          // The orders are already in the correct format for capacity calculation
+          setSelectedTripOrders(tripOrders);
+        } else {
+          // Fallback: create order objects from IDs if needed
+          setSelectedTripOrders(tripOrders.map(orderId => ({ id: orderId })));
+        }
+        
+        setShowCapacityModal(true);
+      } else {
+        setMessage({ type: 'error', text: 'Failed to fetch trip orders for capacity calculation' });
+      }
+    } catch (error) {
+      console.error('Capacity calculation error:', error);
+      setMessage({ type: 'error', text: 'Failed to calculate capacity' });
+    }
+  };
+
   const handleStartTrip = async (tripId) => {
     try {
       const result = await tripService.startTrip(tripId, {
@@ -367,17 +402,18 @@ const Trips = () => {
           </select>
 
           <div className="custom-filter-dropdown">
-            <button
-              type="button"
+            <div 
               className="filter-select"
-              onClick={() => {
-                setIsVehicleDropdownOpen(!isVehicleDropdownOpen);
-                setVehicleFilterSearch('');
-              }}
+              onClick={() => setIsVehicleDropdownOpen(!isVehicleDropdownOpen)}
             >
-              {filters.vehicleId ? vehicles.find(v => v.id === filters.vehicleId)?.plate_number : 'All Vehicles'}
+              <span>
+                {filters.vehicleId 
+                  ? vehicles.find(v => v.id === filters.vehicleId)?.plate || 'Unknown Vehicle'
+                  : 'All Vehicles'
+                }
+              </span>
               <span className="dropdown-arrow">▼</span>
-            </button>
+            </div>
             
             {isVehicleDropdownOpen && (
               <div className="custom-dropdown-menu">
@@ -388,34 +424,34 @@ const Trips = () => {
                     placeholder="Search vehicles..."
                     value={vehicleFilterSearch}
                     onChange={(e) => setVehicleFilterSearch(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
                   />
                 </div>
                 <div className="dropdown-options">
-                  <div
+                  <div 
                     className={`dropdown-option ${!filters.vehicleId ? 'selected' : ''}`}
                     onClick={() => {
                       setFilters({ ...filters, vehicleId: '' });
                       setIsVehicleDropdownOpen(false);
+                      setVehicleFilterSearch('');
                     }}
                   >
                     All Vehicles
                   </div>
                   {vehicles
                     .filter(vehicle => 
-                      vehicle.plate_number.toLowerCase().includes(vehicleFilterSearch.toLowerCase())
+                      vehicle.plate?.toLowerCase().includes(vehicleFilterSearch.toLowerCase())
                     )
                     .map(vehicle => (
-                      <div
+                      <div 
                         key={vehicle.id}
                         className={`dropdown-option ${filters.vehicleId === vehicle.id ? 'selected' : ''}`}
                         onClick={() => {
                           setFilters({ ...filters, vehicleId: vehicle.id });
                           setIsVehicleDropdownOpen(false);
+                          setVehicleFilterSearch('');
                         }}
                       >
-                        {vehicle.plate_number} - {vehicle.vehicle_type}
+                        {vehicle.plate}
                       </div>
                     ))
                   }
@@ -425,17 +461,18 @@ const Trips = () => {
           </div>
 
           <div className="custom-filter-dropdown">
-            <button
-              type="button"
+            <div 
               className="filter-select"
-              onClick={() => {
-                setIsDriverDropdownOpen(!isDriverDropdownOpen);
-                setDriverFilterSearch('');
-              }}
+              onClick={() => setIsDriverDropdownOpen(!isDriverDropdownOpen)}
             >
-              {filters.driverId ? drivers.find(d => d.id === filters.driverId)?.name : 'All Drivers'}
+              <span>
+                {filters.driverId 
+                  ? drivers.find(d => d.id === filters.driverId)?.name || drivers.find(d => d.id === filters.driverId)?.full_name || 'Unknown Driver'
+                  : 'All Drivers'
+                }
+              </span>
               <span className="dropdown-arrow">▼</span>
-            </button>
+            </div>
             
             {isDriverDropdownOpen && (
               <div className="custom-dropdown-menu">
@@ -446,34 +483,34 @@ const Trips = () => {
                     placeholder="Search drivers..."
                     value={driverFilterSearch}
                     onChange={(e) => setDriverFilterSearch(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
                   />
                 </div>
                 <div className="dropdown-options">
-                  <div
+                  <div 
                     className={`dropdown-option ${!filters.driverId ? 'selected' : ''}`}
                     onClick={() => {
                       setFilters({ ...filters, driverId: '' });
                       setIsDriverDropdownOpen(false);
+                      setDriverFilterSearch('');
                     }}
                   >
                     All Drivers
                   </div>
                   {drivers
                     .filter(driver => 
-                      driver.name.toLowerCase().includes(driverFilterSearch.toLowerCase())
+                      (driver.name || driver.full_name || '').toLowerCase().includes(driverFilterSearch.toLowerCase())
                     )
                     .map(driver => (
-                      <div
+                      <div 
                         key={driver.id}
                         className={`dropdown-option ${filters.driverId === driver.id ? 'selected' : ''}`}
                         onClick={() => {
                           setFilters({ ...filters, driverId: driver.id });
                           setIsDriverDropdownOpen(false);
+                          setDriverFilterSearch('');
                         }}
                       >
-                        {driver.name}
+                        {driver.name || driver.full_name}
                       </div>
                     ))
                   }
@@ -481,22 +518,28 @@ const Trips = () => {
               </div>
             )}
           </div>
+        </div>
 
-          <input
-            type="date"
-            className="filter-input"
-            value={filters.dateFrom}
-            onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-            placeholder="From Date"
-          />
+        <div className="date-filters-row">
+          <div className="date-filter-group">
+            <label className="filter-label">Date From</label>
+            <input
+              type="date"
+              className="filter-input"
+              value={filters.dateFrom}
+              onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+            />
+          </div>
 
-          <input
-            type="date"
-            className="filter-input"
-            value={filters.dateTo}
-            onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-            placeholder="To Date"
-          />
+          <div className="date-filter-group">
+            <label className="filter-label">Date To</label>
+            <input
+              type="date"
+              className="filter-input"
+              value={filters.dateTo}
+              onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+            />
+          </div>
         </div>
       </div>
 
@@ -530,6 +573,7 @@ const Trips = () => {
           onCompleteTrip={handleCompleteTrip}
           onDeleteTrip={handleDeleteTrip}
           onStatusUpdate={handleStatusUpdate}
+          onCalculateCapacity={handleCalculateCapacity}
         />
       )}
 
@@ -614,6 +658,20 @@ const Trips = () => {
             setSelectedTrip(null);
             fetchTrips(); // Refresh trips after any changes
           }}
+        />
+      )}
+
+      {showCapacityModal && selectedTrip && (
+        <LoadCapacityModal
+          isOpen={showCapacityModal}
+          onClose={() => {
+            setShowCapacityModal(false);
+            setSelectedTrip(null);
+            setSelectedTripOrders([]);
+          }}
+          trip={selectedTrip}
+          orders={selectedTripOrders}
+          vehicle={vehicles.find(v => v.id === selectedTrip.vehicle_id)}
         />
       )}
     </div>

@@ -24,12 +24,14 @@ class SKUType(str, Enum):
     CONSUMABLE = "CONSUMABLE"  # Services like gas refill
     DEPOSIT = "DEPOSIT"  # Customer liability
     BUNDLE = "BUNDLE"  # Composite SKU that explodes to components
+    BULK = "BULK"  # Bulk gas in tanks (measured in kg)
 
 
 class StateAttribute(str, Enum):
-    """State attribute for ASSET type SKUs"""
+    """State attribute for ASSET and BULK type SKUs"""
     EMPTY = "EMPTY"  # Empty cylinder
     FULL = "FULL"  # Full cylinder
+    BULK = "BULK"  # Bulk gas state
 
 
 class RevenueCategory(str, Enum):
@@ -38,6 +40,7 @@ class RevenueCategory(str, Enum):
     DEPOSIT_LIABILITY = "DEPOSIT_LIABILITY"
     ASSET_SALE = "ASSET_SALE"
     SERVICE_FEE = "SERVICE_FEE"
+    BULK_GAS_REVENUE = "BULK_GAS_REVENUE"
 
 
 @dataclass
@@ -75,6 +78,15 @@ class Variant:
     gross_weight_kg: Optional[Decimal] = None
     deposit: Optional[Decimal] = None
     inspection_date: Optional[date] = None
+    # Unit weight and volume for capacity calculations
+    unit_weight_kg: Optional[Decimal] = None
+    unit_volume_m3: Optional[Decimal] = None
+    # Bulk gas specific attributes
+    unit_of_measure: str = "PCS"  # "PCS" for cylinders, "KG" for bulk gas
+    is_variable_quantity: bool = False  # True for bulk gas (decimal quantities allowed)
+    propane_density_kg_per_liter: Optional[Decimal] = None  # For bulk gas calculations
+    max_tank_capacity_kg: Optional[Decimal] = None  # Maximum tank capacity for bulk gas
+    min_order_quantity: Optional[Decimal] = None  # Minimum order quantity (for bulk gas)
     active: bool = True
     # Audit fields
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -97,6 +109,7 @@ class Variant:
             self.sku_type = SKUType.ASSET
             self.is_stock_item = True
             self.affects_inventory = True
+            self.unit_of_measure = "PCS"
             # Infer state from SKU or legacy status
             if "-EMPTY" in self.sku:
                 self.state_attr = StateAttribute.EMPTY
@@ -108,6 +121,7 @@ class Variant:
             self.sku_type = SKUType.CONSUMABLE
             self.is_stock_item = False
             self.affects_inventory = False
+            self.unit_of_measure = "PCS"
             # Infer exchange requirement from legacy scenario
             if self.scenario == ProductScenario.XCH:
                 self.requires_exchange = True
@@ -115,12 +129,24 @@ class Variant:
             self.sku_type = SKUType.DEPOSIT
             self.is_stock_item = False
             self.affects_inventory = False
+            self.unit_of_measure = "PCS"
         elif self.sku.startswith("KIT"):
             self.sku_type = SKUType.BUNDLE
             self.is_stock_item = False
             self.affects_inventory = False
+            self.unit_of_measure = "PCS"
             if not self.bundle_components:
                 self._infer_bundle_components()
+        elif self.sku.startswith("PROP-BULK") or "-BULK" in self.sku:
+            self.sku_type = SKUType.BULK
+            self.state_attr = StateAttribute.BULK
+            self.is_stock_item = True
+            self.affects_inventory = True
+            self.unit_of_measure = "KG"
+            self.is_variable_quantity = True
+            # Set default propane density (0.51 kg per liter)
+            if not self.propane_density_kg_per_liter:
+                self.propane_density_kg_per_liter = Decimal("0.51")
     
     def _infer_revenue_category(self):
         """Infer revenue category from SKU type"""
@@ -130,6 +156,8 @@ class Variant:
             self.revenue_category = RevenueCategory.DEPOSIT_LIABILITY
         elif self.sku_type == SKUType.ASSET:
             self.revenue_category = RevenueCategory.ASSET_SALE
+        elif self.sku_type == SKUType.BULK:
+            self.revenue_category = RevenueCategory.BULK_GAS_REVENUE
     
     def _infer_bundle_components(self):
         """Infer bundle components for KIT SKUs"""
@@ -172,6 +200,14 @@ class Variant:
         gross_weight_kg: Optional[Decimal] = None,
         deposit: Optional[Decimal] = None,
         inspection_date: Optional[date] = None,
+        unit_weight_kg: Optional[Decimal] = None,
+        unit_volume_m3: Optional[Decimal] = None,
+        # Bulk gas specific attributes
+        unit_of_measure: str = "PCS",
+        is_variable_quantity: bool = False,
+        propane_density_kg_per_liter: Optional[Decimal] = None,
+        max_tank_capacity_kg: Optional[Decimal] = None,
+        min_order_quantity: Optional[Decimal] = None,
         active: bool = True,
         created_by: Optional[UUID] = None,
     ) -> "Variant":
@@ -180,6 +216,9 @@ class Variant:
         
         # Auto-determine stock and inventory flags based on SKU type
         if sku_type == SKUType.ASSET:
+            is_stock_item = True
+            affects_inventory = True
+        elif sku_type == SKUType.BULK:
             is_stock_item = True
             affects_inventory = True
         elif sku_type in [SKUType.CONSUMABLE, SKUType.DEPOSIT, SKUType.BUNDLE]:
@@ -206,6 +245,13 @@ class Variant:
             gross_weight_kg=gross_weight_kg,
             deposit=deposit,
             inspection_date=inspection_date,
+            unit_weight_kg=unit_weight_kg,
+            unit_volume_m3=unit_volume_m3,
+            unit_of_measure=unit_of_measure,
+            is_variable_quantity=is_variable_quantity,
+            propane_density_kg_per_liter=propane_density_kg_per_liter,
+            max_tank_capacity_kg=max_tank_capacity_kg,
+            min_order_quantity=min_order_quantity,
             active=active,
             created_by=created_by,
         )
@@ -225,6 +271,10 @@ class Variant:
     def is_bundle(self) -> bool:
         """Check if this variant is a bundle"""
         return self.sku_type == SKUType.BUNDLE or (self.sku_type is None and self.sku.startswith("KIT"))
+    
+    def is_bulk_gas(self) -> bool:
+        """Check if this variant is bulk gas"""
+        return self.sku_type == SKUType.BULK or (self.sku_type is None and ("PROP-BULK" in self.sku or "-BULK" in self.sku))
     
     def needs_exchange(self) -> bool:
         """
@@ -416,6 +466,77 @@ class Variant:
         
         return relationships
     
+    def calculate_bulk_volume_from_kg(self, quantity_kg: Decimal) -> Optional[Decimal]:
+        """
+        Calculate volume in liters from kg quantity for bulk gas.
+        Uses propane density: 0.51 kg/L at standard temperature.
+        """
+        if not self.is_bulk_gas() or not self.propane_density_kg_per_liter:
+            return None
+        
+        return quantity_kg / self.propane_density_kg_per_liter
+    
+    def calculate_bulk_kg_from_volume(self, volume_liters: Decimal) -> Optional[Decimal]:
+        """
+        Calculate kg quantity from volume in liters for bulk gas.
+        Uses propane density: 0.51 kg/L at standard temperature.
+        """
+        if not self.is_bulk_gas() or not self.propane_density_kg_per_liter:
+            return None
+        
+        return volume_liters * self.propane_density_kg_per_liter
+    
+    def validate_bulk_order_quantity(self, requested_kg: Decimal) -> Dict[str, any]:
+        """
+        Validate bulk gas order quantity against tank capacity and minimum order.
+        
+        Returns validation result with any errors or warnings.
+        """
+        if not self.is_bulk_gas():
+            return {"valid": False, "error": "Not a bulk gas variant"}
+        
+        result = {"valid": True, "warnings": [], "errors": []}
+        
+        # Check minimum order quantity
+        if self.min_order_quantity and requested_kg < self.min_order_quantity:
+            result["errors"].append(f"Minimum order quantity is {self.min_order_quantity} kg")
+            result["valid"] = False
+        
+        # Check maximum tank capacity
+        if self.max_tank_capacity_kg and requested_kg > self.max_tank_capacity_kg:
+            result["errors"].append(f"Exceeds maximum tank capacity of {self.max_tank_capacity_kg} kg")
+            result["valid"] = False
+        
+        # Warning for very small quantities
+        if requested_kg < Decimal("50"):
+            result["warnings"].append("Small quantity order - consider delivery economics")
+        
+        # Calculate volume for reference
+        volume_liters = self.calculate_bulk_volume_from_kg(requested_kg)
+        if volume_liters:
+            result["volume_liters"] = float(volume_liters)
+        
+        return result
+    
+    def get_bulk_pricing_info(self, quantity_kg: Decimal) -> Dict[str, any]:
+        """
+        Get bulk gas pricing information including volume calculations.
+        """
+        if not self.is_bulk_gas():
+            return {}
+        
+        volume_liters = self.calculate_bulk_volume_from_kg(quantity_kg)
+        
+        return {
+            "quantity_kg": float(quantity_kg),
+            "volume_liters": float(volume_liters) if volume_liters else None,
+            "unit_of_measure": self.unit_of_measure,
+            "density_kg_per_liter": float(self.propane_density_kg_per_liter) if self.propane_density_kg_per_liter else None,
+            "is_variable_quantity": self.is_variable_quantity,
+            "min_order_quantity": float(self.min_order_quantity) if self.min_order_quantity else None,
+            "max_tank_capacity": float(self.max_tank_capacity_kg) if self.max_tank_capacity_kg else None
+        }
+    
     def validate_business_rules(self) -> List[str]:
         """
         Validate business rules for this variant.
@@ -452,6 +573,24 @@ class Variant:
         if self.is_physical_item() and not self.inspection_date:
             errors.append("Physical cylinders should have inspection_date for safety compliance")
         
+        # Rule 7: Bulk gas specific validations
+        if self.is_bulk_gas():
+            if self.unit_of_measure != "KG":
+                errors.append("Bulk gas variants must use 'KG' as unit of measure")
+            if not self.is_variable_quantity:
+                errors.append("Bulk gas variants must allow variable quantities")
+            if not self.propane_density_kg_per_liter:
+                errors.append("Bulk gas variants must have propane density specified")
+            if self.max_tank_capacity_kg and self.min_order_quantity and self.min_order_quantity > self.max_tank_capacity_kg:
+                errors.append("Minimum order quantity cannot exceed maximum tank capacity")
+        
+        # Rule 8: Non-bulk variants should not have bulk-specific attributes
+        if not self.is_bulk_gas():
+            if self.propane_density_kg_per_liter:
+                errors.append("Only bulk gas variants should have propane density")
+            if self.max_tank_capacity_kg:
+                errors.append("Only bulk gas variants should have tank capacity")
+        
         return errors
     
     def to_dict(self) -> dict:
@@ -477,6 +616,13 @@ class Variant:
             "gross_weight_kg": float(self.gross_weight_kg) if self.gross_weight_kg else None,
             "deposit": float(self.deposit) if self.deposit else None,
             "inspection_date": self.inspection_date.isoformat() if self.inspection_date else None,
+            "unit_weight_kg": float(self.unit_weight_kg) if self.unit_weight_kg else None,
+            "unit_volume_m3": float(self.unit_volume_m3) if self.unit_volume_m3 else None,
+            "unit_of_measure": self.unit_of_measure,
+            "is_variable_quantity": self.is_variable_quantity,
+            "propane_density_kg_per_liter": float(self.propane_density_kg_per_liter) if self.propane_density_kg_per_liter else None,
+            "max_tank_capacity_kg": float(self.max_tank_capacity_kg) if self.max_tank_capacity_kg else None,
+            "min_order_quantity": float(self.min_order_quantity) if self.min_order_quantity else None,
             "active": self.active,
             "created_at": self.created_at.isoformat(),
             "created_by": str(self.created_by) if self.created_by else None,

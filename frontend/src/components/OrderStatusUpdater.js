@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import orderService from '../services/orderService';
 import authService from '../services/authService';
+import './OrderStatusUpdater.css';
 
 const OrderStatusUpdater = ({ order, onStatusUpdate, disabled = false }) => {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -160,20 +161,7 @@ const OrderStatusUpdater = ({ order, onStatusUpdate, disabled = false }) => {
         </div>
       )}
 
-      <style jsx>{`
-        .order-status-updater {
-          position: relative;
-          display: inline-block;
-        }
-        
-        .status-update-btn:hover {
-          background-color: #f8f9fa !important;
-        }
-        
-        .status-dropdown button:hover {
-          background-color: #f8f9fa !important;
-        }
-      `}</style>
+
     </div>
   );
 };

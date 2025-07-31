@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import vehicleWarehouseService from '../services/vehicleWarehouseService';
 import stockReservationService from '../services/stockReservationService';
+import deliveryService from '../services/deliveryService';
 import WarehouseInventorySelector from './WarehouseInventorySelector';
 import './VehicleLoader.css';
 
@@ -187,6 +188,35 @@ const VehicleLoader = ({
       console.error('Error validating capacity:', error);
     } finally {
       setValidating(false);
+    }
+  };
+
+  // Validate mixed load capacity for orders (if trip has orders)
+  const validateMixedLoadCapacity = async (orderIds) => {
+    if (!orderIds || orderIds.length === 0) return null;
+
+    try {
+      const result = await deliveryService.calculateTotalCapacityForOrders(orderIds);
+      
+      if (result.success) {
+        // Check if total weight exceeds vehicle capacity
+        const exceedsCapacity = result.data.totalWeight > vehicle.capacity_kg;
+        
+        return {
+          ...result.data,
+          exceedsCapacity,
+          isValid: !exceedsCapacity,
+          warning: exceedsCapacity ? 
+            `Total order weight (${result.data.weightFormatted}) exceeds vehicle capacity (${vehicle.capacity_kg} kg)` :
+            null
+        };
+      } else {
+        console.error('Mixed load capacity validation failed:', result.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error validating mixed load capacity:', error);
+      return null;
     }
   };
 

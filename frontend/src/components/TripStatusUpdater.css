@@ -1,0 +1,24 @@
+.trip-status-updater {
+  position: relative;
+  display: inline-block;
+}
+
+.trip-status-badge.clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.loading-dots {
+  margin-left: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 20% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.status-dropdown button:hover {
+  background-color: #f8f9fa !important;
+} 

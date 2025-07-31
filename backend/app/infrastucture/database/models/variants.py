@@ -42,6 +42,15 @@ class Variant(Base):
     gross_weight_kg = Column(Numeric, nullable=True)
     deposit = Column(Numeric, nullable=True)
     inspection_date = Column(Date, nullable=True)
+    unit_weight_kg = Column(Numeric, nullable=True)
+    unit_volume_m3 = Column(Numeric, nullable=True)
+    
+    # Bulk gas specific attributes
+    is_variable_quantity = Column(Boolean, nullable=False, default=False)
+    propane_density_kg_per_liter = Column(Numeric, nullable=True)
+    max_tank_capacity_kg = Column(Numeric, nullable=True)
+    min_order_quantity = Column(Numeric, nullable=True)
+    
     active = Column(Boolean, nullable=True, server_default="true")
     
     # Audit fields

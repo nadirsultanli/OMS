@@ -2,7 +2,7 @@ from datetime import date
 from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, Depends, status, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.domain.entities.invoices import InvoiceStatus
 from app.domain.entities.users import User
@@ -28,6 +28,56 @@ from app.infrastucture.logs.logger import get_logger
 
 logger = get_logger("invoices_api")
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
+
+
+@router.get("/available-orders", response_model=List[dict])
+async def get_orders_ready_for_invoicing(
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    invoice_service: InvoiceService = Depends(get_invoice_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Get orders that are ready for invoicing (delivered or closed)"""
+    logger.info(
+        "Getting orders ready for invoicing",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        limit=limit,
+        offset=offset
+    )
+    
+    try:
+        # Get orders that are delivered or closed
+        orders = await invoice_service.get_orders_ready_for_invoicing(
+            user=current_user,
+            limit=limit,
+            offset=offset
+        )
+        
+        # Convert to simple dict format for frontend
+        order_list = []
+        for order in orders:
+            order_list.append({
+                'id': str(order.id),
+                'order_no': order.order_no,
+                'customer_id': str(order.customer_id),
+                'total_amount': float(order.total_amount),
+                'status': order.order_status.value
+            })
+        
+        return order_list
+        
+    except Exception as e:
+        import traceback
+        logger.error(
+            "Failed to get orders ready for invoicing",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            error=str(e),
+            error_type=type(e).__name__,
+            traceback=traceback.format_exc()
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.post("/from-order", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
@@ -92,18 +142,20 @@ async def generate_invoice_from_order(
         )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
+        import traceback
         logger.error(
             "Failed to generate invoice from order",
             user_id=str(current_user.id),
             tenant_id=str(current_user.tenant_id),
             order_id=request.order_id,
             error=str(e),
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
+            traceback=traceback.format_exc()
         )
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@router.post("/", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
 async def create_manual_invoice(
     request: CreateInvoiceRequest,
     invoice_service: InvoiceService = Depends(get_invoice_service),
@@ -156,7 +208,101 @@ async def create_manual_invoice(
             error=str(e),
             error_type=type(e).__name__
         )
+        # Return the actual error for debugging
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("", response_model=InvoiceListResponse)
+async def search_invoices(
+    customer_name: Optional[str] = Query(None, description="Filter by customer name"),
+    invoice_no: Optional[str] = Query(None, description="Filter by invoice number"),
+    invoice_status: Optional[InvoiceStatus] = Query(None, description="Filter by status"),
+    from_date: Optional[date] = Query(None, description="Filter from date"),
+    to_date: Optional[date] = Query(None, description="Filter to date"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    invoice_service: InvoiceService = Depends(get_invoice_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Search invoices with filters"""
+    try:
+        invoices = await invoice_service.search_invoices(
+            user=current_user,
+            customer_name=customer_name,
+            invoice_no=invoice_no,
+            status=invoice_status,
+            from_date=from_date,
+            to_date=to_date,
+            limit=limit,
+            offset=offset
+        )
+        
+        return InvoiceListResponse(
+            invoices=[InvoiceResponse(**invoice.to_dict()) for invoice in invoices],
+            total=len(invoices),
+            limit=limit,
+            offset=offset
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to search invoices",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            error=str(e),
+            error_type=type(e).__name__
+        )
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+@router.get("/{invoice_id}/pdf")
+async def download_invoice_pdf(
+    invoice_id: str,
+    invoice_service: InvoiceService = Depends(get_invoice_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Download invoice as PDF"""
+    logger.info(
+        "Downloading invoice PDF",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        invoice_id=invoice_id
+    )
+    
+    try:
+        # Get the invoice
+        invoice = await invoice_service.get_invoice_by_id(current_user, invoice_id)
+        
+        # Generate PDF content (placeholder - you'll need to implement actual PDF generation)
+        pdf_content = await invoice_service.generate_invoice_pdf(invoice)
+        
+        logger.info(
+            "Invoice PDF generated successfully",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            invoice_id=invoice_id
+        )
+        
+        # Return PDF as response
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=invoice-{invoice.invoice_no}.pdf"
+            }
+        )
+        
+    except InvoiceNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to generate invoice PDF",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            invoice_id=invoice_id,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate PDF")
 
 
 @router.get("/{invoice_id}", response_model=InvoiceResponse)
@@ -171,48 +317,6 @@ async def get_invoice(
         return InvoiceResponse(**invoice.to_dict())
     except InvoiceNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
-
-@router.get("/", response_model=InvoiceListResponse)
-async def search_invoices(
-    customer_name: Optional[str] = Query(None, description="Filter by customer name"),
-    invoice_no: Optional[str] = Query(None, description="Filter by invoice number"),
-    status: Optional[InvoiceStatus] = Query(None, description="Filter by status"),
-    from_date: Optional[date] = Query(None, description="Filter from date"),
-    to_date: Optional[date] = Query(None, description="Filter to date"),
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-    invoice_service: InvoiceService = Depends(get_invoice_service),
-    current_user: User = Depends(get_current_user)
-):
-    """Search invoices with filters"""
-    try:
-        invoices = await invoice_service.search_invoices(
-            user=current_user,
-            customer_name=customer_name,
-            invoice_no=invoice_no,
-            status=status,
-            from_date=from_date,
-            to_date=to_date,
-            limit=limit,
-            offset=offset
-        )
-        
-        return InvoiceListResponse(
-            invoices=[InvoiceResponse(**invoice.to_dict()) for invoice in invoices],
-            total=len(invoices),  # Would need proper count in production
-            limit=limit,
-            offset=offset
-        )
-    except Exception as e:
-        logger.error(
-            "Failed to search invoices",
-            user_id=str(current_user.id),
-            tenant_id=str(current_user.tenant_id),
-            error=str(e),
-            error_type=type(e).__name__
-        )
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.post("/{invoice_id}/send", response_model=InvoiceResponse)

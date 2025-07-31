@@ -122,7 +122,7 @@
 }
 
 /* ============================================
-   FILTERS SECTION - IMPROVED SPACING
+   FILTERS SECTION - IMPROVED SPACING & SYMMETRY
    ============================================ */
 .filters-section {
   background: white;
@@ -227,7 +227,55 @@
 }
 
 /* ============================================
-   TABLE CONTAINER - PROFESSIONAL DESIGN
+   DATE FILTERS ROW - IMPROVED LAYOUT
+   ============================================ */
+.date-filters-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.date-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.date-filter-group .filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.date-filter-group .filter-input {
+  height: 44px;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  transition: all 0.3s ease;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%236b7280' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  color: #374151;
+}
+
+.date-filter-group .filter-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* ============================================
+   TABLE CONTAINER - FULL WIDTH DESIGN
    ============================================ */
 .trips-table-container {
   background: white;
@@ -236,116 +284,44 @@
   overflow: hidden;
   margin-bottom: 24px;
   width: 100%;
+  max-width: 100%;
 }
 
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
-  max-height: none;
   -webkit-overflow-scrolling: touch;
-  /* Removed duplicate border-radius and box-shadow */
 }
 
-/* Fix table layout */
+/* Use shared table layout from Table.css */
 .trips-table {
-  width: 100%;
-  table-layout: auto; /* Changed from fixed to auto for better alignment */
-  border-collapse: collapse;
-  font-size: 14px;
-  position: relative;
-  min-width: 1200px; /* Increased minimum width */
+  min-width: 1000px;
 }
 
-/* Table column widths - Updated for better distribution */
-.trip-number-col { width: 15%; min-width: 150px; }
-.date-col { width: 12%; min-width: 120px; }
-.vehicle-col { width: 18%; min-width: 180px; }
-.driver-col { width: 15%; min-width: 150px; }
-.status-col { width: 12%; min-width: 120px; }
-.orders-col { width: 8%; min-width: 80px; }
-.load-col { width: 10%; min-width: 100px; }
-.actions-col { width: 10%; min-width: 120px; }
+/* Column width coordination with shared Table.css */
+.trips-table th.trip-number-col { width: 16%; }
+.trips-table th.date-col { width: 12%; }
+.trips-table th.vehicle-col { width: 14%; }
+.trips-table th.driver-col { width: 14%; }
+.trips-table th.status-col { width: 12%; }
+.trips-table th.orders-col { width: 8%; text-align: center; }
+.trips-table th.load-col { width: 10%; text-align: right; }
+.trips-table th.actions-col { width: 14%; text-align: center; }
 
-/* Table cell styles */
-.trip-number-cell, 
-.date-cell, 
-.vehicle-cell, 
-.driver-cell, 
-.status-cell, 
-.orders-cell, 
-.load-cell, 
-.actions-cell {
-  padding: 16px;
-  vertical-align: middle;
-  height: 56px; /* Fixed height for consistency */
-  box-sizing: border-box;
-  overflow: hidden;
+/* Cell alignment coordination with shared Table.css */
+.trips-table td.orders-cell { text-align: center; }
+.trips-table td.load-cell { text-align: right; }
+.trips-table td.actions-cell { text-align: center; }
+
+/* Push action buttons to the right */
+.trips-table td.actions-cell > div {
+  justify-content: flex-end !important;
+  padding-right: 12px;
 }
 
-.trip-number-cell { text-align: left; }
-.date-cell { text-align: left; }
-.vehicle-cell { text-align: left; }
-.driver-cell { text-align: left; }
-.status-cell { text-align: left; }
-.orders-cell { text-align: center; }
-.load-cell { text-align: right; }
-.actions-cell { 
-  text-align: center; 
-  padding: 8px 16px !important;
-  min-width: 120px;
-}
+/* Table headers use shared styles from Table.css */
 
-/* Table header styles */
-.trips-table th {
-  padding: 16px;
-  text-align: left;
-  font-weight: 600;
-  color: #1f2937;
-  border-bottom: 2px solid #e5e7eb;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  background: #f8f9fb;
-  box-sizing: border-box;
-}
-
-/* Header alignment to match cell alignment */
-.trips-table th.trip-number-col { text-align: left; }
-.trips-table th.date-col { text-align: left; }
-.trips-table th.vehicle-col { text-align: left; }
-.trips-table th.driver-col { text-align: left; }
-.trips-table th.status-col { text-align: left; }
-.trips-table th.orders-col { text-align: center; }
-.trips-table th.load-col { text-align: right; }
-.trips-table th.actions-col { 
-  text-align: center; 
-  min-width: 120px;
-}
-
-/* Table row styles */
-.trip-row {
-  transition: all 0.2s ease;
-  cursor: pointer;
-  position: relative;
-}
-
-.trip-row:hover {
-  background-color: #f9fafb;
-  transform: translateX(2px);
-}
-
-.trip-row:hover::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  background: linear-gradient(to right, #3b82f6, transparent);
-  opacity: 0.03;
-  pointer-events: none;
-}
+/* Table rows use shared styles from Table.css */
 
 /* Cell content styles */
 .trip-info {
@@ -457,168 +433,14 @@
   width: 100%;
 }
 
-.trips-table thead {
-  background: #f8f9fb;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
+/* Table base styles handled by shared Table.css */
 
-.trips-table th {
-  font-weight: 600;
-  color: #1f2937;
-  border-bottom: 2px solid #e5e7eb;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  background: #f8f9fb;
-  box-sizing: border-box;
-}
+/* Cell content styles are already defined above */
 
-/* Simplified and consistent table styling - remove specific column rules as they're handled inline */
-.trips-table td {
-  border-bottom: 1px solid #f3f4f6;
-  color: #374151;
-  background: white;
-  white-space: nowrap;
-  box-sizing: border-box;
-}
-
-/* Actions Column Specific */
-.trips-table .actions {
-  display: flex;
-  gap: 4px;
-  justify-content: center;
-  align-items: center;
-  white-space: nowrap;
-  height: 100%;
-  min-height: 32px;
-  flex-wrap: nowrap;
-}
-
-.trips-table tbody tr {
-  transition: all 0.2s ease;
-  cursor: pointer;
-  position: relative;
-}
-
-.trips-table tbody tr::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  background: linear-gradient(to right, transparent, transparent);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.trips-table tbody tr:hover {
-  background-color: #f9fafb;
-  transform: translateX(2px);
-}
-
-.trips-table tbody tr:hover::before {
-  background: linear-gradient(to right, #3b82f6, transparent);
-  opacity: 0.03;
-}
-
-.trips-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* Table Cell Specific Styling */
-.trip-info,
-.vehicle-info,
-.driver-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 500;
-  height: 100%;
-}
-
-.trip-info svg,
-.vehicle-info svg,
-.driver-info svg {
-  color: #6b7280;
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-}
-
-.trip-number {
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.trip-info span {
-  color: #2563eb;
-  font-weight: 600;
-}
-
-.date-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.date-info > div:first-child {
-  font-weight: 500;
-  color: #1f2937;
-}
-
-.time-text {
-  font-size: 12px;
-  color: #6b7280;
-  font-weight: 400;
-}
-
-.orders-count {
-  text-align: center;
-  display: flex;
-  justify-content: center;
-}
-
-.count-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 10px;
-  background: #eff6ff;
-  color: #1e40af;
-  border-radius: 16px;
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid #dbeafe;
-}
-
-.load-info {
-  font-weight: 600;
-  color: #059669;
-  white-space: nowrap;
-}
-
-.actions {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  justify-content: center;
-  min-width: 150px;
-  white-space: nowrap;
-}
-
-/* Text Overflow Handling */
-.text-truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* ============================================
+   ACTIONS COLUMN - CLEAN LAYOUT
+   ============================================ */
+/* Action buttons use shared styles from Table.css */
 
 /* ============================================
    BADGES - TRIP STATUS STYLING
@@ -637,49 +459,17 @@
   line-height: 1.2;
   border: 1px solid transparent;
   transition: all 0.2s ease;
+  margin: 0;
 }
 
 .status-badge svg {
   width: 14px;
   height: 14px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
-/* Status-specific styles */
-.status-badge.draft {
-  background: #f3f4f6;
-  color: #6b7280;
-  border-color: #e5e7eb;
-}
-
-.status-badge.planned {
-  background: #eff6ff;
-  color: #2563eb;
-  border-color: #dbeafe;
-}
-
-.status-badge.loaded {
-  background: #fef3c7;
-  color: #d97706;
-  border-color: #fde68a;
-}
-
-.status-badge.in_progress {
-  background: #dbeafe;
-  color: #1e40af;
-  border-color: #bfdbfe;
-}
-
-.status-badge.completed {
-  background: #d1fae5;
-  color: #059669;
-  border-color: #a7f3d0;
-}
-
-.status-badge.cancelled {
-  background: #fee2e2;
-  color: #dc2626;
-  border-color: #fecaca;
-}
+/* Status badges use shared styles from Table.css */
 
 /* ============================================
    LOADING & EMPTY STATES
@@ -737,102 +527,7 @@
   line-height: 1.5;
 }
 
-/* ============================================
-   ACTION BUTTONS - PROFESSIONAL STYLING
-   ============================================ */
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 14px;
-  font-weight: 500;
-  position: relative;
-  flex-shrink: 0;
-  margin: 0;
-  padding: 0;
-}
-
-.action-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.action-btn svg {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-
-.action-btn.view {
-  background: #eff6ff;
-  color: #2563eb;
-  border-color: #dbeafe;
-}
-
-.action-btn.view:hover:not(:disabled) {
-  background: #dbeafe;
-  border-color: #bfdbfe;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
-}
-
-.action-btn.edit {
-  background: #fffbeb;
-  color: #d97706;
-  border-color: #fef3c7;
-}
-
-.action-btn.edit:hover:not(:disabled) {
-  background: #fef3c7;
-  border-color: #fde68a;
-  box-shadow: 0 1px 3px rgba(217, 119, 6, 0.2);
-}
-
-.action-btn.start {
-  background: #ecfdf5;
-  color: #059669;
-  border-color: #d1fae5;
-}
-
-.action-btn.start:hover:not(:disabled) {
-  background: #d1fae5;
-  border-color: #a7f3d0;
-  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.2);
-}
-
-.action-btn.complete {
-  background: #f3f4f6;
-  color: #6b7280;
-  border-color: #e5e7eb;
-}
-
-.action-btn.complete:hover:not(:disabled) {
-  background: #e5e7eb;
-  border-color: #d1d5db;
-  box-shadow: 0 1px 3px rgba(107, 114, 128, 0.2);
-}
-
-.action-btn.delete {
-  background: #fef2f2;
-  color: #dc2626;
-  border-color: #fee2e2;
-}
-
-.action-btn.delete:hover:not(:disabled) {
-  background: #fee2e2;
-  border-color: #fecaca;
-  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.2);
-}
+/* Action button colors use shared styles from Table.css */
 
 .action-btn.secondary {
   background: #f9fafb;
@@ -1429,15 +1124,15 @@
     min-width: 900px;
   }
   
-  /* Adjust column widths for smaller screens */
-  .trip-number-col { width: 14%; min-width: 140px; }
-  .date-col { width: 11%; min-width: 110px; }
-  .vehicle-col { width: 17%; min-width: 160px; }
-  .driver-col { width: 14%; min-width: 140px; }
-  .status-col { width: 11%; min-width: 110px; }
-  .orders-col { width: 8%; min-width: 70px; }
-  .load-col { width: 10%; min-width: 90px; }
-  .actions-col { width: 15%; min-width: 100px; }
+  /* Responsive column widths - maintain proportions */
+  .trips-table th.trip-number-col { width: 16%; min-width: 140px; }
+  .trips-table th.date-col { width: 12%; min-width: 100px; }
+  .trips-table th.vehicle-col { width: 14%; min-width: 120px; }
+  .trips-table th.driver-col { width: 14%; min-width: 120px; }
+  .trips-table th.status-col { width: 12%; min-width: 100px; }
+  .trips-table th.orders-col { width: 8%; min-width: 60px; }
+  .trips-table th.load-col { width: 10%; min-width: 80px; }
+  .trips-table th.actions-col { width: 14%; min-width: 120px; }
 }
 
 @media (max-width: 768px) {
@@ -1521,15 +1216,15 @@
     padding: 12px 8px;
   }
   
-  /* Further reduce column widths for mobile */
-  .trip-number-col { width: 14%; min-width: 120px; }
-  .date-col { width: 10%; min-width: 90px; }
-  .vehicle-col { width: 16%; min-width: 120px; }
-  .driver-col { width: 14%; min-width: 110px; }
-  .status-col { width: 11%; min-width: 90px; }
-  .orders-col { width: 8%; min-width: 60px; }
-  .load-col { width: 10%; min-width: 80px; }
-  .actions-col { width: 17%; min-width: 80px; }
+  /* Mobile column widths - maintain table structure */
+  .trips-table th.trip-number-col { min-width: 120px; }
+  .trips-table th.date-col { min-width: 80px; }
+  .trips-table th.vehicle-col { min-width: 100px; }
+  .trips-table th.driver-col { min-width: 100px; }
+  .trips-table th.status-col { min-width: 80px; }
+  .trips-table th.orders-col { min-width: 50px; }
+  .trips-table th.load-col { min-width: 70px; }
+  .trips-table th.actions-col { min-width: 80px; }
 
   .form-actions,
   .trip-actions {

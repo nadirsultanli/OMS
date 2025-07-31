@@ -7,7 +7,8 @@ import {
   Edit2,
   Play,
   CheckCircle,
-  Trash2
+  Trash2,
+  Scale
 } from 'lucide-react';
 import TripStatusUpdater from './TripStatusUpdater';
 import './Table.css';
@@ -22,7 +23,8 @@ const TripsTable = ({
   onStartTrip,
   onCompleteTrip,
   onDeleteTrip,
-  onStatusUpdate
+  onStatusUpdate,
+  onCalculateCapacity
 }) => {
   // Helper functions
   const formatDate = (dateString) => {
@@ -44,9 +46,18 @@ const TripsTable = ({
     });
   };
 
+  const formatTimeFromCreated = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const getVehicleName = (vehicleId) => {
     const vehicle = vehicles.find(v => v.id === vehicleId);
-    return vehicle ? vehicle.plate_number : 'Not assigned';
+    return vehicle ? vehicle.plate : 'Not assigned';
   };
 
   const getDriverName = (driverId) => {
@@ -108,7 +119,7 @@ const TripsTable = ({
             {trips.map((trip) => {
               const vehicleName = getVehicleName(trip.vehicle_id);
               const driverName = getDriverName(trip.driver_id);
-              const tripNumber = trip.trip_number || `TRIP-${trip.id?.slice(0, 8)}`;
+              const tripNumber = trip.trip_no || `TRIP-${trip.id?.slice(0, 8)}`;
               
               return (
                 <tr key={trip.id} className="trip-row">
@@ -127,7 +138,7 @@ const TripsTable = ({
                   <td className="date-cell">
                     <div className="date-info">
                       <div className="date-main">{formatDate(trip.planned_date)}</div>
-                      <div className="time-text">{formatTime(trip.planned_date)}</div>
+                      <div className="time-text">{formatTimeFromCreated(trip.created_at)}</div>
                     </div>
                   </td>
                   
@@ -167,7 +178,7 @@ const TripsTable = ({
                   {/* Load */}
                   <td className="load-cell">
                     <div className="load-info">
-                      {trip.gross_loaded_kg || 0} kg
+                      {parseFloat(trip.gross_loaded_kg || 0).toFixed(1)} kg
                     </div>
                   </td>
                   
@@ -183,8 +194,19 @@ const TripsTable = ({
                         <Package size={16} />
                       </button>
                       
+                      {/* Calculate Capacity button - for trips with orders */}
+                      {trip.order_count > 0 && (
+                        <button 
+                          className="action-btn capacity"
+                          onClick={() => onCalculateCapacity && onCalculateCapacity(trip)}
+                          title="Calculate Load Capacity"
+                        >
+                          <Scale size={16} />
+                        </button>
+                      )}
+                      
                       {/* Edit button - for draft/planned */}
-                      {(trip.status?.toLowerCase() === 'draft' || trip.status?.toLowerCase() === 'planned') && (
+                      {(trip.trip_status?.toLowerCase() === 'draft' || trip.trip_status?.toLowerCase() === 'planned') && (
                         <button 
                           className="action-btn edit"
                           onClick={() => onEditTrip && onEditTrip(trip)}
@@ -195,7 +217,7 @@ const TripsTable = ({
                       )}
                       
                       {/* Start button - for loaded */}
-                      {trip.status?.toLowerCase() === 'loaded' && (
+                      {trip.trip_status?.toLowerCase() === 'loaded' && (
                         <button 
                           className="action-btn start"
                           onClick={() => onStartTrip && onStartTrip(trip.id)}
@@ -206,7 +228,7 @@ const TripsTable = ({
                       )}
                       
                       {/* Complete button - for in_progress */}
-                      {trip.status?.toLowerCase() === 'in_progress' && (
+                      {trip.trip_status?.toLowerCase() === 'in_progress' && (
                         <button 
                           className="action-btn complete"
                           onClick={() => onCompleteTrip && onCompleteTrip(trip.id)}
@@ -216,8 +238,8 @@ const TripsTable = ({
                         </button>
                       )}
                       
-                      {/* Delete button - for draft only */}
-                      {trip.status?.toLowerCase() === 'draft' && (
+                      {/* Delete button - for draft and planned */}
+                      {(trip.trip_status?.toLowerCase() === 'draft' || trip.trip_status?.toLowerCase() === 'planned') && (
                         <button 
                           className="action-btn delete"
                           onClick={() => onDeleteTrip && onDeleteTrip(trip.id)}

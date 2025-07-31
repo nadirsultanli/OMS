@@ -22,6 +22,11 @@ import StockLevels from './pages/StockLevels';
 import StockDocuments from './pages/StockDocuments';
 import Trips from './pages/Trips';
 import Vehicles from './pages/Vehicles';
+import Audit from './pages/Audit';
+import Invoices from './pages/Invoices';
+import Payments from './pages/Payments';
+import Subscriptions from './pages/Subscriptions';
+
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import authService from './services/authService';
@@ -229,6 +234,48 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/audit"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Audit />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/invoices"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Invoices />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payments"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Payments />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Subscriptions />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+
           <Route 
             path="/price-lists" 
             element={
@@ -259,7 +306,9 @@ function App() {
           {/* Default redirect */}
           <Route 
             path="/" 
-            element={<AuthCallback />}
+            element={
+              <Navigate to={authService.isAuthenticated() ? "/dashboard" : "/login"} replace />
+            }
           />
           
           {/* Catch all route */}

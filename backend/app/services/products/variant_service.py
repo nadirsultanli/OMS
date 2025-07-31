@@ -47,6 +47,12 @@ class VariantService:
         gross_weight_kg: Optional[float] = None,
         deposit: Optional[float] = None,
         inspection_date: Optional[date] = None,
+        # Bulk gas specific attributes
+        unit_of_measure: str = "PCS",
+        is_variable_quantity: bool = False,
+        propane_density_kg_per_liter: Optional[float] = None,
+        max_tank_capacity_kg: Optional[float] = None,
+        min_order_quantity: Optional[float] = None,
         active: bool = True,
         created_by: Optional[str] = None
     ) -> Variant:
@@ -360,3 +366,122 @@ class VariantService:
             UUID(variant_id), 
             deleted_by or UUID("00000000-0000-0000-0000-000000000000")
         )
+    
+    # Bulk Gas Methods
+    async def create_bulk_gas_variant(
+        self,
+        tenant_id: str,
+        product_id: str,
+        sku: str = "PROP-BULK",
+        propane_density_kg_per_liter: float = 0.51,
+        max_tank_capacity_kg: Optional[float] = None,
+        min_order_quantity: Optional[float] = None,
+        default_price: Optional[float] = None,
+        created_by: Optional[UUID] = None
+    ) -> Variant:
+        """
+        Create a bulk gas variant (PROP-BULK).
+        
+        Args:
+            tenant_id: Tenant ID
+            product_id: Product ID
+            sku: SKU code (defaults to PROP-BULK)
+            propane_density_kg_per_liter: Propane density (defaults to 0.51)
+            max_tank_capacity_kg: Maximum tank capacity in kg
+            min_order_quantity: Minimum order quantity in kg
+            default_price: Default price per kg
+            created_by: User who created the variant
+        
+        Returns:
+            Created bulk gas variant
+        """
+        from decimal import Decimal
+        
+        # Check if variant already exists
+        existing = await self.get_variant_by_sku(UUID(tenant_id), sku)
+        if existing:
+            raise VariantAlreadyExistsError(f"Variant with SKU {sku} already exists")
+        
+        # Create bulk gas variant
+        variant = Variant.create(
+            tenant_id=UUID(tenant_id),
+            product_id=UUID(product_id),
+            sku=sku,
+            sku_type=SKUType.BULK,
+            state_attr=StateAttribute.BULK,
+            is_stock_item=True,
+            affects_inventory=True,
+            revenue_category=RevenueCategory.BULK_GAS_REVENUE,
+            unit_of_measure="KG",
+            is_variable_quantity=True,
+            propane_density_kg_per_liter=Decimal(str(propane_density_kg_per_liter)),
+            max_tank_capacity_kg=Decimal(str(max_tank_capacity_kg)) if max_tank_capacity_kg else None,
+            min_order_quantity=Decimal(str(min_order_quantity)) if min_order_quantity else None,
+            default_price=Decimal(str(default_price)) if default_price else None,
+            created_by=created_by
+        )
+        
+        return await self.variant_repository.create_variant(variant)
+    
+    async def get_bulk_gas_variants(self, tenant_id: UUID) -> List[Variant]:
+        """Get all bulk gas variants for a tenant"""
+        all_variants = await self.variant_repository.get_variants_by_tenant(tenant_id)
+        return [v for v in all_variants if v.is_bulk_gas()]
+    
+    async def validate_bulk_gas_order(
+        self, 
+        tenant_id: str, 
+        sku: str, 
+        quantity_kg: float,
+        tank_capacity_kg: Optional[float] = None
+    ) -> dict:
+        """
+        Validate a bulk gas order against business rules.
+        
+        Args:
+            tenant_id: Tenant ID
+            sku: Bulk gas SKU
+            quantity_kg: Requested quantity in kg
+            tank_capacity_kg: Customer's tank capacity in kg
+        
+        Returns:
+            Validation result with errors/warnings
+        """
+        from decimal import Decimal
+        
+        variant = await self.get_variant_by_sku(UUID(tenant_id), sku)
+        if not variant:
+            raise VariantNotFoundError(f"Variant {sku} not found")
+        
+        if not variant.is_bulk_gas():
+            return {"valid": False, "error": "Not a bulk gas variant"}
+        
+        return variant.validate_bulk_order_quantity(Decimal(str(quantity_kg)))
+    
+    async def calculate_bulk_gas_pricing(
+        self, 
+        tenant_id: str, 
+        sku: str, 
+        quantity_kg: float
+    ) -> dict:
+        """
+        Calculate bulk gas pricing information including volume conversions.
+        
+        Args:
+            tenant_id: Tenant ID
+            sku: Bulk gas SKU
+            quantity_kg: Quantity in kg
+        
+        Returns:
+            Pricing and volume information
+        """
+        from decimal import Decimal
+        
+        variant = await self.get_variant_by_sku(UUID(tenant_id), sku)
+        if not variant:
+            raise VariantNotFoundError(f"Variant {sku} not found")
+        
+        if not variant.is_bulk_gas():
+            return {}
+        
+        return variant.get_bulk_pricing_info(Decimal(str(quantity_kg)))

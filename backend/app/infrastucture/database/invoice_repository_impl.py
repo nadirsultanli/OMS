@@ -1,47 +1,80 @@
 from typing import List, Optional
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime
 
 from app.domain.repositories.invoice_repository import InvoiceRepository
 from app.domain.entities.invoices import Invoice, InvoiceStatus, InvoiceType
-from app.infrastucture.database.repositories.supabase_repository import SupabaseRepository
+from app.infrastucture.database.connection import get_database
+from app.infrastucture.logs.logger import default_logger
 
 
-class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
+class InvoiceRepositoryImpl(InvoiceRepository):
     """Implementation of InvoiceRepository using Supabase"""
 
     def __init__(self):
-        super().__init__()
         self.table_name = "invoices"
         self.lines_table_name = "invoice_lines"
+        self.supabase = get_database()
+        self.logger = default_logger
 
     async def create_invoice(self, invoice: Invoice) -> Invoice:
         """Create a new invoice"""
         try:
             # Insert invoice
-            invoice_data = invoice.to_dict()
-            lines_data = invoice_data.pop('invoice_lines', [])
+            invoice_data = invoice.to_dict(include_lines=False)
+            lines_data = []
             
-            result = await self.supabase.table(self.table_name).insert(invoice_data).execute()
+            # Extract invoice lines data
+            self.logger.info(f"Processing {len(invoice.invoice_lines)} invoice lines")
+            for line in invoice.invoice_lines:
+                line_data = {
+                    'id': str(line.id),
+                    'invoice_id': str(invoice.id),
+                    'order_line_id': str(line.order_line_id) if line.order_line_id else None,
+                    'description': line.description,
+                    'quantity': float(line.quantity),
+                    'unit_price': float(line.unit_price),
+                    'line_total': float(line.line_total),
+                    'tax_code': line.tax_code,
+                    'tax_rate': float(line.tax_rate),
+                    'tax_amount': float(line.tax_amount),
+                    'net_amount': float(line.net_amount),
+                    'gross_amount': float(line.gross_amount),
+                    'product_code': line.product_code,
+                    'variant_sku': line.variant_sku,
+                    'component_type': line.component_type
+                }
+                lines_data.append(line_data)
+                self.logger.info(f"Processed line: {line.description} - Qty: {line.quantity}, Price: {line.unit_price}")
+            
+            result = self.supabase.table(self.table_name).insert(invoice_data).execute()
             
             if not result.data:
                 raise Exception("Failed to create invoice")
             
             # Insert lines if any
             if lines_data:
-                await self.supabase.table(self.lines_table_name).insert(lines_data).execute()
+                self.logger.info(f"Inserting {len(lines_data)} invoice lines")
+                try:
+                    result = self.supabase.table(self.lines_table_name).insert(lines_data).execute()
+                    self.logger.info(f"Successfully inserted {len(lines_data)} invoice lines")
+                except Exception as e:
+                    self.logger.error(f"Failed to insert invoice lines: {str(e)}")
+                    raise
+            else:
+                self.logger.info("No invoice lines to insert")
             
             return await self.get_invoice_by_id(str(invoice.id), invoice.tenant_id)
             
         except Exception as e:
-            self.logger.error(f"Error creating invoice: {e}")
-            raise
+            self.logger.error(f"Error creating invoice: {str(e)}")
+            raise Exception(f"Failed to create invoice: {str(e)}")
 
     async def get_invoice_by_id(self, invoice_id: str, tenant_id: UUID) -> Optional[Invoice]:
         """Get invoice by ID"""
         try:
             # Get invoice
-            invoice_result = await self.supabase.table(self.table_name)\
+            invoice_result = self.supabase.table(self.table_name)\
                 .select("*")\
                 .eq("id", invoice_id)\
                 .eq("tenant_id", str(tenant_id))\
@@ -53,10 +86,10 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
             invoice_data = invoice_result.data[0]
             
             # Get lines
-            lines_result = await self.supabase.table(self.lines_table_name)\
+            lines_result = self.supabase.table(self.lines_table_name)\
                 .select("*")\
                 .eq("invoice_id", invoice_id)\
-                .order("line_number")\
+                .order("created_at")\
                 .execute()
             
             invoice_data['invoice_lines'] = lines_result.data or []
@@ -64,13 +97,12 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
             return self._dict_to_invoice(invoice_data)
             
         except Exception as e:
-            self.logger.error(f"Error getting invoice by ID: {e}")
             return None
 
     async def get_invoice_by_number(self, invoice_no: str, tenant_id: UUID) -> Optional[Invoice]:
         """Get invoice by invoice number"""
         try:
-            result = await self.supabase.table(self.table_name)\
+            result = self.supabase.table(self.table_name)\
                 .select("*")\
                 .eq("invoice_no", invoice_no)\
                 .eq("tenant_id", str(tenant_id))\
@@ -82,10 +114,10 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
             invoice_data = result.data[0]
             
             # Get lines
-            lines_result = await self.supabase.table(self.lines_table_name)\
+            lines_result = self.supabase.table(self.lines_table_name)\
                 .select("*")\
                 .eq("invoice_id", invoice_data['id'])\
-                .order("line_number")\
+                .order("created_at")\
                 .execute()
             
             invoice_data['invoice_lines'] = lines_result.data or []
@@ -93,37 +125,124 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
             return self._dict_to_invoice(invoice_data)
             
         except Exception as e:
-            self.logger.error(f"Error getting invoice by number: {e}")
             return None
 
-    async def get_invoice_by_order(self, order_id: str, tenant_id: UUID) -> Optional[Invoice]:
-        """Get invoice by order ID"""
+    async def get_invoices_by_order(self, order_id: UUID, tenant_id: UUID) -> List[Invoice]:
+        """Get invoices by order ID"""
         try:
-            result = await self.supabase.table(self.table_name)\
+            result = self.supabase.table(self.table_name)\
                 .select("*")\
-                .eq("order_id", order_id)\
+                .eq("order_id", str(order_id))\
                 .eq("tenant_id", str(tenant_id))\
                 .execute()
             
             if not result.data:
-                return None
+                return []
             
-            invoice_data = result.data[0]
+            # Get all invoice IDs
+            invoice_ids = [invoice_data['id'] for invoice_data in result.data]
             
-            # Get lines
-            lines_result = await self.supabase.table(self.lines_table_name)\
+            # Fetch all invoice lines in a single query (avoid N+1)
+            lines_result = self.supabase.table(self.lines_table_name)\
                 .select("*")\
-                .eq("invoice_id", invoice_data['id'])\
-                .order("line_number")\
+                .in_("invoice_id", invoice_ids)\
+                .order("invoice_id, created_at")\
                 .execute()
             
-            invoice_data['invoice_lines'] = lines_result.data or []
+            # Group lines by invoice_id
+            lines_by_invoice = {}
+            for line_data in lines_result.data or []:
+                invoice_id = line_data['invoice_id']
+                if invoice_id not in lines_by_invoice:
+                    lines_by_invoice[invoice_id] = []
+                lines_by_invoice[invoice_id].append(line_data)
             
-            return self._dict_to_invoice(invoice_data)
+            # Build invoices with their lines
+            invoices = []
+            for invoice_data in result.data:
+                invoice_data['invoice_lines'] = lines_by_invoice.get(invoice_data['id'], [])
+                invoices.append(self._dict_to_invoice(invoice_data))
+            
+            return invoices
             
         except Exception as e:
-            self.logger.error(f"Error getting invoice by order: {e}")
-            return None
+            self.logger.error(f"Error getting invoices by order ID: {e}")
+            return []
+
+    async def get_invoices_by_status(
+        self, 
+        status: InvoiceStatus, 
+        tenant_id: UUID,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[Invoice]:
+        """Get invoices by status"""
+        try:
+            result = self.supabase.table(self.table_name)\
+                .select("*")\
+                .eq("status", status.value)\
+                .eq("tenant_id", str(tenant_id))\
+                .range(offset, offset + limit - 1)\
+                .order("created_at", desc=True)\
+                .execute()
+            
+            if not result.data:
+                return []
+            
+            # Get all invoice IDs
+            invoice_ids = [invoice_data['id'] for invoice_data in result.data]
+            
+            # Fetch all invoice lines in a single query (avoid N+1)
+            lines_result = self.supabase.table(self.lines_table_name)\
+                .select("*")\
+                .in_("invoice_id", invoice_ids)\
+                .order("invoice_id, created_at")\
+                .execute()
+            
+            # Group lines by invoice_id
+            lines_by_invoice = {}
+            for line_data in lines_result.data or []:
+                invoice_id = line_data['invoice_id']
+                if invoice_id not in lines_by_invoice:
+                    lines_by_invoice[invoice_id] = []
+                lines_by_invoice[invoice_id].append(line_data)
+            
+            # Build invoices with their lines
+            invoices = []
+            for invoice_data in result.data:
+                invoice_data['invoice_lines'] = lines_by_invoice.get(invoice_data['id'], [])
+                invoices.append(self._dict_to_invoice(invoice_data))
+            
+            return invoices
+            
+        except Exception as e:
+            self.logger.error(f"Error getting invoices by status: {e}")
+            return []
+
+    async def count_invoices(
+        self,
+        tenant_id: UUID,
+        status: Optional[InvoiceStatus] = None,
+        customer_id: Optional[UUID] = None
+    ) -> int:
+        """Count invoices with optional filters"""
+        try:
+            query = self.supabase.table(self.table_name)\
+                .select("id", count="exact")\
+                .eq("tenant_id", str(tenant_id))
+            
+            if status:
+                query = query.eq("status", status.value)
+            
+            if customer_id:
+                query = query.eq("customer_id", str(customer_id))
+            
+            result = query.execute()
+            return result.count or 0
+            
+        except Exception as e:
+            self.logger.error(f"Error counting invoices: {e}")
+            return 0
 
     async def update_invoice(self, invoice_id: str, invoice: Invoice) -> Invoice:
         """Update an existing invoice"""
@@ -132,19 +251,19 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
             lines_data = invoice_data.pop('invoice_lines', [])
             
             # Update invoice
-            await self.supabase.table(self.table_name)\
+            self.supabase.table(self.table_name)\
                 .update(invoice_data)\
                 .eq("id", invoice_id)\
                 .execute()
             
             # Delete existing lines and insert new ones
-            await self.supabase.table(self.lines_table_name)\
+            self.supabase.table(self.lines_table_name)\
                 .delete()\
                 .eq("invoice_id", invoice_id)\
                 .execute()
             
             if lines_data:
-                await self.supabase.table(self.lines_table_name).insert(lines_data).execute()
+                self.supabase.table(self.lines_table_name).insert(lines_data).execute()
             
             return await self.get_invoice_by_id(invoice_id, invoice.tenant_id)
             
@@ -156,13 +275,13 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
         """Delete an invoice"""
         try:
             # Delete lines first
-            await self.supabase.table(self.lines_table_name)\
+            self.supabase.table(self.lines_table_name)\
                 .delete()\
                 .eq("invoice_id", invoice_id)\
                 .execute()
             
             # Delete invoice
-            result = await self.supabase.table(self.table_name)\
+            result = self.supabase.table(self.table_name)\
                 .delete()\
                 .eq("id", invoice_id)\
                 .eq("tenant_id", str(tenant_id))\
@@ -183,7 +302,7 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
     ) -> List[Invoice]:
         """Get invoices for a customer"""
         try:
-            result = await self.supabase.table(self.table_name)\
+            result = self.supabase.table(self.table_name)\
                 .select("*")\
                 .eq("tenant_id", str(tenant_id))\
                 .eq("customer_id", str(customer_id))\
@@ -194,10 +313,10 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
             invoices = []
             for invoice_data in result.data or []:
                 # Get lines for each invoice
-                lines_result = await self.supabase.table(self.lines_table_name)\
+                lines_result = self.supabase.table(self.lines_table_name)\
                     .select("*")\
                     .eq("invoice_id", invoice_data['id'])\
-                    .order("line_number")\
+                    .order("created_at")\
                     .execute()
                 
                 invoice_data['invoice_lines'] = lines_result.data or []
@@ -222,46 +341,106 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
     ) -> List[Invoice]:
         """Search invoices with filters"""
         try:
-            query = self.supabase.table(self.table_name).select("*")
+            # Add debugging
+            self.logger.info(
+                "Searching invoices in repository",
+                tenant_id=str(tenant_id),
+                tenant_id_type=type(tenant_id).__name__,
+                customer_name=customer_name,
+                invoice_no=invoice_no,
+                status=status.value if status else None,
+                limit=limit,
+                offset=offset
+            )
             
-            # Apply filters
-            query = query.eq("tenant_id", str(tenant_id))
-            
-            if customer_name:
-                query = query.ilike("customer_name", f"%{customer_name}%")
-            
-            if invoice_no:
-                query = query.ilike("invoice_no", f"%{invoice_no}%")
-            
-            if status:
-                query = query.eq("invoice_status", status.value)
-            
-            if from_date:
-                query = query.gte("invoice_date", from_date.isoformat())
-            
-            if to_date:
-                query = query.lte("invoice_date", to_date.isoformat())
-            
-            # Apply pagination and ordering
-            query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
-            
-            result = await query.execute()
-            
-            invoices = []
-            for invoice_data in result.data or []:
-                lines_result = await self.supabase.table(self.lines_table_name)\
-                    .select("*")\
-                    .eq("invoice_id", invoice_data['id'])\
-                    .order("line_number")\
-                    .execute()
+            def build_query(client):
+                query = client.table(self.table_name).select("*")
                 
-                invoice_data['invoice_lines'] = lines_result.data or []
-                invoices.append(self._dict_to_invoice(invoice_data))
+                # Apply filters
+                query = query.eq("tenant_id", str(tenant_id))
+                
+                if customer_name:
+                    query = query.ilike("customer_name", f"%{customer_name}%")
+                
+                if invoice_no:
+                    query = query.ilike("invoice_no", f"%{invoice_no}%")
+                
+                if status:
+                    query = query.eq("invoice_status", status.value)
+                
+                if from_date:
+                    query = query.gte("invoice_date", from_date.isoformat())
+                
+                if to_date:
+                    query = query.lte("invoice_date", to_date.isoformat())
+                
+                # Apply pagination and ordering
+                query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
+                
+                return query
+            
+            result = build_query(self.supabase).execute()
+            
+            self.logger.info(
+                "Database query completed",
+                tenant_id=str(tenant_id),
+                result_count=len(result.data) if result.data else 0,
+                has_data=bool(result.data)
+            )
+            
+            if not result.data:
+                return []
+            
+            # Get all invoice IDs
+            invoice_ids = [invoice_data['id'] for invoice_data in result.data]
+            
+            # Fetch all invoice lines in a single query (avoid N+1)
+            lines_result = self.supabase.table(self.lines_table_name)\
+                .select("*")\
+                .in_("invoice_id", invoice_ids)\
+                .order("invoice_id, created_at")\
+                .execute()
+            
+            # Group lines by invoice_id
+            lines_by_invoice = {}
+            for line_data in lines_result.data or []:
+                invoice_id = line_data['invoice_id']
+                if invoice_id not in lines_by_invoice:
+                    lines_by_invoice[invoice_id] = []
+                lines_by_invoice[invoice_id].append(line_data)
+            
+            # Build invoices with their lines
+            invoices = []
+            for invoice_data in result.data:
+                try:
+                    invoice_data['invoice_lines'] = lines_by_invoice.get(invoice_data['id'], [])
+                    invoice = self._dict_to_invoice(invoice_data)
+                    invoices.append(invoice)
+                except Exception as e:
+                    self.logger.error(
+                        "Error converting invoice data",
+                        invoice_id=invoice_data.get('id'),
+                        error=str(e),
+                        error_type=type(e).__name__,
+                        invoice_data_keys=list(invoice_data.keys())
+                    )
+                    continue
+            
+            self.logger.info(
+                "Invoice search completed",
+                tenant_id=str(tenant_id),
+                final_count=len(invoices)
+            )
             
             return invoices
             
         except Exception as e:
-            self.logger.error(f"Error searching invoices: {e}")
+            self.logger.error(
+                "Error searching invoices",
+                tenant_id=str(tenant_id),
+                error=str(e),
+                error_type=type(e).__name__
+            )
             return []
 
     async def get_overdue_invoices(
@@ -276,7 +455,7 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
             if not as_of_date:
                 as_of_date = date.today()
             
-            result = await self.supabase.table(self.table_name)\
+            result = self.supabase.table(self.table_name)\
                 .select("*")\
                 .eq("tenant_id", str(tenant_id))\
                 .in_("invoice_status", [InvoiceStatus.SENT.value, InvoiceStatus.PARTIAL_PAID.value])\
@@ -285,15 +464,31 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
                 .range(offset, offset + limit - 1)\
                 .execute()
             
+            if not result.data:
+                return []
+            
+            # Get all invoice IDs
+            invoice_ids = [invoice_data['id'] for invoice_data in result.data]
+            
+            # Fetch all invoice lines in a single query (avoid N+1)
+            lines_result = self.supabase.table(self.lines_table_name)\
+                .select("*")\
+                .in_("invoice_id", invoice_ids)\
+                .order("invoice_id, created_at")\
+                .execute()
+            
+            # Group lines by invoice_id
+            lines_by_invoice = {}
+            for line_data in lines_result.data or []:
+                invoice_id = line_data['invoice_id']
+                if invoice_id not in lines_by_invoice:
+                    lines_by_invoice[invoice_id] = []
+                lines_by_invoice[invoice_id].append(line_data)
+            
+            # Build invoices with their lines
             invoices = []
-            for invoice_data in result.data or []:
-                lines_result = await self.supabase.table(self.lines_table_name)\
-                    .select("*")\
-                    .eq("invoice_id", invoice_data['id'])\
-                    .order("line_number")\
-                    .execute()
-                
-                invoice_data['invoice_lines'] = lines_result.data or []
+            for invoice_data in result.data:
+                invoice_data['invoice_lines'] = lines_by_invoice.get(invoice_data['id'], [])
                 invoices.append(self._dict_to_invoice(invoice_data))
             
             return invoices
@@ -306,7 +501,7 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
         """Generate next invoice number"""
         try:
             # Get the highest number for this prefix and tenant
-            result = await self.supabase.table(self.table_name)\
+            result = self.supabase.table(self.table_name)\
                 .select("invoice_no")\
                 .eq("tenant_id", str(tenant_id))\
                 .like("invoice_no", f"{prefix}%")\
@@ -349,7 +544,7 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
             if invoice_type:
                 query = query.eq("invoice_type", invoice_type.value)
             
-            result = await query.execute()
+            result = query.execute()
             return result.count or 0
             
         except Exception as e:
@@ -388,19 +583,97 @@ class InvoiceRepositoryImpl(InvoiceRepository, SupabaseRepository):
                 'total_invoices': 0
             }
 
+    def _parse_datetime(self, datetime_str: str) -> datetime:
+        """Parse datetime string with proper error handling for various formats"""
+        if not datetime_str:
+            return datetime.now()
+        
+        try:
+            # Handle 'Z' suffix
+            if datetime_str.endswith('Z'):
+                datetime_str = datetime_str.replace('Z', '+00:00')
+            
+            # Try direct parsing first
+            return datetime.fromisoformat(datetime_str)
+        except ValueError:
+            try:
+                # Try parsing with dateutil for more flexible parsing
+                from dateutil import parser
+                return parser.parse(datetime_str)
+            except:
+                # Fallback to current time if all parsing fails
+                self.logger.warning(f"Failed to parse datetime: {datetime_str}, using current time")
+                return datetime.now()
+
     def _dict_to_invoice(self, invoice_data: dict) -> Invoice:
         """Convert dictionary to Invoice entity"""
-        # This is a simplified conversion - in a real implementation,
-        # you would properly map all fields and handle type conversions
-        from app.domain.entities.invoices import InvoiceLine
+        from app.domain.entities.invoices import InvoiceLine, InvoiceStatus, InvoiceType
+        from datetime import datetime
+        from uuid import UUID
+        from decimal import Decimal
         
         # Convert lines
         lines = []
         for line_data in invoice_data.get('invoice_lines', []):
-            line = InvoiceLine(**line_data)
-            lines.append(line)
+            try:
+                line = InvoiceLine(
+                    id=UUID(line_data['id']),
+                    invoice_id=UUID(line_data['invoice_id']),
+                    order_line_id=UUID(line_data['order_line_id']) if line_data.get('order_line_id') else None,
+                    description=line_data['description'],
+                    quantity=Decimal(str(line_data['quantity'])),
+                    unit_price=Decimal(str(line_data['unit_price'])),
+                    line_total=Decimal(str(line_data['line_total'])),
+                    tax_code=line_data.get('tax_code', 'TX_STD'),
+                    tax_rate=Decimal(str(line_data.get('tax_rate', '23.00'))),
+                    tax_amount=Decimal(str(line_data.get('tax_amount', '0.00'))),
+                    net_amount=Decimal(str(line_data.get('net_amount', '0.00'))),
+                    gross_amount=Decimal(str(line_data.get('gross_amount', '0.00'))),
+                    product_code=line_data.get('product_code'),
+                    variant_sku=line_data.get('variant_sku'),
+                    component_type=line_data.get('component_type', 'STANDARD'),
+                                    created_at=self._parse_datetime(line_data.get('created_at')) if line_data.get('created_at') else datetime.now(),
+                updated_at=self._parse_datetime(line_data.get('updated_at')) if line_data.get('updated_at') else datetime.now()
+                )
+                lines.append(line)
+            except Exception as e:
+                self.logger.error(f"Error converting line data: {e}, line_data: {line_data}")
+                continue
         
         invoice_data['invoice_lines'] = lines
         
-        # Convert dates and UUIDs as needed
-        return Invoice(**invoice_data)
+        # Convert invoice data
+        try:
+            return Invoice(
+                id=UUID(invoice_data['id']),
+                tenant_id=UUID(invoice_data['tenant_id']),
+                invoice_no=invoice_data['invoice_no'],
+                invoice_type=InvoiceType(invoice_data['invoice_type']),
+                invoice_status=InvoiceStatus(invoice_data['invoice_status']),
+                customer_id=UUID(invoice_data['customer_id']),
+                customer_name=invoice_data['customer_name'],
+                customer_address=invoice_data['customer_address'],
+                customer_tax_id=invoice_data.get('customer_tax_id'),
+                order_id=UUID(invoice_data['order_id']) if invoice_data.get('order_id') else None,
+                order_no=invoice_data.get('order_no'),
+                invoice_date=datetime.strptime(invoice_data['invoice_date'], '%Y-%m-%d').date(),
+                due_date=datetime.strptime(invoice_data['due_date'], '%Y-%m-%d').date(),
+                delivery_date=datetime.strptime(invoice_data['delivery_date'], '%Y-%m-%d').date() if invoice_data.get('delivery_date') and invoice_data['delivery_date'] != 'None' else None,
+                subtotal=Decimal(str(invoice_data.get('subtotal', '0.00'))),
+                total_tax=Decimal(str(invoice_data.get('total_tax', '0.00'))),
+                total_amount=Decimal(str(invoice_data.get('total_amount', '0.00'))),
+                paid_amount=Decimal(str(invoice_data.get('paid_amount', '0.00'))),
+                balance_due=Decimal(str(invoice_data.get('balance_due', '0.00'))),
+                currency=invoice_data.get('currency', 'EUR'),
+                payment_terms=invoice_data.get('payment_terms'),
+                notes=invoice_data.get('notes'),
+                created_at=self._parse_datetime(invoice_data.get('created_at')) if invoice_data.get('created_at') else datetime.now(),
+                created_by=UUID(invoice_data['created_by']) if invoice_data.get('created_by') else None,
+                updated_at=self._parse_datetime(invoice_data.get('updated_at')) if invoice_data.get('updated_at') else datetime.now(),
+                updated_by=UUID(invoice_data['updated_by']) if invoice_data.get('updated_by') else None,
+                sent_at=self._parse_datetime(invoice_data.get('sent_at')) if invoice_data.get('sent_at') else None,
+                paid_at=self._parse_datetime(invoice_data.get('paid_at')) if invoice_data.get('paid_at') else None
+            )
+        except Exception as e:
+            self.logger.error(f"Error converting invoice data: {e}, invoice_data: {invoice_data}")
+            raise

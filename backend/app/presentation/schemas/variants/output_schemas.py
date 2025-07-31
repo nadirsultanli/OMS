@@ -30,6 +30,14 @@ class VariantResponse(BaseModel):
     gross_weight_kg: Optional[Decimal]
     deposit: Optional[Decimal]
     inspection_date: Optional[str]
+    unit_weight_kg: Optional[Decimal]
+    unit_volume_m3: Optional[Decimal]
+    # Bulk gas specific attributes
+    unit_of_measure: str
+    is_variable_quantity: bool
+    propane_density_kg_per_liter: Optional[Decimal]
+    max_tank_capacity_kg: Optional[Decimal]
+    min_order_quantity: Optional[Decimal]
     active: bool
     # Audit fields
     created_at: str
@@ -77,6 +85,36 @@ class ExchangeCalculationResponse(BaseModel):
 class BundleComponentsResponse(BaseModel):
     """Response schema for bundle component explosion"""
     bundle_sku: str
+    components: List[Dict[str, Any]]
+    exploded_items: List[Dict[str, Any]]
+
+class BulkGasValidationResponse(BaseModel):
+    """Response schema for bulk gas order validation"""
+    valid: bool
+    errors: List[str]
+    warnings: List[str]
+    quantity_kg: Decimal
+    volume_liters: Optional[Decimal]
+    tank_utilization_percent: Optional[Decimal] = None
+
+class BulkPricingResponse(BaseModel):
+    """Response schema for bulk gas pricing calculations"""
+    quantity_kg: Decimal
+    volume_liters: Optional[Decimal]
+    unit_of_measure: str
+    density_kg_per_liter: Optional[Decimal]
+    is_variable_quantity: bool
+    min_order_quantity: Optional[Decimal]
+    max_tank_capacity: Optional[Decimal]
+    unit_price_per_kg: Optional[Decimal] = None
+    total_price: Optional[Decimal] = None
+
+class BulkGasResponse(BaseModel):
+    """Response schema specifically for bulk gas variants"""
+    variant: VariantResponse
+    volume_calculations: Dict[str, Any]
+    capacity_info: Dict[str, Any]
+    pricing_info: Optional[Dict[str, Any]] = None
     components: List[Dict[str, Any]]
 
 class BusinessValidationResponse(BaseModel):

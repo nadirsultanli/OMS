@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, HTTPException, Depends, status
 from app.services.users.user_service import UserService
 from app.domain.exceptions.users import (
@@ -27,12 +28,20 @@ from app.services.dependencies.railway_users import get_railway_user_service, sh
 from app.services.dependencies.tenants import get_tenant_service
 from app.services.tenants.tenant_service import TenantService
 from app.infrastucture.database.connection import get_supabase_client_sync, get_supabase_admin_client_sync
-from decouple import config
 from app.domain.entities.users import UserStatus
 from app.core.user_context import UserContext, user_context
-
 logger = get_logger("auth_api")
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+# Conditionally include Google OAuth router if dependencies are available
+try:
+    from app.presentation.api.users.google_auth import google_auth_router
+    auth_router.include_router(google_auth_router)
+    logger.info("Google OAuth router included successfully")
+except ImportError as e:
+    logger.warning(f"Google OAuth router not available: {str(e)}")
+except Exception as e:
+    logger.error(f"Failed to include Google OAuth router: {str(e)}")
 
 
 # @auth_router.post("/signup", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
@@ -383,9 +392,9 @@ async def forgot_password(
         supabase = get_supabase_client_sync()
         
         # Configure redirect URL based on role
-        frontend_url = config("FRONTEND_URL", default="http://localhost:3000")
+        frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
         if user.role.value.lower() == "driver":
-            driver_frontend_url = config("DRIVER_FRONTEND_URL", default="http://localhost:3001")
+            driver_frontend_url = os.getenv("DRIVER_FRONTEND_URL", "https://omsfrontend.netlify.app")
             redirect_url = f"{driver_frontend_url}/reset-password"
         else:
             redirect_url = f"{frontend_url}/reset-password"

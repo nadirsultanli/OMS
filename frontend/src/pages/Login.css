@@ -163,6 +163,72 @@
   box-shadow: none;
 }
 
+/* Google Login Button Styles */
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: #e5e7eb;
+}
+
+.divider span {
+  padding: 0 16px;
+  background-color: white;
+}
+
+.google-login-button {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  background-color: white;
+  color: #374151;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.google-login-button:hover:not(:disabled) {
+  border-color: #d1d5db;
+  background-color: #f9fafb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.google-login-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.google-login-button:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.google-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
 .forgot-password-link {
   text-align: center;
   margin-top: 16px;

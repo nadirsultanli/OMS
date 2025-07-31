@@ -1,21 +1,199 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Path
+from typing import List, Optional, Dict, Any
 from uuid import UUID
+from decimal import Decimal
 from datetime import datetime
+
+from app.domain.entities.users import User
+from app.domain.entities.trips import TripStatus
+from app.domain.entities.deliveries import Delivery, DeliveryStatus
+from app.domain.entities.orders import Order
+from app.domain.exceptions.trips.trip_exceptions import TripNotFoundError
+from app.presentation.schemas.deliveries.input_schemas import (
+    CreateDeliveryRequest,
+    UpdateDeliveryRequest,
+    MarkDamagedCylinderRequest,
+    LostEmptyCylinderRequest,
+    MixedSizeLoadCapacityRequest
+)
+from app.presentation.schemas.deliveries.output_schemas import (
+    DeliveryResponse,
+    DeliveryListResponse,
+    MixedSizeLoadCapacityResponse
+)
 from app.services.deliveries.delivery_service import DeliveryService
 from app.services.trips.trip_service import TripService
 from app.services.dependencies.trips import get_trip_service
 from app.services.dependencies.auth import get_current_user
-from app.domain.entities.users import User
-from app.domain.entities.trips import TripStatus
-from app.domain.entities.deliveries import DeliveryStatus
-from app.domain.exceptions.trips.trip_exceptions import TripNotFoundError
-from app.infrastucture.logs.logger import default_logger
+from app.services.dependencies.deliveries import get_delivery_service
+from app.infrastucture.logs.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/deliveries", tags=["deliveries"])
 
-def get_delivery_service() -> DeliveryService:
-    return DeliveryService()
+@router.post("/", response_model=DeliveryResponse)
+async def create_delivery(
+    request: CreateDeliveryRequest,
+    delivery_service: DeliveryService = Depends(get_delivery_service)
+) -> DeliveryResponse:
+    """Create a new delivery"""
+    try:
+        delivery = await delivery_service.create_delivery(
+            trip_id=request.trip_id,
+            order_id=request.order_id,
+            customer_id=request.customer_id,
+            stop_id=request.stop_id,
+            created_by=request.created_by
+        )
+        return DeliveryResponse.from_entity(delivery)
+    except Exception as e:
+        logger.error(f"Failed to create delivery: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create delivery: {str(e)}"
+        )
+
+@router.get("/{delivery_id}", response_model=DeliveryResponse)
+async def get_delivery(
+    delivery_id: UUID,
+    delivery_service: DeliveryService = Depends(get_delivery_service)
+) -> DeliveryResponse:
+    """Get delivery by ID"""
+    try:
+        delivery = await delivery_service.get_delivery(delivery_id)
+        if not delivery:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Delivery not found"
+            )
+        return DeliveryResponse.from_entity(delivery)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get delivery: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get delivery: {str(e)}"
+        )
+
+@router.get("/", response_model=DeliveryListResponse)
+async def list_deliveries(
+    trip_id: Optional[UUID] = None,
+    order_id: Optional[UUID] = None,
+    status: Optional[DeliveryStatus] = None,
+    delivery_service: DeliveryService = Depends(get_delivery_service)
+) -> DeliveryListResponse:
+    """List deliveries with optional filters"""
+    try:
+        deliveries = await delivery_service.list_deliveries(
+            trip_id=trip_id,
+            order_id=order_id,
+            status=status
+        )
+        return DeliveryListResponse(
+            deliveries=[DeliveryResponse.from_entity(d) for d in deliveries]
+        )
+    except Exception as e:
+        logger.error(f"Failed to list deliveries: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list deliveries: {str(e)}"
+        )
+
+# Edge Case 1: Damaged Cylinder in Field
+@router.post("/{delivery_id}/mark-damaged", response_model=DeliveryResponse)
+async def mark_damaged_cylinder(
+    delivery_id: UUID,
+    request: MarkDamagedCylinderRequest,
+    delivery_service: DeliveryService = Depends(get_delivery_service)
+) -> DeliveryResponse:
+    """
+    Edge Case 1: Damaged Cylinder in Field
+    Driver marks qty as 0 delivered, notes damaged; triggers variance workflow
+    """
+    try:
+        delivery = await delivery_service.mark_damaged_cylinder(
+            delivery_id=delivery_id,
+            order_line_id=request.order_line_id,
+            damage_notes=request.damage_notes,
+            photos=request.photos,
+            actor_id=request.actor_id
+        )
+        return DeliveryResponse.from_entity(delivery)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to mark damaged cylinder: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to mark damaged cylinder: {str(e)}"
+        )
+
+# Edge Case 2: Lost Empty Cylinder Logic
+@router.post("/lost-empty-handler", response_model=Dict[str, Any])
+async def handle_lost_empty_cylinder(
+    request: LostEmptyCylinderRequest,
+    delivery_service: DeliveryService = Depends(get_delivery_service)
+) -> Dict[str, Any]:
+    """
+    Edge Case 2: Lost Empty Logic
+    Customer fails to return; OMS flips EMPTY credit line to Deposit charge after X days
+    """
+    try:
+        converted = await delivery_service.handle_lost_empty_cylinder(
+            customer_id=request.customer_id,
+            variant_id=request.variant_id,
+            days_overdue=request.days_overdue,
+            actor_id=request.actor_id
+        )
+        
+        return {
+            "success": True,
+            "converted": converted,
+            "customer_id": str(request.customer_id),
+            "variant_id": str(request.variant_id),
+            "days_overdue": request.days_overdue,
+            "message": "Lost empty cylinder processed successfully" if converted else "No overdue empty returns found"
+        }
+    except Exception as e:
+        logger.error(f"Failed to handle lost empty cylinder: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to handle lost empty cylinder: {str(e)}"
+        )
+
+# Edge Case 3: Mixed-size Load Capacity Calculation
+@router.post("/calculate-mixed-load-capacity", response_model=MixedSizeLoadCapacityResponse)
+async def calculate_mixed_size_load_capacity(
+    request: MixedSizeLoadCapacityRequest,
+    delivery_service: DeliveryService = Depends(get_delivery_service)
+) -> MixedSizeLoadCapacityResponse:
+    """
+    Edge Case 3: Mixed-size Load Capacity
+    Capacity calc uses SUM(qty × variant.gross_kg)
+    """
+    try:
+        capacity_data = await delivery_service.calculate_mixed_size_load_capacity(
+            order_id=request.order_id
+        )
+        
+        return MixedSizeLoadCapacityResponse(
+            order_id=capacity_data['order_id'],
+            total_weight_kg=float(capacity_data['total_weight_kg']),
+            total_volume_m3=float(capacity_data['total_volume_m3']),
+            line_details=capacity_data['line_details'],
+            calculation_method=capacity_data['calculation_method']
+        )
+    except Exception as e:
+        logger.error(f"Failed to calculate mixed size load capacity: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to calculate mixed size load capacity: {str(e)}"
+        )
 
 @router.post("/trip/{trip_id}/stop/{stop_id}/arrive", status_code=200)
 async def arrive_at_stop(
@@ -312,4 +490,23 @@ async def get_truck_inventory(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         default_logger.error(f"Failed to get truck inventory: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/estimate-volume-for-gas-type", status_code=200)
+async def estimate_volume_for_gas_type(
+    request: dict = ...,  # Contains order_id
+    current_user: User = Depends(get_current_user),
+    delivery_service: DeliveryService = Depends(get_delivery_service)
+):
+    """Estimate volume for order lines with gas_type but no variant_id"""
+    try:
+        order_id = request.get("order_id")
+        if not order_id:
+            raise HTTPException(status_code=400, detail="order_id is required")
+        
+        result = await delivery_service.estimate_volume_for_gas_type(UUID(order_id))
+        return result
+        
+    except Exception as e:
+        default_logger.error(f"Failed to estimate volume for gas type: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")

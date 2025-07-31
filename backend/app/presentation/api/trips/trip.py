@@ -192,9 +192,12 @@ async def get_trip_with_stops(
         stops = await trip_service.get_trip_stops_by_trip(trip_id)
         
         trip_data = trip.to_dict()
-        trip_data["stops"] = [stop.to_dict() for stop in stops]
+        stops_data = [stop.to_dict() for stop in stops]
         
-        return TripWithStopsResponse(**trip_data)
+        return TripWithStopsResponse(
+            trip=TripResponse(**trip_data),
+            stops=[TripStopResponse(**stop_data) for stop_data in stops_data]
+        )
         
     except TripNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

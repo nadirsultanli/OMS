@@ -26,12 +26,24 @@ from app.presentation.api.trips.trip_order_integration import router as trip_ord
 from app.presentation.api.trips.monitoring import router as monitoring_router
 from app.presentation.api.vehicles.vehicle import router as vehicle_router
 from app.presentation.api.vehicles.vehicle_warehouse import router as vehicle_warehouse_router
+from app.presentation.api.audit.audit import router as audit_router
+from app.presentation.api.deliveries.delivery import router as delivery_router
+from app.presentation.api.stripe.stripe import router as stripe_router
+from app.presentation.api.invoices.invoice import router as invoice_router
+from app.presentation.api.payments.payment import router as payment_router
+from app.presentation.api.tenant_subscriptions.tenant_subscription import router as subscription_router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
+from app.core.audit_middleware import AuditMiddleware
 
 # Get configuration from environment
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")
 ENVIRONMENT = config("ENVIRONMENT", default="development")
+AUDIT_ENABLED = config("AUDIT_ENABLED", default="true", cast=bool)
+
+# CORS configuration
+CORS_ORIGINS = config("CORS_ORIGINS", default="*")
+ALLOWED_ORIGINS = ["*"] if CORS_ORIGINS == "*" else [origin.strip() for origin in CORS_ORIGINS.split(",")]
 
 
 @asynccontextmanager
@@ -114,6 +126,30 @@ app = FastAPI(
         {
             "name": "Trips",
             "description": "Trip management, vehicle routing, and delivery operations"
+        },
+        {
+            "name": "Deliveries",
+            "description": "Delivery operations and edge-case workflows (damaged cylinders, lost empties, mixed-size loads)"
+        },
+        {
+            "name": "Audit",
+            "description": "Audit trail, compliance monitoring, and activity logging"
+        },
+        {
+            "name": "Stripe Billing",
+            "description": "Stripe billing integration, tenant management, and subscription operations"
+        },
+        {
+            "name": "Invoices",
+            "description": "Invoice management, generation, and payment tracking operations"
+        },
+        {
+            "name": "Payments",
+            "description": "Payment processing, refunds, and payment cycle management operations"
+        },
+        {
+            "name": "Subscriptions",
+            "description": "Tenant-level subscription management, plan limits, and usage tracking for Circl OMS platform"
         }
     ]
 )
@@ -124,11 +160,26 @@ setup_logging(app, log_level=LOG_LEVEL)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now - configure properly for production
+    allow_origins=["*"],  # Allow all origins for now
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+default_logger.info(f"CORS middleware configured with origins: {ALLOWED_ORIGINS}")
+
+# Add audit middleware for automatic request/response logging (if enabled)
+if AUDIT_ENABLED:
+    app.add_middleware(
+        AuditMiddleware,
+        excluded_paths=[
+            "/health", "/docs", "/redoc", "/openapi.json",
+            "/debug", "/logs/test", "/cors-test", "/db/test"
+        ],
+        excluded_methods=["OPTIONS", "HEAD"]
+    )
+    default_logger.info("Audit middleware enabled - automatic request/response logging active")
 
 # Custom exception handler to ensure CORS headers are always included
 @app.exception_handler(StarletteHTTPException)
@@ -177,6 +228,12 @@ app.include_router(trip_order_integration_router, prefix="/api/v1")
 app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(vehicle_router, prefix="/api/v1")
 app.include_router(vehicle_warehouse_router, prefix="/api/v1")
+app.include_router(audit_router, prefix="/api/v1")
+app.include_router(delivery_router, prefix="/api/v1")
+app.include_router(stripe_router, prefix="/api/v1")
+app.include_router(invoice_router, prefix="/api/v1")
+app.include_router(payment_router, prefix="/api/v1")
+app.include_router(subscription_router, prefix="/api/v1")
 
 
 def custom_openapi():
@@ -203,6 +260,9 @@ app.openapi = custom_openapi
 
 @app.options("/{path:path}")
 async def options_handler(request: Request, path: str):
+    """Handle OPTIONS requests for CORS preflight"""
+    origin = request.headers.get("origin", "*")
+    
     return JSONResponse(
         status_code=200,
         content="OK",
@@ -211,6 +271,7 @@ async def options_handler(request: Request, path: str):
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
             "Access-Control-Allow-Headers": "*",
             "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "86400",
         }
     )
 
@@ -234,7 +295,21 @@ async def cors_test():
     """Test endpoint to verify CORS headers"""
     return {
         "message": "CORS test successful",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "allowed_origins": ALLOWED_ORIGINS,
+        "environment": ENVIRONMENT,
+        "cors_enabled": True
+    }
+
+@app.get("/api/v1/cors-test")
+async def api_cors_test():
+    """Test endpoint to verify CORS headers for API routes"""
+    return {
+        "message": "API CORS test successful",
+        "timestamp": datetime.now().isoformat(),
+        "allowed_origins": ALLOWED_ORIGINS,
+        "environment": ENVIRONMENT,
+        "cors_enabled": True
     }
 
 

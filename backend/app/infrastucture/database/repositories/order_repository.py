@@ -225,6 +225,28 @@ class SQLAlchemyOrderRepository(OrderRepository):
         
         return [self._to_order_entity(model) for model in models]
 
+    async def get_orders_by_statuses(self, statuses: List[OrderStatus], tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
+        """Get all orders with any of the specified statuses"""
+        status_values = [status.value if isinstance(status, OrderStatus) else status for status in statuses]
+        stmt = (
+            select(OrderModel)
+            .options(selectinload(OrderModel.order_lines))
+            .where(
+                and_(
+                    OrderModel.order_status.in_(status_values),
+                    OrderModel.tenant_id == tenant_id,
+                    OrderModel.deleted_at.is_(None)
+                )
+            )
+            .order_by(OrderModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        
+        return [self._to_order_entity(model) for model in models]
+
     async def get_orders_by_date_range(
         self, 
         start_date: date, 
