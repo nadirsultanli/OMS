@@ -26,10 +26,11 @@ from app.domain.exceptions.invoices import (
 
 class InvoiceService:
     """Service for invoice business logic"""
-
-    def __init__(self, invoice_repository: InvoiceRepository, order_repository: OrderRepository):
+    
+    def __init__(self, invoice_repository: InvoiceRepository, order_repository: OrderRepository, tenant_service=None):
         self.invoice_repository = invoice_repository
         self.order_repository = order_repository
+        self.tenant_service = tenant_service
 
     # ============================================================================
     # PERMISSION CHECKS
@@ -71,9 +72,13 @@ class InvoiceService:
             raise InvoicePermissionError("User does not have permission to create invoices")
 
         # Get the order
-        order = await self.order_repository.get_order_by_id(order_id, user.tenant_id)
+        order = await self.order_repository.get_order_by_id(order_id)
         if not order:
             raise InvoiceNotFoundError(f"Order {order_id} not found")
+        
+        # Validate tenant ownership
+        if order.tenant_id != user.tenant_id:
+            raise InvoiceNotFoundError(f"Order {order_id} not found in your tenant")
 
         # Validate order can be invoiced
         if order.order_status not in [OrderStatus.DELIVERED, OrderStatus.CLOSED]:
@@ -94,6 +99,16 @@ class InvoiceService:
         # Generate invoice number
         invoice_no = await self.invoice_repository.get_next_invoice_number(user.tenant_id, "INV")
 
+        # Get tenant currency
+        currency = 'KES'  # Default to KES
+        if self.tenant_service:
+            try:
+                tenant = await self.tenant_service.get_tenant_by_id(str(user.tenant_id))
+                currency = tenant.base_currency
+            except Exception as e:
+                # Log error but continue with default currency
+                print(f"Warning: Could not get tenant currency, using default KES: {e}")
+
         # Create the invoice
         invoice = Invoice.create(
             tenant_id=user.tenant_id,
@@ -106,6 +121,7 @@ class InvoiceService:
             order_id=order.id,
             order_no=order.order_no,
             payment_terms=payment_terms,
+            currency=currency,
             created_by=user.id
         )
 
@@ -651,6 +667,20 @@ class InvoiceService:
     # ============================================================================
     # BULK OPERATIONS
     # ============================================================================
+
+    async def get_orders_ready_for_invoicing(
+        self,
+        user: User,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[Order]:
+        """Get orders that are ready for invoicing (delivered or closed)"""
+        return await self.order_repository.get_orders_by_statuses(
+            [OrderStatus.DELIVERED, OrderStatus.CLOSED],
+            user.tenant_id,
+            limit=limit,
+            offset=offset
+        )
 
     async def generate_invoices_for_delivered_orders(
         self,

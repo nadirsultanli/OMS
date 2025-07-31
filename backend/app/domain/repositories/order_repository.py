@@ -36,6 +36,11 @@ class OrderRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_orders_by_statuses(self, statuses: List[OrderStatus], tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
+        """Get all orders with any of the specified statuses"""
+        pass
+
+    @abstractmethod
     async def get_orders_by_date_range(
         self, 
         start_date: date, 

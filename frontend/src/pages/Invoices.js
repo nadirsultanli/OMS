@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import invoiceService from '../services/invoiceService';
 import customerService from '../services/customerService';
+import orderService from '../services/orderService';
 
 import './Invoices.css';
 
@@ -32,6 +33,8 @@ const Invoices = () => {
     due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     payment_terms: '30 days'
   });
+  const [orders, setOrders] = useState([]);
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [createInvoiceData, setCreateInvoiceData] = useState({
     customer_id: '',
     customer_name: '',
@@ -61,6 +64,7 @@ const Invoices = () => {
   useEffect(() => {
     loadInvoices();
     loadCustomers();
+    loadOrders();
     
     // Check for success/cancel messages from Stripe redirect
     const urlParams = new URLSearchParams(window.location.search);
@@ -108,6 +112,17 @@ const Invoices = () => {
       }
     } catch (err) {
       console.error('Error loading customers:', err);
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      const result = await invoiceService.getOrdersReadyForInvoicing(1000);
+      if (result.success) {
+        setOrders(result.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading orders:', err);
     }
   };
 
@@ -248,10 +263,12 @@ const Invoices = () => {
         setShowGenerateInvoiceModal(false);
         setGenerateInvoiceData({
           order_id: '',
+          mode: '',
           invoice_date: new Date().toISOString().split('T')[0],
           due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           payment_terms: '30 days'
         });
+        setSelectedOrder(null);
         loadInvoices(); // Refresh the list
         setError(null);
       } else {
@@ -379,7 +396,8 @@ const Invoices = () => {
 
   const renderInvoiceRow = (invoice) => {
     const remainingAmount = calculateRemainingAmount(invoice);
-    const isOverdue = invoice.status === 'SENT' && new Date(invoice.due_date) < new Date();
+    const invoiceStatus = invoice.invoice_status || invoice.status; // Handle both field names
+    const isOverdue = invoiceStatus === 'SENT' && new Date(invoice.due_date) < new Date();
     
     return (
       <tr 
@@ -391,14 +409,14 @@ const Invoices = () => {
         <td>{getCustomerName(invoice.customer_id)}</td>
         <td>{invoiceService.formatDate(invoice.invoice_date)}</td>
         <td>{invoiceService.formatDate(invoice.due_date)}</td>
-        <td>{invoiceService.formatCurrency(invoice.total_amount)}</td>
-        <td>{invoiceService.formatCurrency(remainingAmount)}</td>
+        <td>{invoiceService.formatCurrency(invoice.total_amount, invoice.currency || 'KES')}</td>
+        <td>{invoiceService.formatCurrency(remainingAmount, invoice.currency || 'KES')}</td>
         <td>
           <span 
             className="status-badge"
-            style={{ backgroundColor: invoiceService.getInvoiceStatusColor(invoice.status) }}
+            style={{ backgroundColor: invoiceService.getInvoiceStatusColor(invoiceStatus) }}
           >
-            {invoiceService.getInvoiceStatusLabel(invoice.status)}
+            {invoiceService.getInvoiceStatusLabel(invoiceStatus)}
           </span>
         </td>
         <td>
@@ -412,7 +430,7 @@ const Invoices = () => {
             >
               PDF
             </button>
-            {invoice.status === 'SENT' && remainingAmount > 0 && (
+            {invoiceStatus === 'SENT' && remainingAmount > 0 && (
               <>
                 <button 
                   className="btn btn-sm btn-success"
@@ -435,7 +453,7 @@ const Invoices = () => {
                 </button>
               </>
             )}
-            {invoice.status === 'GENERATED' && (
+            {invoiceStatus === 'GENERATED' && (
               <button 
                 className="btn btn-sm btn-info"
                 onClick={(e) => {
@@ -458,6 +476,7 @@ const Invoices = () => {
 
     const remainingAmount = calculateRemainingAmount(selectedInvoice);
     const payments = selectedInvoice.payments || [];
+    const invoiceStatus = selectedInvoice.invoice_status || selectedInvoice.status; // Handle both field names
 
     return (
       <div className="invoice-detail-modal">
@@ -491,12 +510,35 @@ const Invoices = () => {
                 <span className="value">
                   <span 
                     className="status-badge"
-                    style={{ backgroundColor: invoiceService.getInvoiceStatusColor(selectedInvoice.status) }}
+                    style={{ backgroundColor: invoiceService.getInvoiceStatusColor(invoiceStatus) }}
                   >
-                    {invoiceService.getInvoiceStatusLabel(selectedInvoice.status)}
+                    {invoiceService.getInvoiceStatusLabel(invoiceStatus)}
                   </span>
+                  {invoiceStatus === 'SENT' && new Date(selectedInvoice.due_date) < new Date() && (
+                    <span className="overdue-indicator">Overdue</span>
+                  )}
                 </span>
               </div>
+              {invoiceStatus === 'SENT' && (
+                <div className="info-row">
+                  <span className="label">Days Until Due:</span>
+                  <span className="value">
+                    {(() => {
+                      const dueDate = new Date(selectedInvoice.due_date);
+                      const today = new Date();
+                      const diffTime = dueDate - today;
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      if (diffDays < 0) {
+                        return <span className="overdue-text">{Math.abs(diffDays)} days overdue</span>;
+                      } else if (diffDays === 0) {
+                        return <span className="due-today">Due today</span>;
+                      } else {
+                        return <span className="due-soon">{diffDays} days remaining</span>;
+                      }
+                    })()}
+                  </span>
+                </div>
+              )}
               <div className="info-row">
                 <span className="label">Total Amount:</span>
                 <span className="value">{invoiceService.formatCurrency(selectedInvoice.total_amount)}</span>
@@ -538,7 +580,7 @@ const Invoices = () => {
               >
                 Download PDF
               </button>
-              {selectedInvoice.status === 'SENT' && remainingAmount > 0 && (
+              {invoiceStatus === 'SENT' && remainingAmount > 0 && (
                 <button 
                   className="btn btn-success"
                   onClick={() => setShowPaymentModal(true)}
@@ -546,7 +588,7 @@ const Invoices = () => {
                   Record Payment
                 </button>
               )}
-              {selectedInvoice.status === 'GENERATED' && (
+              {invoiceStatus === 'GENERATED' && (
                 <button 
                   className="btn btn-info"
                   onClick={() => setShowSendModal(true)}
@@ -702,22 +744,50 @@ const Invoices = () => {
                 >
                   Create Manual Invoice
                 </button>
-                <button className="btn btn-primary" disabled>
-                  Generate from Order (Coming Soon)
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => setGenerateInvoiceData(prev => ({ ...prev, mode: 'order' }))}
+                >
+                  Generate from Order
                 </button>
               </div>
             </div>
             
-            <div className="form-group">
-              <label>Order ID:</label>
-              <input
-                type="text"
-                value={generateInvoiceData.order_id}
-                onChange={(e) => setGenerateInvoiceData(prev => ({ ...prev, order_id: e.target.value }))}
-                placeholder="Enter order ID"
-                disabled
-              />
-            </div>
+            {generateInvoiceData.mode === 'order' && (
+              <>
+                <div className="form-group">
+                  <label>Select Order:</label>
+                  <select
+                    value={generateInvoiceData.order_id}
+                    onChange={(e) => {
+                      const orderId = e.target.value;
+                      const order = orders.find(o => o.id === orderId);
+                      setSelectedOrder(order);
+                      setGenerateInvoiceData(prev => ({ ...prev, order_id: orderId }));
+                    }}
+                  >
+                    <option value="">Select an order...</option>
+                    {orders.map(order => (
+                      <option key={order.id} value={order.id}>
+                        {order.order_no} - {order.customer_name} ({invoiceService.formatCurrency(order.total_amount)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {selectedOrder && (
+                  <div className="order-preview">
+                    <h4>Order Preview:</h4>
+                    <div className="order-info">
+                      <p><strong>Order No:</strong> {selectedOrder.order_no}</p>
+                      <p><strong>Customer:</strong> {selectedOrder.customer_name}</p>
+                      <p><strong>Total Amount:</strong> {invoiceService.formatCurrency(selectedOrder.total_amount)}</p>
+                      <p><strong>Status:</strong> {selectedOrder.status}</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
             
             <div className="form-group">
               <label>Invoice Date:</label>
@@ -751,7 +821,11 @@ const Invoices = () => {
             <button className="btn btn-secondary" onClick={() => setShowGenerateInvoiceModal(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleGenerateInvoiceFromOrder} disabled>
+            <button 
+              className="btn btn-primary" 
+              onClick={handleGenerateInvoiceFromOrder} 
+              disabled={!generateInvoiceData.order_id}
+            >
               Generate Invoice
             </button>
           </div>

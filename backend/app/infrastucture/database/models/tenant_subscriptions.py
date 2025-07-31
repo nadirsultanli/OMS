@@ -26,7 +26,7 @@ class TenantPlanModel(Base):
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
     plan_name = Column(String(255), nullable=False)
-    plan_tier = Column(Enum(PlanTier), nullable=False)
+    plan_tier = Column(Enum('basic', 'professional', 'enterprise', name='plan_tier'), nullable=False)
     description = Column(Text, nullable=False)
     billing_cycle = Column(String(20), nullable=False)
     base_amount = Column(Numeric(15, 2), nullable=False)
@@ -47,7 +47,7 @@ class TenantPlanModel(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships
-    subscriptions = relationship("TenantSubscriptionModel", back_populates="plan")
+    # subscriptions = relationship("TenantSubscriptionModel", back_populates="plan")
 
 
 class TenantSubscriptionModel(Base):
@@ -55,16 +55,16 @@ class TenantSubscriptionModel(Base):
     __tablename__ = "tenant_subscriptions"
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
-    tenant_id = Column(PostgresUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(PostgresUUID(as_uuid=True), nullable=False)
     
     # Stripe integration
     stripe_customer_id = Column(String(255), nullable=True)
     stripe_subscription_id = Column(String(255), nullable=True)
     
     # Plan information
-    plan_id = Column(PostgresUUID(as_uuid=True), ForeignKey("tenant_plans.id"), nullable=False)
+    plan_id = Column(PostgresUUID(as_uuid=True), nullable=False)
     plan_name = Column(String(255), nullable=False)
-    plan_tier = Column(Enum(PlanTier), nullable=False)
+    plan_tier = Column(Enum('basic', 'professional', 'enterprise', name='plan_tier'), nullable=False)
     billing_cycle = Column(String(20), nullable=False)
     base_amount = Column(Numeric(15, 2), nullable=False)
     currency = Column(String(3), nullable=False, default='EUR')
@@ -77,7 +77,7 @@ class TenantSubscriptionModel(Base):
     trial_end = Column(DateTime(timezone=True), nullable=True)
     
     # Status and settings
-    subscription_status = Column(Enum(TenantSubscriptionStatus), nullable=False, default=TenantSubscriptionStatus.TRIAL)
+    subscription_status = Column(Enum('active', 'trial', 'past_due', 'cancelled', 'suspended', 'expired', name='tenant_subscription_status'), nullable=False, default='trial')
     cancel_at_period_end = Column(Boolean, default=False)
     canceled_at = Column(DateTime(timezone=True), nullable=True)
     ended_at = Column(DateTime(timezone=True), nullable=True)
@@ -88,11 +88,8 @@ class TenantSubscriptionModel(Base):
     # Audit fields
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    updated_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_by = Column(PostgresUUID(as_uuid=True), nullable=True)
+    updated_by = Column(PostgresUUID(as_uuid=True), nullable=True)
     
     # Relationships
-    plan = relationship("TenantPlanModel", back_populates="subscriptions")
-    tenant = relationship("TenantModel", back_populates="subscriptions")
-    creator = relationship("UserModel", foreign_keys=[created_by])
-    updater = relationship("UserModel", foreign_keys=[updated_by]) 
+    # plan = relationship("TenantPlanModel", back_populates="subscriptions") 

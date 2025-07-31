@@ -370,6 +370,37 @@
     flex-wrap: wrap;
 }
 
+/* Upgrade Section */
+.upgrade-section {
+    margin-top: 2rem;
+}
+
+.upgrade-card {
+    text-align: center;
+    padding: 2rem;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid #f59e0b;
+}
+
+.upgrade-card h3 {
+    font-size: 1.5rem;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.upgrade-card p {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+}
+
+.upgrade-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .subscriptions-container {
@@ -392,7 +423,8 @@
         grid-template-columns: 1fr;
     }
     
-    .subscribe-actions {
+    .subscribe-actions,
+    .upgrade-actions {
         flex-direction: column;
     }
 }

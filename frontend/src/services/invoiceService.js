@@ -119,6 +119,25 @@ const invoiceService = {
     }
   },
 
+  // Get orders ready for invoicing
+  getOrdersReadyForInvoicing: async (limit = 100, offset = 0) => {
+    try {
+      const params = new URLSearchParams({
+        limit: limit,
+        offset: offset
+      });
+
+      const response = await api.get(`/invoices/available-orders?${params.toString()}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error fetching orders ready for invoicing:', error);
+      return { 
+        success: false, 
+        error: extractErrorMessage(error.response?.data) || 'Failed to fetch orders ready for invoicing' 
+      };
+    }
+  },
+
   // Get overdue invoices
   getOverdueInvoices: async (asOfDate = null, limit = 100, offset = 0) => {
     try {
@@ -217,6 +236,9 @@ const invoiceService = {
 
   // Helper functions for UI
   getInvoiceStatusLabel: (status) => {
+    if (!status) return 'Unknown';
+    
+    const normalizedStatus = status.toUpperCase();
     const labels = {
       'DRAFT': 'Draft',
       'GENERATED': 'Generated',
@@ -226,23 +248,26 @@ const invoiceService = {
       'OVERDUE': 'Overdue',
       'CANCELLED': 'Cancelled'
     };
-    return labels[status] || status;
+    return labels[normalizedStatus] || status;
   },
 
   getInvoiceStatusColor: (status) => {
+    if (!status) return '#6c757d';
+    
+    const normalizedStatus = status.toUpperCase();
     const colors = {
       'DRAFT': '#6c757d',
       'GENERATED': '#17a2b8',
       'SENT': '#007bff',
-      'PARTIAL_PAID': '#ffc107',
+      'PARTIAL_PAID': '#fd7e14',
       'PAID': '#28a745',
       'OVERDUE': '#dc3545',
       'CANCELLED': '#6c757d'
     };
-    return colors[status] || '#6c757d';
+    return colors[normalizedStatus] || '#6c757d';
   },
 
-  formatCurrency: (amount, currency = 'EUR') => {
+  formatCurrency: (amount, currency = 'KES') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency

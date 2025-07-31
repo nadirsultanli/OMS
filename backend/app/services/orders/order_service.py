@@ -97,6 +97,10 @@ class OrderService:
         """Get all orders with a specific status"""
         return await self.order_repository.get_orders_by_status(status, tenant_id)
 
+    async def get_orders_by_statuses(self, statuses: List[OrderStatus], tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
+        """Get all orders with any of the specified statuses"""
+        return await self.order_repository.get_orders_by_statuses(statuses, tenant_id, limit, offset)
+
     async def get_all_orders(
         self, 
         tenant_id: UUID, 

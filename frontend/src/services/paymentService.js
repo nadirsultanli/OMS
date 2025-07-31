@@ -250,7 +250,7 @@ const paymentService = {
     return labels[type] || type;
   },
 
-  formatCurrency: (amount, currency = 'EUR') => {
+  formatCurrency: (amount, currency = 'KES') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency

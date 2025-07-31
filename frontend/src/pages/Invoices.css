@@ -149,14 +149,87 @@
 }
 
 .status-badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 600;
   color: white;
+  text-transform: capitalize;
+  letter-spacing: 0.3px;
+  min-width: 80px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
+  position: relative;
+}
+
+.status-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.status-badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.8);
+  margin-right: 6px;
+}
+
+.overdue-indicator {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #dc3545;
+  color: white;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+}
+
+.overdue-text {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.due-today {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+.due-soon {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.order-preview {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+.order-preview h4 {
+  margin: 0 0 10px 0;
+  color: #495057;
+  font-size: 1rem;
+}
+
+.order-info p {
+  margin: 5px 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.order-info strong {
+  color: #495057;
 }
 
 .action-buttons {

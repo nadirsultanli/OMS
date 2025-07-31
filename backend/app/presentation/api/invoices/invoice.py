@@ -30,6 +30,56 @@ logger = get_logger("invoices_api")
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
 
+@router.get("/available-orders", response_model=List[dict])
+async def get_orders_ready_for_invoicing(
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    invoice_service: InvoiceService = Depends(get_invoice_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Get orders that are ready for invoicing (delivered or closed)"""
+    logger.info(
+        "Getting orders ready for invoicing",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        limit=limit,
+        offset=offset
+    )
+    
+    try:
+        # Get orders that are delivered or closed
+        orders = await invoice_service.get_orders_ready_for_invoicing(
+            user=current_user,
+            limit=limit,
+            offset=offset
+        )
+        
+        # Convert to simple dict format for frontend
+        order_list = []
+        for order in orders:
+            order_list.append({
+                'id': str(order.id),
+                'order_no': order.order_no,
+                'customer_id': str(order.customer_id),
+                'total_amount': float(order.total_amount),
+                'status': order.order_status.value
+            })
+        
+        return order_list
+        
+    except Exception as e:
+        import traceback
+        logger.error(
+            "Failed to get orders ready for invoicing",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            error=str(e),
+            error_type=type(e).__name__,
+            traceback=traceback.format_exc()
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.post("/from-order", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
 async def generate_invoice_from_order(
     request: InvoiceFromOrderRequest,
@@ -92,15 +142,17 @@ async def generate_invoice_from_order(
         )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
+        import traceback
         logger.error(
             "Failed to generate invoice from order",
             user_id=str(current_user.id),
             tenant_id=str(current_user.tenant_id),
             order_id=request.order_id,
             error=str(e),
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
+            traceback=traceback.format_exc()
         )
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.post("", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)

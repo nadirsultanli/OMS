@@ -62,7 +62,9 @@ async def get_current_user(
         
         # Get user from our database using the auth_user_id
         auth_user_id = auth_response.user.id
+        print(f"🔍 Debug: Looking up user with auth_user_id: {auth_user_id}")
         user = await user_service.get_user_by_auth_id(auth_user_id)
+        print(f"🔍 Debug: User lookup result: {user is not None}")
         
         if not user:
             raise HTTPException(

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Button, Badge, Alert, Spinner } from '../components/ui';
 import { apiService } from '../services/apiService';
+import subscriptionService from '../services/subscriptionService';
 import './Subscriptions.css';
 
 const Subscriptions = () => {
@@ -54,22 +55,47 @@ const Subscriptions = () => {
 
         try {
             setLoading(true);
-            const response = await apiService.post('/subscriptions', {
-                tenant_id: subscription?.tenant_id || 'current',
-                plan_id: selectedPlan.id,
-                billing_cycle: 'monthly',
-                trial_days: 14
-            });
             
-            setSubscription(response);
+            // If user has existing subscription, use upgrade endpoint
+            const endpoint = subscription ? '/subscriptions/upgrade' : '/subscriptions';
+            const requestData = subscription 
+                ? {
+                    plan_id: selectedPlan.id,
+                    billing_cycle: 'monthly'
+                }
+                : {
+                    plan_id: selectedPlan.id,
+                    billing_cycle: 'monthly',
+                    trial_days: 14
+                };
+            
+            const response = await apiService.post(endpoint, requestData);
+            
+            // If we have a payment URL, redirect to Stripe
+            if (response.payment_url) {
+                window.location.href = response.payment_url;
+                return;
+            }
+            
+            // Update local state
+            setSubscription(response.subscription);
             setSelectedPlan(null);
             fetchCurrentSubscription();
             
             // Show success message
-            alert('Subscription created successfully! You can now use the platform.');
+            const message = subscription 
+                ? 'Subscription upgraded successfully! Your plan will be updated immediately.'
+                : 'Subscription created successfully! You can now use the platform.';
+            alert(message);
         } catch (err) {
-            setError('Failed to create subscription. Please try again.');
-            console.error('Error creating subscription:', err);
+            if (err.response?.status === 400 && err.response?.data?.detail?.includes('already has an active subscription')) {
+                setError('You already have an active subscription. Please use the upgrade option above.');
+            } else if (err.response?.status === 401) {
+                setError('Your session has expired. Please refresh the page and try again.');
+            } else {
+                setError('Failed to process subscription. Please try again.');
+            }
+            console.error('Error processing subscription:', err);
         } finally {
             setLoading(false);
         }
@@ -138,7 +164,7 @@ const Subscriptions = () => {
                                     {subscription.subscription_status.toUpperCase()}
                                 </Badge>
                                 <p className="subscription-price">
-                                    €{subscription.base_amount}/{subscription.billing_cycle}
+                                                                         €{subscription.base_amount}/{subscription.billing_cycle}
                                 </p>
                                 <p className="subscription-dates">
                                     Started: {new Date(subscription.start_date).toLocaleDateString()}
@@ -198,7 +224,7 @@ const Subscriptions = () => {
                             </div>
                             
                             <div className="plan-price">
-                                <span className="price-amount">€{plan.base_amount}</span>
+                                                                 <span className="price-amount">€{plan.base_amount}</span>
                                 <span className="price-period">/{plan.billing_cycle}</span>
                             </div>
                             
@@ -251,11 +277,11 @@ const Subscriptions = () => {
             </div>
 
             {/* Subscribe Button */}
-            {selectedPlan && (
+            {selectedPlan && !subscription && (
                 <div className="subscribe-section">
                     <Card className="subscribe-card">
                         <h3>Ready to Subscribe?</h3>
-                        <p>You've selected the <strong>{selectedPlan.plan_name}</strong> plan for €{selectedPlan.base_amount}/{selectedPlan.billing_cycle}</p>
+                                                 <p>You've selected the <strong>{selectedPlan.plan_name}</strong> plan for €{selectedPlan.base_amount}/{selectedPlan.billing_cycle}</p>
                         <div className="subscribe-actions">
                             <Button 
                                 color="success" 
@@ -264,6 +290,33 @@ const Subscriptions = () => {
                                 disabled={loading}
                             >
                                 {loading ? 'Creating Subscription...' : 'Subscribe Now'}
+                            </Button>
+                            <Button 
+                                color="secondary" 
+                                onClick={() => setSelectedPlan(null)}
+                                disabled={loading}
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* Upgrade/Downgrade Section */}
+            {selectedPlan && subscription && (
+                <div className="subscribe-section">
+                    <Card className="subscribe-card">
+                        <h3>Upgrade Your Subscription</h3>
+                        <p>You currently have the <strong>{subscription.plan_name}</strong> plan. Upgrade to <strong>{selectedPlan.plan_name}</strong> for €{selectedPlan.base_amount}/{selectedPlan.billing_cycle}</p>
+                        <div className="subscribe-actions">
+                            <Button 
+                                color="success" 
+                                size="large"
+                                onClick={handleSubscribe}
+                                disabled={loading}
+                            >
+                                {loading ? 'Upgrading...' : 'Upgrade Now'}
                             </Button>
                             <Button 
                                 color="secondary" 
