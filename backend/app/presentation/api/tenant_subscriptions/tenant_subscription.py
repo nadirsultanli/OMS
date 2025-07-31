@@ -420,9 +420,43 @@ async def get_current_user_subscription(
             )
             raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="No active subscription found")
         
-        # Map the data using the repository
-        subscription = tenant_subscription_service.tenant_subscription_repository._map_dict_to_subscription_entity(result.data[0])
-        logger.info(f"Found subscription: {subscription.id}")
+        # Map the data directly
+        from uuid import UUID
+        from datetime import datetime, date
+        from decimal import Decimal
+        from app.domain.entities.tenant_subscriptions import TenantSubscription, PlanTier, BillingCycle, TenantSubscriptionStatus
+        
+        sub_data = result.data[0]
+        logger.info(f"Mapping subscription data: {sub_data}")
+        
+        subscription = TenantSubscription(
+            id=UUID(sub_data['id']),
+            tenant_id=UUID(sub_data['tenant_id']),
+            plan_id=UUID(sub_data['plan_id']),
+            plan_name=sub_data['plan_name'],
+            plan_tier=PlanTier(sub_data['plan_tier']),
+            billing_cycle=BillingCycle(sub_data['billing_cycle']),
+            base_amount=Decimal(str(sub_data['base_amount'])),
+            currency=sub_data.get('currency', 'EUR'),
+            start_date=date.fromisoformat(sub_data['start_date'].split('T')[0]) if sub_data.get('start_date') else date.today(),
+            current_period_start=datetime.fromisoformat(sub_data['current_period_start'].replace('Z', '+00:00')) if sub_data.get('current_period_start') else datetime.utcnow(),
+            current_period_end=datetime.fromisoformat(sub_data['current_period_end'].replace('Z', '+00:00')) if sub_data.get('current_period_end') else datetime.utcnow(),
+            stripe_customer_id=sub_data.get('stripe_customer_id'),
+            stripe_subscription_id=sub_data.get('stripe_subscription_id'),
+            trial_start=datetime.fromisoformat(sub_data['trial_start'].replace('Z', '+00:00')) if sub_data.get('trial_start') else None,
+            trial_end=datetime.fromisoformat(sub_data['trial_end'].replace('Z', '+00:00')) if sub_data.get('trial_end') else None,
+            subscription_status=TenantSubscriptionStatus(sub_data.get('subscription_status', 'active')),
+            cancel_at_period_end=sub_data.get('cancel_at_period_end', False),
+            canceled_at=datetime.fromisoformat(sub_data['canceled_at'].replace('Z', '+00:00')) if sub_data.get('canceled_at') else None,
+            ended_at=datetime.fromisoformat(sub_data['ended_at'].replace('Z', '+00:00')) if sub_data.get('ended_at') else None,
+            current_usage=sub_data.get('current_usage', {}),
+            created_at=datetime.fromisoformat(sub_data['created_at'].replace('Z', '+00:00')) if sub_data.get('created_at') else datetime.utcnow(),
+            updated_at=datetime.fromisoformat(sub_data['updated_at'].replace('Z', '+00:00')) if sub_data.get('updated_at') else datetime.utcnow(),
+            created_by=UUID(sub_data['created_by']) if sub_data.get('created_by') else None,
+            updated_by=UUID(sub_data['updated_by']) if sub_data.get('updated_by') else None
+        )
+        
+        logger.info(f"Successfully mapped subscription: {subscription.id}")
         
         logger.info(
             "Found active subscription for user",
