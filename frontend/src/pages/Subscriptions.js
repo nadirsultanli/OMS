@@ -37,7 +37,8 @@ const Subscriptions = () => {
     const fetchCurrentSubscription = useCallback(async () => {
         try {
             // Updated to use /subscriptions/current endpoint for production fix
-            const response = await apiService.get('/subscriptions/current');
+            // Added timestamp to force cache refresh
+            const response = await apiService.get('/subscriptions/current?v=' + Date.now());
             setSubscription(response);
             fetchUsage(response.tenant_id);
         } catch (err) {
