@@ -398,15 +398,48 @@ async def get_current_user_subscription(
             tenant_id=str(current_user.tenant_id)
         )
         
+        # Try the original method first
         subscription = await tenant_subscription_service.get_tenant_subscription_by_tenant_id(current_user.tenant_id)
         
         if not subscription:
             logger.info(
-                "No active subscription found for user",
+                "No active subscription found via get_tenant_subscription_by_tenant_id, trying alternative approach",
                 user_id=str(current_user.id),
                 tenant_id=str(current_user.tenant_id)
             )
-            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="No active subscription found")
+            
+            # Alternative approach: search for subscriptions and get the first active one
+            from app.infrastucture.database.connection import get_supabase_client_sync
+            
+            try:
+                client = get_supabase_client_sync()
+                result = client.table('tenant_subscriptions')\
+                    .select('*')\
+                    .eq('tenant_id', str(current_user.tenant_id))\
+                    .in_('subscription_status', ['active', 'trial'])\
+                    .is_('ended_at', 'null')\
+                    .limit(1)\
+                    .execute()
+                
+                logger.info(f"Alternative query result: {len(result.data) if result.data else 0} records found")
+                
+                if result.data:
+                    # Use the repository to map the data
+                    from app.infrastucture.database.repositories.tenant_subscription_repository import TenantSubscriptionRepositoryImpl
+                    repo = TenantSubscriptionRepositoryImpl()
+                    subscription = repo._map_dict_to_subscription_entity(result.data[0])
+                    logger.info(f"Found subscription via alternative method: {subscription.id}")
+                else:
+                    logger.info(
+                        "No active subscription found via alternative method",
+                        user_id=str(current_user.id),
+                        tenant_id=str(current_user.tenant_id)
+                    )
+                    raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="No active subscription found")
+                    
+            except Exception as alt_e:
+                logger.error(f"Alternative method also failed: {str(alt_e)}")
+                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="No active subscription found")
         
         logger.info(
             "Found active subscription for user",
