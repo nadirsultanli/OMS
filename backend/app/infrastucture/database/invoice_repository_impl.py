@@ -341,6 +341,18 @@ class InvoiceRepositoryImpl(InvoiceRepository):
     ) -> List[Invoice]:
         """Search invoices with filters"""
         try:
+            # Add debugging
+            self.logger.info(
+                "Searching invoices in repository",
+                tenant_id=str(tenant_id),
+                tenant_id_type=type(tenant_id).__name__,
+                customer_name=customer_name,
+                invoice_no=invoice_no,
+                status=status.value if status else None,
+                limit=limit,
+                offset=offset
+            )
+            
             def build_query(client):
                 query = client.table(self.table_name).select("*")
                 
@@ -369,6 +381,13 @@ class InvoiceRepositoryImpl(InvoiceRepository):
             
             result = build_query(self.supabase).execute()
             
+            self.logger.info(
+                "Database query completed",
+                tenant_id=str(tenant_id),
+                result_count=len(result.data) if result.data else 0,
+                has_data=bool(result.data)
+            )
+            
             if not result.data:
                 return []
             
@@ -396,9 +415,21 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                 invoice_data['invoice_lines'] = lines_by_invoice.get(invoice_data['id'], [])
                 invoices.append(self._dict_to_invoice(invoice_data))
             
+            self.logger.info(
+                "Invoice search completed",
+                tenant_id=str(tenant_id),
+                final_count=len(invoices)
+            )
+            
             return invoices
             
         except Exception as e:
+            self.logger.error(
+                "Error searching invoices",
+                tenant_id=str(tenant_id),
+                error=str(e),
+                error_type=type(e).__name__
+            )
             return []
 
     async def get_overdue_invoices(

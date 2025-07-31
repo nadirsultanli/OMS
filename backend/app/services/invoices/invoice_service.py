@@ -531,7 +531,23 @@ class InvoiceService:
         offset: int = 0
     ) -> List[Invoice]:
         """Search invoices"""
-        return await self.invoice_repository.search_invoices(
+        # Add debugging
+        from app.infrastucture.logs.logger import get_logger
+        logger = get_logger("invoice_service")
+        
+        logger.info(
+            "Searching invoices",
+            user_id=str(user.id),
+            tenant_id=str(user.tenant_id),
+            tenant_id_type=type(user.tenant_id).__name__,
+            customer_name=customer_name,
+            invoice_no=invoice_no,
+            status=status.value if status else None,
+            limit=limit,
+            offset=offset
+        )
+        
+        result = await self.invoice_repository.search_invoices(
             tenant_id=user.tenant_id,
             customer_name=customer_name,
             invoice_no=invoice_no,
@@ -541,6 +557,15 @@ class InvoiceService:
             limit=limit,
             offset=offset
         )
+        
+        logger.info(
+            "Invoice search completed",
+            user_id=str(user.id),
+            tenant_id=str(user.tenant_id),
+            result_count=len(result)
+        )
+        
+        return result
 
     # ============================================================================
     # INVOICE STATUS MANAGEMENT
