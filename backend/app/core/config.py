@@ -22,7 +22,8 @@ class Settings:
         
         # Application settings
         self.app_name: str = env_config("APP_NAME", default="OMS Backend")
-        self.debug: bool = env_config("DEBUG", default=False, cast=bool)
+        debug_env = env_config("DEBUG", default="false")
+        self.debug: bool = debug_env.lower() in ("true", "1", "yes", "on")
         self.environment: str = env_config("ENVIRONMENT", default="development")
         
         # Google OAuth settings
@@ -30,7 +31,8 @@ class Settings:
         self.google_client_secret: Optional[str] = env_config("GOOGLE_CLIENT_SECRET", default=None)
         
         # Railway settings
-        self.railway_environment: bool = env_config("RAILWAY_ENVIRONMENT", default=False, cast=bool)
+        railway_env = env_config("RAILWAY_ENVIRONMENT", default="false")
+        self.railway_environment: bool = railway_env.lower() in ("true", "1", "yes", "on")
         
         # CORS settings
         self.allowed_origins: list = env_config("ALLOWED_ORIGINS", default="http://localhost:3000,http://localhost:8080", cast=lambda x: x.split(","))
