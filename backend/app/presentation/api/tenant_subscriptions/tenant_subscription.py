@@ -302,37 +302,113 @@ async def upgrade_tenant_subscription(
     )
     
     try:
-        result = await tenant_subscription_service.upgrade_tenant_subscription(
-            tenant_id=current_user.tenant_id,
-            plan_id=UUID(request.plan_id),
-            billing_cycle=request.billing_cycle,
-            updated_by=current_user.id
-        )
+        # Direct approach: use the same pattern as the current subscription endpoint
+        from app.infrastucture.database.connection import get_supabase_client_sync
+        from datetime import datetime, timezone
+        import uuid
+        
+        client = get_supabase_client_sync()
+        
+        # First check if tenant has an active subscription
+        sub_result = client.table('tenant_subscriptions')\
+            .select('*')\
+            .eq('tenant_id', str(current_user.tenant_id))\
+            .in_('subscription_status', ['active', 'trial'])\
+            .is_('ended_at', 'null')\
+            .limit(1)\
+            .execute()
+            
+        if not sub_result.data:
+            logger.error(
+                "No active subscription found for upgrade",
+                user_id=str(current_user.id),
+                tenant_id=str(current_user.tenant_id)
+            )
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="No active subscription found to upgrade")
+        
+        current_subscription = sub_result.data[0]
+        
+        # Get the new plan details
+        plan_result = client.table('tenant_plans')\
+            .select('*')\
+            .eq('id', request.plan_id)\
+            .single()\
+            .execute()
+            
+        if not plan_result.data:
+            logger.error(
+                "Plan not found",
+                user_id=str(current_user.id),
+                plan_id=request.plan_id
+            )
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Plan not found")
+            
+        new_plan = plan_result.data
+        
+        # Update the subscription with new plan details
+        update_data = {
+            'plan_id': new_plan['id'],
+            'plan_name': new_plan['plan_name'],
+            'plan_tier': new_plan['plan_tier'],
+            'billing_cycle': request.billing_cycle,
+            'base_amount': new_plan['base_amount'],
+            'updated_at': datetime.now(timezone.utc).isoformat(),
+            'updated_by': str(current_user.id)
+        }
+        
+        # For demo purposes, simulate immediate upgrade without Stripe
+        update_result = client.table('tenant_subscriptions')\
+            .update(update_data)\
+            .eq('id', current_subscription['id'])\
+            .execute()
+            
+        if not update_result.data:
+            raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update subscription")
+        
+        updated_subscription = update_result.data[0]
+        
+        # Create response in the expected format
+        subscription_dict = {
+            'id': updated_subscription['id'],
+            'tenant_id': updated_subscription['tenant_id'],
+            'stripe_customer_id': updated_subscription.get('stripe_customer_id', ''),
+            'stripe_subscription_id': updated_subscription.get('stripe_subscription_id', ''),
+            'plan_id': updated_subscription['plan_id'],
+            'plan_name': updated_subscription['plan_name'],
+            'plan_tier': updated_subscription['plan_tier'],
+            'billing_cycle': updated_subscription['billing_cycle'],
+            'base_amount': float(updated_subscription['base_amount']),
+            'currency': updated_subscription.get('currency', 'EUR'),
+            'start_date': updated_subscription['start_date'],
+            'current_period_start': updated_subscription['current_period_start'],
+            'current_period_end': updated_subscription['current_period_end'],
+            'trial_start': updated_subscription.get('trial_start'),
+            'trial_end': updated_subscription.get('trial_end'),
+            'subscription_status': updated_subscription.get('subscription_status', 'active'),
+            'cancel_at_period_end': updated_subscription.get('cancel_at_period_end', False),
+            'canceled_at': updated_subscription.get('canceled_at'),
+            'ended_at': updated_subscription.get('ended_at'),
+            'current_usage': updated_subscription.get('current_usage', {}),
+            'created_at': updated_subscription['created_at'],
+            'updated_at': updated_subscription['updated_at']
+        }
         
         logger.info(
             "Tenant subscription upgraded successfully",
             user_id=str(current_user.id),
-            subscription_id=result['subscription']['id']
+            subscription_id=updated_subscription['id']
         )
         
         return CreateTenantSubscriptionResponse(
-            subscription=TenantSubscriptionResponse(**result['subscription']),
-            payment_url=result.get('payment_url'),
-            stripe_customer_id=result['stripe_customer_id'],
-            stripe_subscription_id=result['stripe_subscription_id']
+            subscription=TenantSubscriptionResponse(**subscription_dict),
+            payment_url=None,  # No payment URL for demo
+            stripe_customer_id=updated_subscription.get('stripe_customer_id', ''),
+            stripe_subscription_id=updated_subscription.get('stripe_subscription_id', '')
         )
         
-    except (InvalidTenantSubscriptionDataException, TenantPlanNotFoundException) as e:
-        logger.error(
-            "Failed to upgrade tenant subscription - validation error",
-            user_id=str(current_user.id),
-            error=str(e),
-            request_data={
-                "plan_id": request.plan_id,
-                "billing_cycle": request.billing_cycle
-            }
-        )
-        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         import traceback
         logger.error(
@@ -663,16 +739,97 @@ async def get_tenant_usage_summary(
 ):
     """Get tenant usage summary"""
     try:
-        usage_summary = await tenant_subscription_service.get_tenant_usage_summary(UUID(tenant_id))
-        return TenantUsageSummaryResponse(**usage_summary)
-    except TenantSubscriptionNotFoundException as e:
-        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail=str(e))
-    except Exception as e:
-        logger.error(
-            "Failed to get tenant usage summary",
+        logger.info(
+            "Getting tenant usage summary",
             user_id=str(current_user.id),
             tenant_id=tenant_id,
-            error=str(e)
+            requested_tenant_id=tenant_id,
+            user_tenant_id=str(current_user.tenant_id)
+        )
+        
+        # Direct approach: use the same pattern as the current subscription endpoint
+        from app.infrastucture.database.connection import get_supabase_client_sync
+        
+        client = get_supabase_client_sync()
+        
+        # First get the active subscription for the tenant
+        sub_result = client.table('tenant_subscriptions')\
+            .select('*')\
+            .eq('tenant_id', tenant_id)\
+            .in_('subscription_status', ['active', 'trial'])\
+            .is_('ended_at', 'null')\
+            .limit(1)\
+            .execute()
+            
+        if not sub_result.data:
+            logger.info(
+                "No active subscription found for tenant",
+                user_id=str(current_user.id),
+                tenant_id=tenant_id
+            )
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="No active subscription found for tenant")
+        
+        subscription = sub_result.data[0]
+        
+        # Get the plan details
+        plan_result = client.table('tenant_plans')\
+            .select('*')\
+            .eq('id', subscription['plan_id'])\
+            .single()\
+            .execute()
+            
+        if not plan_result.data:
+            logger.error(
+                "Plan not found for subscription",
+                user_id=str(current_user.id),
+                plan_id=subscription['plan_id']
+            )
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Plan not found")
+            
+        plan = plan_result.data
+        
+        # Create the usage summary response
+        usage_summary = {
+            'subscription': {
+                'id': subscription['id'],
+                'status': subscription['subscription_status'],
+                'start_date': subscription['start_date'],
+                'current_period_end': subscription['current_period_end'],
+                'trial_end': subscription.get('trial_end')
+            },
+            'plan': {
+                'id': plan['id'],
+                'name': plan['plan_name'],
+                'tier': plan['plan_tier'],
+                'limits': {
+                    'max_orders_per_month': plan['max_orders_per_month'],
+                    'max_active_drivers': plan['max_active_drivers'],
+                    'max_storage_gb': plan['max_storage_gb'],
+                    'max_api_requests_per_minute': plan['max_api_requests_per_minute']
+                }
+            },
+            'usage': subscription.get('current_usage', {
+                'orders_this_month': 0,
+                'active_drivers': 0,
+                'storage_used_gb': 0,
+                'api_requests_today': 0
+            })
+        }
+        
+        logger.info(f"Returning usage summary for tenant {tenant_id}")
+        return TenantUsageSummaryResponse(**usage_summary)
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404)
+        raise
+    except Exception as e:
+        import traceback
+        logger.error(
+            "Failed to get tenant usage summary - unexpected error",
+            user_id=str(current_user.id),
+            tenant_id=tenant_id,
+            error=str(e),
+            traceback=traceback.format_exc()
         )
         raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
