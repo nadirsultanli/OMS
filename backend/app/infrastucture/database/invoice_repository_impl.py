@@ -412,8 +412,19 @@ class InvoiceRepositoryImpl(InvoiceRepository):
             # Build invoices with their lines
             invoices = []
             for invoice_data in result.data:
-                invoice_data['invoice_lines'] = lines_by_invoice.get(invoice_data['id'], [])
-                invoices.append(self._dict_to_invoice(invoice_data))
+                try:
+                    invoice_data['invoice_lines'] = lines_by_invoice.get(invoice_data['id'], [])
+                    invoice = self._dict_to_invoice(invoice_data)
+                    invoices.append(invoice)
+                except Exception as e:
+                    self.logger.error(
+                        "Error converting invoice data",
+                        invoice_id=invoice_data.get('id'),
+                        error=str(e),
+                        error_type=type(e).__name__,
+                        invoice_data_keys=list(invoice_data.keys())
+                    )
+                    continue
             
             self.logger.info(
                 "Invoice search completed",
@@ -572,6 +583,28 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                 'total_invoices': 0
             }
 
+    def _parse_datetime(self, datetime_str: str) -> datetime:
+        """Parse datetime string with proper error handling for various formats"""
+        if not datetime_str:
+            return datetime.utcnow()
+        
+        try:
+            # Handle 'Z' suffix
+            if datetime_str.endswith('Z'):
+                datetime_str = datetime_str.replace('Z', '+00:00')
+            
+            # Try direct parsing first
+            return datetime.fromisoformat(datetime_str)
+        except ValueError:
+            try:
+                # Try parsing with dateutil for more flexible parsing
+                from dateutil import parser
+                return parser.parse(datetime_str)
+            except:
+                # Fallback to current time if all parsing fails
+                self.logger.warning(f"Failed to parse datetime: {datetime_str}, using current time")
+                return datetime.utcnow()
+
     def _dict_to_invoice(self, invoice_data: dict) -> Invoice:
         """Convert dictionary to Invoice entity"""
         from app.domain.entities.invoices import InvoiceLine, InvoiceStatus, InvoiceType
@@ -599,8 +632,8 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                     product_code=line_data.get('product_code'),
                     variant_sku=line_data.get('variant_sku'),
                     component_type=line_data.get('component_type', 'STANDARD'),
-                    created_at=datetime.fromisoformat(line_data['created_at'].replace('Z', '+00:00')) if line_data.get('created_at') else datetime.utcnow(),
-                    updated_at=datetime.fromisoformat(line_data['updated_at'].replace('Z', '+00:00')) if line_data.get('updated_at') else datetime.utcnow()
+                                    created_at=self._parse_datetime(line_data.get('created_at')) if line_data.get('created_at') else datetime.utcnow(),
+                updated_at=self._parse_datetime(line_data.get('updated_at')) if line_data.get('updated_at') else datetime.utcnow()
                 )
                 lines.append(line)
             except Exception as e:
@@ -634,12 +667,12 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                 currency=invoice_data.get('currency', 'EUR'),
                 payment_terms=invoice_data.get('payment_terms'),
                 notes=invoice_data.get('notes'),
-                created_at=datetime.fromisoformat(invoice_data['created_at'].replace('Z', '+00:00')) if invoice_data.get('created_at') else datetime.utcnow(),
+                created_at=self._parse_datetime(invoice_data.get('created_at')) if invoice_data.get('created_at') else datetime.utcnow(),
                 created_by=UUID(invoice_data['created_by']) if invoice_data.get('created_by') else None,
-                updated_at=datetime.fromisoformat(invoice_data['updated_at'].replace('Z', '+00:00')) if invoice_data.get('updated_at') else datetime.utcnow(),
+                updated_at=self._parse_datetime(invoice_data.get('updated_at')) if invoice_data.get('updated_at') else datetime.utcnow(),
                 updated_by=UUID(invoice_data['updated_by']) if invoice_data.get('updated_by') else None,
-                sent_at=datetime.fromisoformat(invoice_data['sent_at'].replace('Z', '+00:00')) if invoice_data.get('sent_at') else None,
-                paid_at=datetime.fromisoformat(invoice_data['paid_at'].replace('Z', '+00:00')) if invoice_data.get('paid_at') else None
+                sent_at=self._parse_datetime(invoice_data.get('sent_at')) if invoice_data.get('sent_at') else None,
+                paid_at=self._parse_datetime(invoice_data.get('paid_at')) if invoice_data.get('paid_at') else None
             )
         except Exception as e:
             self.logger.error(f"Error converting invoice data: {e}, invoice_data: {invoice_data}")
