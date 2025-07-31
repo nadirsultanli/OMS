@@ -385,6 +385,26 @@ async def search_tenant_subscriptions(
         )
         raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
+@router.get("/current", response_model=TenantSubscriptionResponse)
+async def get_current_user_subscription(
+    tenant_subscription_service: TenantSubscriptionService = Depends(get_tenant_subscription_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Get current user's subscription"""
+    try:
+        subscription = await tenant_subscription_service.get_tenant_subscription_by_tenant_id(current_user.tenant_id)
+        if not subscription:
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="No active subscription found")
+        return TenantSubscriptionResponse(**subscription.to_dict())
+    except Exception as e:
+        logger.error(
+            "Failed to get current user subscription",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            error=str(e)
+        )
+        raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
 @router.get("/{subscription_id}", response_model=TenantSubscriptionResponse)
 async def get_tenant_subscription(
     subscription_id: str,

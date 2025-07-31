@@ -36,13 +36,16 @@ const Subscriptions = () => {
 
     const fetchCurrentSubscription = useCallback(async () => {
         try {
-            const response = await apiService.get('/subscriptions');
-            if (response.subscriptions && response.subscriptions.length > 0) {
-                setSubscription(response.subscriptions[0]);
-                fetchUsage(response.subscriptions[0].tenant_id);
-            }
+            const response = await apiService.get('/subscriptions/current');
+            setSubscription(response);
+            fetchUsage(response.tenant_id);
         } catch (err) {
-            console.error('Error fetching current subscription:', err);
+            if (err.response?.status === 404) {
+                // No subscription found, that's okay
+                setSubscription(null);
+            } else {
+                console.error('Error fetching current subscription:', err);
+            }
         }
     }, [fetchUsage]);
 
