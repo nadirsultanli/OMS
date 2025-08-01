@@ -90,6 +90,10 @@ class PaymentService:
 
         return await self.payment_repository.create_payment(payment)
 
+    async def update_payment(self, payment_id: str, payment: Payment) -> Payment:
+        """Update a payment"""
+        return await self.payment_repository.update_payment(payment_id, payment)
+
     async def create_invoice_payment(
         self,
         user: User,

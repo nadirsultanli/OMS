@@ -140,8 +140,19 @@ async def mpesa_callback(
             checkout_request_id = result['checkout_request_id']
             
             # Find payment by checkout_request_id
+            # Create a system user for webhook processing
+            from app.domain.entities.users import User, UserRoleType
+            system_user = User(
+                id=UUID('00000000-0000-0000-0000-000000000000'),
+                auth_user_id='system',
+                email='system@oms.com',
+                role=UserRoleType.TENANT_ADMIN,
+                tenant_id=UUID('00000000-0000-0000-0000-000000000000'),
+                is_active=True
+            )
+            
             payments = await payment_service.search_payments(
-                user=None,  # We need to find by external_transaction_id
+                user=system_user,
                 external_transaction_id=checkout_request_id
             )
             
@@ -150,8 +161,8 @@ async def mpesa_callback(
                 
                 # Mark payment as completed
                 await payment_service.process_payment(
+                    user=system_user,
                     payment_id=str(payment.id),
-                    processed_by=None,  # System processed
                     gateway_response=result
                 )
                 
@@ -168,7 +179,7 @@ async def mpesa_callback(
             
             # Find payment and mark as failed
             payments = await payment_service.search_payments(
-                user=None,
+                user=system_user,
                 external_transaction_id=checkout_request_id
             )
             
@@ -176,8 +187,8 @@ async def mpesa_callback(
                 payment = payments[0]
                 
                 await payment_service.fail_payment(
+                    user=system_user,
                     payment_id=str(payment.id),
-                    processed_by=None,
                     reason=result.get('result_description', 'Payment failed'),
                     gateway_response=result
                 )
