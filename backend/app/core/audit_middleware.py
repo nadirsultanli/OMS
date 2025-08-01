@@ -359,6 +359,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     "PRICE-LISTS": AuditObjectType.PRICE_LIST,
                     "DELIVERIES": AuditObjectType.DELIVERY,
                     "TENANTS": AuditObjectType.TENANT,
+                    "INVOICES": AuditObjectType.INVOICE,
+                    "PAYMENTS": AuditObjectType.PAYMENT,
                     "SUBSCRIPTIONS": AuditObjectType.OTHER,
                     "STRIPE": AuditObjectType.OTHER,
                     "AUDIT": AuditObjectType.OTHER

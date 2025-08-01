@@ -142,3 +142,46 @@ class PaymentStatusResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# M-PESA SPECIFIC SCHEMAS
+# ============================================================================
+
+class CreateMpesaPaymentRequest(BaseModel):
+    amount: Decimal = Field(..., gt=0, description="Payment amount")
+    phone_number: str = Field(..., description="M-PESA phone number (format: 07XXXXXXXX or +254XXXXXXXX)")
+    payment_date: Optional[date] = Field(None, description="Payment date (defaults to today)")
+    customer_id: Optional[UUID] = Field(None, description="Customer ID")
+    invoice_id: Optional[UUID] = Field(None, description="Invoice ID")
+    order_id: Optional[UUID] = Field(None, description="Order ID")
+    reference_number: Optional[str] = Field(None, description="Reference number")
+    description: Optional[str] = Field(None, description="Payment description")
+    currency: str = Field('KES', description="Currency code (defaults to KES)")
+
+
+class MpesaPaymentResponse(BaseModel):
+    success: bool = Field(..., description="Success status")
+    payment: dict = Field(..., description="Payment details")
+    checkout_request_id: Optional[str] = Field(None, description="M-PESA checkout request ID")
+    merchant_request_id: Optional[str] = Field(None, description="M-PESA merchant request ID")
+    customer_message: Optional[str] = Field(None, description="Message to show customer")
+    phone_number: str = Field(..., description="Phone number used")
+    error: Optional[str] = Field(None, description="Error message if failed")
+
+    class Config:
+        from_attributes = True
+
+
+class MpesaStatusResponse(BaseModel):
+    success: bool = Field(..., description="Success status")
+    result_code: Optional[str] = Field(None, description="M-PESA result code")
+    result_description: Optional[str] = Field(None, description="M-PESA result description")
+    amount: Optional[float] = Field(None, description="Transaction amount")
+    mpesa_receipt_number: Optional[str] = Field(None, description="M-PESA receipt number")
+    transaction_date: Optional[str] = Field(None, description="Transaction date")
+    phone_number: Optional[str] = Field(None, description="Phone number")
+    error: Optional[str] = Field(None, description="Error message if failed")
+
+    class Config:
+        from_attributes = True

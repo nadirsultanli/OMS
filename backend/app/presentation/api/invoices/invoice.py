@@ -23,6 +23,7 @@ from app.presentation.schemas.invoices import (
     InvoiceListResponse,
     InvoiceSummaryResponse
 )
+from app.presentation.schemas.payments import CreateMpesaPaymentRequest, MpesaPaymentResponse
 from app.services.invoices.invoice_service import InvoiceService
 from app.services.payments.payment_service import PaymentService
 from app.services.dependencies.invoices import get_invoice_service
@@ -679,12 +680,11 @@ async def process_invoice_payment(
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create Stripe payment")
                 
         elif payment_method == 'mpesa':
-            # M-Pesa payment - placeholder for future implementation
-            return {
-                "success": False,
-                "message": "M-Pesa integration coming soon",
-                "status": "not_implemented"
-            }
+            # M-Pesa payment - redirect to dedicated M-PESA endpoint
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Please use the dedicated M-PESA endpoint: /invoices/{invoice_id}/mpesa-payment"
+            )
             
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported payment method: {payment_method}")
@@ -701,6 +701,108 @@ async def process_invoice_payment(
             error_type=type(e).__name__
         )
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+@router.post("/{invoice_id}/mpesa-payment", response_model=MpesaPaymentResponse)
+async def initiate_mpesa_payment_for_invoice(
+    invoice_id: str,
+    request: CreateMpesaPaymentRequest,
+    payment_service: PaymentService = Depends(get_payment_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Initiate M-PESA payment for an invoice"""
+    logger.info(
+        "Initiating M-PESA payment for invoice",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        invoice_id=invoice_id,
+        amount=float(request.amount),
+        phone_number=request.phone_number
+    )
+    
+    try:
+        # Create M-PESA payment
+        payment = await payment_service.create_invoice_payment(
+            user=current_user,
+            invoice_id=UUID(invoice_id),
+            amount=request.amount,
+            payment_method=PaymentMethod.MPESA,
+            payment_date=request.payment_date or date.today(),
+            reference_number=request.reference_number,
+            auto_apply=False  # Don't auto-apply until M-PESA confirms
+        )
+        
+        # Import M-PESA service
+        from app.services.payments.mpesa_service import MpesaService
+        mpesa_service = MpesaService()
+        
+        # Validate phone number
+        if not mpesa_service.validate_phone_number(request.phone_number):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Invalid phone number format. Please use format: 07XXXXXXXX or +254XXXXXXXX"
+            )
+        
+        # Initiate STK Push
+        stk_result = await mpesa_service.initiate_stk_push(
+            phone_number=request.phone_number,
+            amount=request.amount,
+            reference=payment.payment_no,
+            description=request.description or f"Payment for invoice {payment.payment_no}"
+        )
+        
+        if not stk_result['success']:
+            # Mark payment as failed
+            await payment_service.fail_payment(
+                user=current_user,
+                payment_id=str(payment.id),
+                gateway_response=stk_result,
+                reason=f"M-PESA STK Push failed: {stk_result.get('error', 'Unknown error')}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=f"M-PESA payment initiation failed: {stk_result.get('error', 'Unknown error')}"
+            )
+        
+        # Update payment with M-PESA details
+        payment.external_transaction_id = stk_result['checkout_request_id']
+        payment.gateway_provider = "mpesa"
+        payment.gateway_response = stk_result
+        payment.notes = f"M-PESA STK Push initiated\nPhone: {request.phone_number}\nCheckoutRequestID: {stk_result['checkout_request_id']}"
+        
+        # Update payment in database
+        updated_payment = await payment_service.update_payment(str(payment.id), payment)
+        
+        logger.info(
+            "M-PESA payment initiated successfully",
+            user_id=str(current_user.id),
+            payment_id=str(payment.id),
+            checkout_request_id=stk_result['checkout_request_id']
+        )
+        
+        return MpesaPaymentResponse(
+            success=True,
+            payment=updated_payment.to_dict(),
+            checkout_request_id=stk_result['checkout_request_id'],
+            merchant_request_id=stk_result['merchant_request_id'],
+            customer_message=stk_result['customer_message'],
+            phone_number=request.phone_number
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        logger.error(
+            "Failed to initiate M-PESA payment for invoice",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            invoice_id=invoice_id,
+            error=str(e),
+            error_type=type(e).__name__,
+            traceback=traceback.format_exc()
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal server error: {str(e)}")
 
 
 @router.get("/overdue/list", response_model=InvoiceListResponse)

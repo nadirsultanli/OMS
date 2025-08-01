@@ -25,11 +25,11 @@ class AuditEventModel(Base):
     actor_type = Column(Enum('user', 'service', name='audit_actor_type'), nullable=False, default="user")
     
     # Object information
-    object_type = Column(Enum('order', 'customer', 'trip', 'stock_doc', 'stock_level', 'product', 'user', 'tenant', 'price_list', 'variant', 'warehouse', 'vehicle', 'address', 'delivery', 'other', name='audit_object_type'), nullable=False, index=True)
+    object_type = Column(Enum('order', 'customer', 'trip', 'stock_doc', 'stock_level', 'product', 'user', 'tenant', 'price_list', 'variant', 'warehouse', 'vehicle', 'address', 'delivery', 'invoice', 'payment', 'other', name='audit_object_type'), nullable=False, index=True)
     object_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     
     # Event details
-    event_type = Column(Enum('create', 'read', 'update', 'status_change', 'delete', 'login', 'logout', 'permission_change', 'price_change', 'stock_adjustment', 'delivery_complete', 'delivery_failed', 'trip_start', 'trip_complete', 'credit_approval', 'credit_rejection', 'error', name='audit_event_type'), nullable=False, index=True)
+    event_type = Column(Enum('create', 'read', 'update', 'status_change', 'delete', 'login', 'logout', 'permission_change', 'price_change', 'stock_adjustment', 'delivery_complete', 'delivery_failed', 'trip_start', 'trip_complete', 'credit_approval', 'credit_rejection', 'error', 'payment_processed', 'payment_failed', 'payment_refunded', name='audit_event_type'), nullable=False, index=True)
     field_name = Column(String(100), nullable=True)  # For field-level changes
     
     # Change data (JSONB for flexibility)

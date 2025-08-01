@@ -228,7 +228,44 @@ const Invoices = () => {
           setError(result.error);
         }
       } else if (paymentData.payment_method === 'mpesa') {
-        setError('M-Pesa integration coming soon!');
+        // Validate phone number for M-PESA
+        if (!paymentData.phone_number) {
+          setError('Phone number is required for M-PESA payments');
+          return;
+        }
+        
+        // Use M-PESA specific endpoint
+        const result = await invoiceService.initiateMpesaPayment(selectedInvoice.id, {
+          amount: parseFloat(paymentData.payment_amount),
+          phone_number: paymentData.phone_number,
+          payment_date: paymentData.payment_date || new Date().toISOString().split('T')[0],
+          reference_number: paymentData.payment_reference
+        });
+        
+        if (result.success) {
+          setShowPaymentModal(false);
+          setPaymentData({
+            payment_amount: '',
+            payment_date: new Date().toISOString().split('T')[0],
+            payment_reference: '',
+            payment_method: 'cash',
+            phone_number: ''
+          });
+          loadInvoices();
+          
+          // Show success message for M-PESA
+          alert(`M-PESA payment initiated successfully!\n\nPlease check your phone for the payment prompt.\n\nCheckout Request ID: ${result.data.checkout_request_id}`);
+          
+          if (showInvoiceDetail) {
+            // Refresh selected invoice
+            const invoiceResult = await invoiceService.getInvoiceById(selectedInvoice.id);
+            if (invoiceResult.success) {
+              setSelectedInvoice(invoiceResult.data);
+            }
+          }
+        } else {
+          setError(result.error);
+        }
       }
     } catch (err) {
       setError('Failed to process payment');
@@ -880,7 +917,7 @@ const Invoices = () => {
                 <span className="payment-method-text">
                   {paymentData.payment_method === 'cash' ? 'Cash Payment' : 
                    paymentData.payment_method === 'card' ? 'Credit/Debit Card (Stripe)' : 
-                   paymentData.payment_method === 'mpesa' ? 'M-Pesa (Coming Soon)' : 'Select Method'}
+                   paymentData.payment_method === 'mpesa' ? 'M-Pesa Mobile Money' : 'Select Method'}
                 </span>
               </div>
               <select
@@ -889,9 +926,25 @@ const Invoices = () => {
               >
                 <option value="cash">Cash</option>
                 <option value="card">Credit/Debit Card (Stripe)</option>
-                <option value="mpesa">M-Pesa (Coming Soon)</option>
+                <option value="mpesa">M-Pesa Mobile Money</option>
               </select>
             </div>
+            
+            {paymentData.payment_method === 'mpesa' && (
+              <div className="form-group">
+                <label>Phone Number:</label>
+                <input
+                  type="tel"
+                  value={paymentData.phone_number || ''}
+                  onChange={(e) => setPaymentData(prev => ({ ...prev, phone_number: e.target.value }))}
+                  placeholder="07XXXXXXXX or +254XXXXXXXX"
+                  required
+                />
+                <small className="form-help">
+                  Enter the M-PESA phone number to receive payment
+                </small>
+              </div>
+            )}
             
             <div className="form-group">
               <label>Payment Amount:</label>
@@ -937,10 +990,11 @@ const Invoices = () => {
               <button 
                 className="btn btn-primary"
                 onClick={handleRecordPayment}
-                disabled={!paymentData.payment_amount}
+                disabled={!paymentData.payment_amount || (paymentData.payment_method === 'mpesa' && !paymentData.phone_number)}
               >
                 {paymentData.payment_method === 'cash' ? 'Record Cash Payment' : 
                  paymentData.payment_method === 'card' ? 'Process Card Payment' : 
+                 paymentData.payment_method === 'mpesa' ? 'Initiate M-PESA Payment' :
                  'Process Payment'}
               </button>
             </div>

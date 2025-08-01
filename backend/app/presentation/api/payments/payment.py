@@ -25,6 +25,7 @@ from app.presentation.schemas.payments import (
     OrderPaymentCycleResponse,
     PaymentStatusResponse
 )
+from app.presentation.api.payments.mpesa import router as mpesa_router
 from app.services.payments.payment_service import PaymentService
 from app.services.dependencies.payments import get_payment_service
 from app.services.dependencies.auth import get_current_user
@@ -32,6 +33,9 @@ from app.infrastucture.logs.logger import get_logger
 
 logger = get_logger("payments_api")
 router = APIRouter(prefix="/payments", tags=["Payments"])
+
+# Include M-PESA router
+router.include_router(mpesa_router)
 
 
 @router.post("", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
@@ -160,6 +164,7 @@ async def search_payments(
     method: Optional[PaymentMethod] = Query(None, description="Filter by payment method"),
     payment_type: Optional[PaymentType] = Query(None, description="Filter by payment type"),
     customer_id: Optional[UUID] = Query(None, description="Filter by customer ID"),
+    external_transaction_id: Optional[str] = Query(None, description="Filter by external transaction ID"),
     from_date: Optional[date] = Query(None, description="Filter from date"),
     to_date: Optional[date] = Query(None, description="Filter to date"),
     limit: int = Query(100, ge=1, le=1000),
@@ -176,6 +181,7 @@ async def search_payments(
             method=method,
             payment_type=payment_type,
             customer_id=customer_id,
+            external_transaction_id=external_transaction_id,
             from_date=from_date,
             to_date=to_date,
             limit=limit,

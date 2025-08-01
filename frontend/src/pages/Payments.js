@@ -130,9 +130,33 @@ const Payments = () => {
 
   const handleCreatePayment = async () => {
     if (!paymentData.amount || !paymentData.customer_id) return;
+    
+    // Validate M-PESA phone number if selected
+    if (paymentData.payment_method === 'MPESA' && !paymentData.phone_number) {
+      setError('Phone number is required for M-PESA payments');
+      return;
+    }
 
     try {
-      const result = await paymentService.createPayment(paymentData);
+      let result;
+      
+      if (paymentData.payment_method === 'MPESA') {
+        // Use M-PESA specific endpoint
+        result = await paymentService.initiateMpesaPayment({
+          amount: parseFloat(paymentData.amount),
+          phone_number: paymentData.phone_number,
+          customer_id: paymentData.customer_id,
+          invoice_id: paymentData.invoice_id || null,
+          order_id: paymentData.order_id || null,
+          reference_number: paymentData.reference_number,
+          description: paymentData.notes,
+          currency: 'KES'
+        });
+      } else {
+        // Use regular payment endpoint
+        result = await paymentService.createPayment(paymentData);
+      }
+      
       if (result.success) {
         setShowCreateModal(false);
         setPaymentData({
@@ -142,9 +166,15 @@ const Payments = () => {
           payment_method: 'CASH',
           payment_date: new Date().toISOString().split('T')[0],
           reference_number: '',
-          notes: ''
+          notes: '',
+          phone_number: ''
         });
         loadPayments();
+        
+        // Show success message for M-PESA
+        if (paymentData.payment_method === 'MPESA') {
+          alert(`M-PESA payment initiated successfully!\n\nPlease check your phone for the payment prompt.\n\nCheckout Request ID: ${result.data.checkout_request_id}`);
+        }
       } else {
         setError(result.error);
       }
@@ -574,12 +604,29 @@ const Payments = () => {
               >
                 <option value="CASH">Cash</option>
                 <option value="CARD">Card</option>
+                <option value="MPESA">M-PESA</option>
                 <option value="BANK_TRANSFER">Bank Transfer</option>
                 <option value="CHECK">Check</option>
                 <option value="STRIPE">Stripe</option>
                 <option value="PAYPAL">PayPal</option>
               </select>
             </div>
+            
+            {paymentData.payment_method === 'MPESA' && (
+              <div className="form-group">
+                <label>Phone Number:</label>
+                <input
+                  type="tel"
+                  value={paymentData.phone_number || ''}
+                  onChange={(e) => setPaymentData(prev => ({ ...prev, phone_number: e.target.value }))}
+                  placeholder="07XXXXXXXX or +254XXXXXXXX"
+                  required
+                />
+                <small className="form-help">
+                  Enter the M-PESA phone number to receive payment
+                </small>
+              </div>
+            )}
             
             <div className="form-group">
               <label>Payment Date:</label>

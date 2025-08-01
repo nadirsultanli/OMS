@@ -267,6 +267,25 @@ const invoiceService = {
     }
   },
 
+  // Initiate M-PESA payment for invoice
+  initiateMpesaPayment: async (invoiceId, paymentData) => {
+    try {
+      const response = await api.post(`/invoices/${invoiceId}/mpesa-payment`, {
+        amount: paymentData.amount,
+        phone_number: paymentData.phone_number,
+        payment_date: paymentData.payment_date,
+        reference_number: paymentData.reference_number
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error initiating M-PESA payment:', error);
+      return { 
+        success: false, 
+        error: extractErrorMessage(error.response?.data) || 'Failed to initiate M-PESA payment' 
+      };
+    }
+  },
+
   // Update invoice status
   updateStatus: async (invoiceId, status) => {
     try {

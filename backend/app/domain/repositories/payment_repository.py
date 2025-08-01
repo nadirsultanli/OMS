@@ -76,6 +76,7 @@ class PaymentRepository(ABC):
         method: Optional[PaymentMethod] = None,
         payment_type: Optional[PaymentType] = None,
         customer_id: Optional[UUID] = None,
+        external_transaction_id: Optional[str] = None,
         from_date: Optional[date] = None,
         to_date: Optional[date] = None,
         limit: int = 100,

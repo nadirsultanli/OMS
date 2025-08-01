@@ -45,6 +45,16 @@ class Settings:
         self.stripe_publishable_key: Optional[str] = env_config("STRIPE_PUBLISHABLE_KEY", default=None)
         self.stripe_webhook_secret: Optional[str] = env_config("STRIPE_WEBHOOK_SECRET", default=None)
         
+        # M-PESA settings
+        self.mpesa_consumer_key: Optional[str] = env_config("MPESA_CONSUMER_KEY", default=None)
+        self.mpesa_consumer_secret: Optional[str] = env_config("MPESA_CONSUMER_SECRET", default=None)
+        self.mpesa_shortcode: Optional[str] = env_config("MPESA_SHORTCODE", default=None)
+        self.mpesa_passkey: Optional[str] = env_config("MPESA_PASSKEY", default=None)
+        self.mpesa_environment: str = env_config("MPESA_ENVIRONMENT", default="sandbox")
+        
+        # Backend URL for callbacks
+        self.backend_url: str = env_config("BACKEND_URL", default="http://localhost:8000")
+        
         # Logging settings
         self.log_level: str = env_config("LOG_LEVEL", default="INFO")
         

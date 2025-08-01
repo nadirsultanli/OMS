@@ -201,6 +201,50 @@ const paymentService = {
     }
   },
 
+  // M-PESA specific methods
+  initiateMpesaPayment: async (mpesaData) => {
+    try {
+      const response = await api.post('/payments/mpesa/initiate', mpesaData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error initiating M-PESA payment:', error);
+      return { 
+        success: false, 
+        error: extractErrorMessage(error.response?.data) || 'Failed to initiate M-PESA payment' 
+      };
+    }
+  },
+
+  checkMpesaStatus: async (checkoutRequestId) => {
+    try {
+      const response = await api.post(`/payments/mpesa/status/${checkoutRequestId}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error checking M-PESA status:', error);
+      return { 
+        success: false, 
+        error: extractErrorMessage(error.response?.data) || 'Failed to check M-PESA status' 
+      };
+    }
+  },
+
+  refundMpesaPayment: async (paymentId, amount, phoneNumber) => {
+    try {
+      const response = await api.post('/payments/mpesa/refund', {
+        payment_id: paymentId,
+        amount: amount,
+        phone_number: phoneNumber
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error refunding M-PESA payment:', error);
+      return { 
+        success: false, 
+        error: extractErrorMessage(error.response?.data) || 'Failed to refund M-PESA payment' 
+      };
+    }
+  },
+
   // Helper functions for UI
   getPaymentStatusLabel: (status) => {
     // Normalize status to uppercase for comparison
@@ -241,6 +285,7 @@ const paymentService = {
     const labels = {
       'CASH': 'Cash',
       'CARD': 'Card',
+      'MPESA': 'M-PESA',
       'BANK_TRANSFER': 'Bank Transfer',
       'CHECK': 'Check',
       'STRIPE': 'Stripe',

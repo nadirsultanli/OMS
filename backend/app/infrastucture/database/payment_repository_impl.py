@@ -294,6 +294,7 @@ class PaymentRepositoryImpl(PaymentRepository):
         method: Optional[PaymentMethod] = None,
         payment_type: Optional[PaymentType] = None,
         customer_id: Optional[UUID] = None,
+        external_transaction_id: Optional[str] = None,
         from_date: Optional[date] = None,
         to_date: Optional[date] = None,
         limit: int = 100,
@@ -317,6 +318,9 @@ class PaymentRepositoryImpl(PaymentRepository):
             
             if customer_id:
                 conditions.append(PaymentModel.customer_id == customer_id)
+            
+            if external_transaction_id:
+                conditions.append(PaymentModel.external_transaction_id == external_transaction_id)
             
             if from_date:
                 conditions.append(PaymentModel.payment_date >= from_date)
