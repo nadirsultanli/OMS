@@ -1,10 +1,12 @@
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse, Response
 
 from app.domain.entities.invoices import InvoiceStatus
+from app.domain.entities.payments import PaymentMethod
 from app.domain.entities.users import User
 from app.domain.exceptions.invoices import (
     InvoiceNotFoundError,
@@ -22,7 +24,9 @@ from app.presentation.schemas.invoices import (
     InvoiceSummaryResponse
 )
 from app.services.invoices.invoice_service import InvoiceService
+from app.services.payments.payment_service import PaymentService
 from app.services.dependencies.invoices import get_invoice_service
+from app.services.dependencies.payments import get_payment_service
 from app.services.dependencies.auth import get_current_user
 from app.infrastucture.logs.logger import get_logger
 
@@ -363,11 +367,57 @@ async def send_invoice(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
+@router.post("/{invoice_id}/mark-generated", response_model=InvoiceResponse)
+async def mark_invoice_as_generated(
+    invoice_id: str,
+    invoice_service: InvoiceService = Depends(get_invoice_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark invoice as generated (ready for payment)"""
+    logger.info(
+        "Marking invoice as generated",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        invoice_id=invoice_id
+    )
+    
+    try:
+        invoice = await invoice_service.mark_as_generated(current_user, invoice_id)
+        
+        logger.info(
+            "Invoice marked as generated successfully",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            invoice_id=invoice_id,
+            new_status=invoice.invoice_status.value
+        )
+        
+        return InvoiceResponse(**invoice.to_dict())
+        
+    except InvoiceNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except InvoicePermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except InvoiceStatusError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to mark invoice as generated",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            invoice_id=invoice_id,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
 @router.post("/{invoice_id}/payment", response_model=InvoiceResponse)
 async def record_payment(
     invoice_id: str,
     request: RecordPaymentRequest,
     invoice_service: InvoiceService = Depends(get_invoice_service),
+    payment_service: PaymentService = Depends(get_payment_service),
     current_user: User = Depends(get_current_user)
 ):
     """Record a payment against an invoice"""
@@ -380,19 +430,26 @@ async def record_payment(
     )
     
     try:
-        invoice = await invoice_service.record_payment(
+        # Create a payment record and apply it to the invoice in one operation
+        payment = await payment_service.create_invoice_payment(
             user=current_user,
             invoice_id=invoice_id,
-            payment_amount=request.payment_amount,
-            payment_date=request.payment_date,
-            payment_reference=request.payment_reference
+            amount=request.payment_amount,
+            payment_method=PaymentMethod.CASH,  # Default to cash for this endpoint
+            payment_date=request.payment_date or date.today(),
+            reference_number=request.payment_reference,
+            auto_apply=True  # Auto-apply to invoice
         )
         
+        # Get the updated invoice
+        invoice = await invoice_service.get_invoice_by_id(current_user, invoice_id)
+        
         logger.info(
-            "Payment recorded successfully",
+            "Payment created and applied successfully",
             user_id=str(current_user.id),
             tenant_id=str(current_user.tenant_id),
             invoice_id=invoice_id,
+            payment_id=str(payment.id),
             payment_amount=float(request.payment_amount),
             new_status=invoice.invoice_status.value
         )
@@ -410,6 +467,233 @@ async def record_payment(
     except Exception as e:
         logger.error(
             "Failed to record payment",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            invoice_id=invoice_id,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+@router.patch("/{invoice_id}/status", response_model=InvoiceResponse)
+async def update_invoice_status(
+    invoice_id: str,
+    request: dict,
+    invoice_service: InvoiceService = Depends(get_invoice_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Update invoice status"""
+    logger.info(
+        "Updating invoice status",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        invoice_id=invoice_id,
+        new_status=request.get('status')
+    )
+    
+    try:
+        new_status = request.get('status')
+        if not new_status:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status is required")
+        
+        # Validate status
+        try:
+            invoice_status = InvoiceStatus(new_status)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid status: {new_status}")
+        
+        # Get current invoice
+        invoice = await invoice_service.get_invoice_by_id(current_user, invoice_id)
+        
+        # Don't allow changing PAID invoices
+        if invoice.invoice_status == InvoiceStatus.PAID:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change status of paid invoices")
+        
+        # Update status based on the new status
+        if invoice_status == InvoiceStatus.GENERATED:
+            invoice = await invoice_service.mark_as_generated(current_user, invoice_id)
+        elif invoice_status == InvoiceStatus.SENT:
+            invoice = await invoice_service.send_invoice(current_user, invoice_id)
+        elif invoice_status == InvoiceStatus.DRAFT:
+            # For DRAFT, we need to reset the invoice status
+            invoice.invoice_status = InvoiceStatus.DRAFT
+            invoice.updated_by = current_user.id
+            invoice.updated_at = datetime.now()
+            invoice = await invoice_service.invoice_repository.update_invoice(invoice_id, invoice)
+        else:
+            # For other statuses, just update directly
+            invoice.invoice_status = invoice_status
+            invoice.updated_by = current_user.id
+            invoice.updated_at = datetime.now()
+            invoice = await invoice_service.invoice_repository.update_invoice(invoice_id, invoice)
+        
+        logger.info(
+            "Invoice status updated successfully",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            invoice_id=invoice_id,
+            old_status=invoice.invoice_status.value,
+            new_status=new_status
+        )
+        
+        return InvoiceResponse(**invoice.to_dict())
+        
+    except InvoiceNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except InvoicePermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except InvoiceStatusError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to update invoice status",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            invoice_id=invoice_id,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+@router.post("/{invoice_id}/process-payment", response_model=dict)
+async def process_invoice_payment(
+    invoice_id: str,
+    request: dict,
+    invoice_service: InvoiceService = Depends(get_invoice_service),
+    payment_service: PaymentService = Depends(get_payment_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Process invoice payment with different payment methods"""
+    logger.info(
+        "Processing invoice payment",
+        user_id=str(current_user.id),
+        tenant_id=str(current_user.tenant_id),
+        invoice_id=invoice_id,
+        payment_method=request.get('payment_method')
+    )
+    
+    try:
+        payment_method = request.get('payment_method')
+        amount = Decimal(str(request.get('amount', 0)))
+        
+        if not amount or amount <= 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment amount")
+        
+        # Handle payment date
+        payment_date_str = request.get('payment_date')
+        if payment_date_str:
+            try:
+                from datetime import datetime
+                payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment date format. Use YYYY-MM-DD")
+        else:
+            payment_date = date.today()
+        
+        # Get the invoice
+        invoice = await invoice_service.get_invoice_by_id(current_user, invoice_id)
+        
+        if not invoice.can_be_paid():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot process payment for invoice in status: {invoice.invoice_status}")
+        
+        # Handle different payment methods
+        if payment_method == 'cash':
+            # Cash payment - immediate completion
+            try:
+                payment = await payment_service.create_invoice_payment(
+                    user=current_user,
+                    invoice_id=invoice_id,
+                    amount=amount,
+                    payment_method=PaymentMethod.CASH,
+                    payment_date=payment_date,
+                    reference_number=request.get('reference_number'),
+                    auto_apply=True
+                )
+                
+                # Payment is already processed by create_invoice_payment when auto_apply=True
+                # No need to call process_payment again
+                
+                return {
+                    "success": True,
+                    "message": "Cash payment processed successfully",
+                    "payment_id": str(payment.id),
+                    "payment_no": payment.payment_no,
+                    "amount": float(payment.amount),
+                    "status": payment.payment_status.value
+                }
+            except Exception as e:
+                logger.error(f"Cash payment processing error: {str(e)}", exc_info=True)
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to process cash payment: {str(e)}")
+            
+        elif payment_method == 'card':
+            # Stripe payment - create payment intent
+            try:
+                import stripe
+                from app.core.config import settings
+                
+                if not settings.stripe_secret_key:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+                
+                stripe.api_key = settings.stripe_secret_key
+                
+                # Create payment intent
+                payment_intent = stripe.PaymentIntent.create(
+                    amount=int(amount * 100),  # Convert to cents
+                    currency='eur',
+                    metadata={
+                        'invoice_id': invoice_id,
+                        'tenant_id': str(current_user.tenant_id),
+                        'customer_id': str(invoice.customer_id),
+                        'payment_type': 'invoice_payment'
+                    },
+                    description=f"Payment for invoice {invoice.invoice_no}"
+                )
+                
+                # Create payment record with invoice currency
+                payment = await payment_service.create_invoice_payment(
+                    user=current_user,
+                    invoice_id=invoice_id,
+                    amount=amount,
+                    payment_method=PaymentMethod.CARD,
+                    payment_date=payment_date,
+                    reference_number=payment_intent.id,
+                    auto_apply=False
+                )
+                
+                return {
+                    "success": True,
+                    "message": "Stripe payment intent created",
+                    "payment_id": str(payment.id),
+                    "payment_intent_id": payment_intent.id,
+                    "client_secret": payment_intent.client_secret,
+                    "amount": float(payment.amount),
+                    "status": "requires_payment_method"
+                }
+                
+            except Exception as e:
+                logger.error(f"Stripe payment error: {str(e)}")
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create Stripe payment")
+                
+        elif payment_method == 'mpesa':
+            # M-Pesa payment - placeholder for future implementation
+            return {
+                "success": False,
+                "message": "M-Pesa integration coming soon",
+                "status": "not_implemented"
+            }
+            
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported payment method: {payment_method}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to process invoice payment",
             user_id=str(current_user.id),
             tenant_id=str(current_user.tenant_id),
             invoice_id=invoice_id,

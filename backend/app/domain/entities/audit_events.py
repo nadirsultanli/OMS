@@ -27,6 +27,8 @@ class AuditObjectType(str, Enum):
     VEHICLE = "vehicle"
     ADDRESS = "address"
     DELIVERY = "delivery"
+    INVOICE = "invoice"
+    PAYMENT = "payment"
     OTHER = "other"
 
 
@@ -48,6 +50,9 @@ class AuditEventType(str, Enum):
     TRIP_COMPLETE = "trip_complete"
     CREDIT_APPROVAL = "credit_approval"
     CREDIT_REJECTION = "credit_rejection"
+    PAYMENT_PROCESSED = "payment_processed"
+    PAYMENT_FAILED = "payment_failed"
+    PAYMENT_REFUNDED = "payment_refunded"
     ERROR = "error"
 
 

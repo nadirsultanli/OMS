@@ -49,8 +49,8 @@ class InvoiceLine:
     component_type: str = 'STANDARD'  # GAS_FILL, CYLINDER_DEPOSIT, EMPTY_RETURN
     
     # Timestamps
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
 
     @staticmethod
     def create(
@@ -90,7 +90,7 @@ class InvoiceLine:
         self.tax_amount = self.line_total * (self.tax_rate / 100)
         self.net_amount = self.line_total
         self.gross_amount = self.line_total + self.tax_amount
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now()
 
 
 @dataclass
@@ -135,9 +135,9 @@ class Invoice:
     invoice_lines: List[InvoiceLine] = field(default_factory=list)
     
     # Audit fields
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.now)
     created_by: Optional[UUID] = None
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.now)
     updated_by: Optional[UUID] = None
     sent_at: Optional[datetime] = None
     paid_at: Optional[datetime] = None
@@ -187,14 +187,20 @@ class Invoice:
         self.total_tax = sum(line.tax_amount for line in self.invoice_lines)
         self.total_amount = self.subtotal + self.total_tax
         self.balance_due = self.total_amount - self.paid_amount
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now()
 
     def mark_as_sent(self, sent_by: Optional[UUID] = None):
         """Mark invoice as sent"""
         self.invoice_status = InvoiceStatus.SENT
-        self.sent_at = datetime.utcnow()
+        self.sent_at = datetime.now()
         self.updated_by = sent_by
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now()
+
+    def mark_as_generated(self, updated_by: Optional[UUID] = None):
+        """Mark invoice as generated (ready for payment)"""
+        self.invoice_status = InvoiceStatus.GENERATED
+        self.updated_by = updated_by
+        self.updated_at = datetime.now()
 
     def record_payment(self, payment_amount: Decimal, payment_by: Optional[UUID] = None):
         """Record a payment against the invoice"""
@@ -203,12 +209,12 @@ class Invoice:
         
         if self.balance_due <= Decimal('0.00'):
             self.invoice_status = InvoiceStatus.PAID
-            self.paid_at = datetime.utcnow()
+            self.paid_at = datetime.now()
         elif self.paid_amount > Decimal('0.00'):
             self.invoice_status = InvoiceStatus.PARTIAL_PAID
         
         self.updated_by = payment_by
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now()
 
     def is_overdue(self) -> bool:
         """Check if invoice is overdue"""
@@ -230,7 +236,7 @@ class Invoice:
         """Check if invoice can be edited"""
         return self.invoice_status in [InvoiceStatus.DRAFT]
 
-    def to_dict(self, include_lines: bool = True) -> dict:
+    def to_dict(self, include_lines: bool = True, include_computed: bool = True) -> dict:
         """Convert invoice to dictionary"""
         result = {
             'id': str(self.id),
@@ -282,6 +288,8 @@ class Invoice:
                 }
                 for line in self.invoice_lines
             ]
+        
+        if include_computed:
             result['is_overdue'] = self.is_overdue()
         
         return result

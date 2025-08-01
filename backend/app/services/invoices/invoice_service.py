@@ -601,6 +601,20 @@ class InvoiceService:
         invoice.mark_as_sent(user.id)
         return await self.invoice_repository.update_invoice(invoice_id, invoice)
 
+    async def mark_as_generated(self, user: User, invoice_id: str) -> Invoice:
+        """Mark invoice as generated (ready for payment)"""
+        
+        if not self.can_send_invoice(user):  # Use send permission instead of edit permission
+            raise InvoicePermissionError("User does not have permission to modify invoices")
+
+        invoice = await self.get_invoice_by_id(user, invoice_id)
+        
+        if invoice.invoice_status != InvoiceStatus.DRAFT:
+            raise InvoiceStatusError(f"Cannot mark invoice as generated in status: {invoice.invoice_status}")
+
+        invoice.mark_as_generated(user.id)
+        return await self.invoice_repository.update_invoice(invoice_id, invoice)
+
     async def record_payment(
         self,
         user: User,
@@ -625,8 +639,20 @@ class InvoiceService:
         if payment_amount > invoice.balance_due:
             raise ValueError(f"Payment amount ({payment_amount}) exceeds balance due ({invoice.balance_due})")
 
+        # Log before recording payment
+        print(f"Recording payment - Invoice: {invoice.invoice_no}, Amount: {payment_amount}, "
+              f"Balance before: {invoice.balance_due}, Total: {invoice.total_amount}, Paid: {invoice.paid_amount}")
+        
         invoice.record_payment(payment_amount, user.id)
-        return await self.invoice_repository.update_invoice(invoice_id, invoice)
+        
+        # Log after recording payment
+        print(f"Payment recorded - Invoice: {invoice.invoice_no}, New balance: {invoice.balance_due}, "
+              f"New paid amount: {invoice.paid_amount}, New status: {invoice.invoice_status.value}")
+        
+        # Update invoice in repository
+        updated_invoice = await self.invoice_repository.update_invoice(invoice_id, invoice)
+        
+        return updated_invoice
 
     # ============================================================================
     # REPORTING AND ANALYTICS

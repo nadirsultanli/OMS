@@ -19,6 +19,7 @@ class CreatePaymentRequest(BaseModel):
     order_id: Optional[UUID] = Field(None, description="Order ID")
     reference_number: Optional[str] = Field(None, description="Reference number")
     description: Optional[str] = Field(None, description="Payment description")
+    currency: str = Field('EUR', description="Currency code (defaults to EUR)")
 
 
 class CreateInvoicePaymentRequest(BaseModel):

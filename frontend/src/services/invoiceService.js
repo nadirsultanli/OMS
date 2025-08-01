@@ -101,7 +101,7 @@ const invoiceService = {
     }
   },
 
-  // Record payment against invoice
+  // Record payment against invoice (legacy method)
   recordPayment: async (invoiceId, paymentData) => {
     try {
       const response = await api.post(`/invoices/${invoiceId}/payment`, {
@@ -115,6 +115,25 @@ const invoiceService = {
       return { 
         success: false, 
         error: extractErrorMessage(error.response?.data) || 'Failed to record payment' 
+      };
+    }
+  },
+
+  // Process payment with payment module integration
+  processPayment: async (invoiceId, paymentData) => {
+    try {
+      const response = await api.post(`/invoices/${invoiceId}/process-payment`, {
+        amount: paymentData.payment_amount,
+        payment_method: paymentData.payment_method,
+        payment_date: paymentData.payment_date,
+        reference_number: paymentData.payment_reference
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      return { 
+        success: false, 
+        error: extractErrorMessage(error.response?.data) || 'Failed to process payment' 
       };
     }
   },
@@ -234,6 +253,36 @@ const invoiceService = {
     }
   },
 
+  // Process payment with different methods
+  processPayment: async (invoiceId, paymentData) => {
+    try {
+      const response = await api.post(`/invoices/${invoiceId}/process-payment`, paymentData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      return { 
+        success: false, 
+        error: extractErrorMessage(error.response?.data) || 'Failed to process payment' 
+      };
+    }
+  },
+
+  // Update invoice status
+  updateStatus: async (invoiceId, status) => {
+    try {
+      const response = await api.patch(`/invoices/${invoiceId}/status`, {
+        status: status
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error updating invoice status:', error);
+      return { 
+        success: false, 
+        error: extractErrorMessage(error.response?.data) || 'Failed to update invoice status' 
+      };
+    }
+  },
+
   // Helper functions for UI
   getInvoiceStatusLabel: (status) => {
     if (!status) return 'Unknown';
@@ -267,7 +316,7 @@ const invoiceService = {
     return colors[normalizedStatus] || '#6c757d';
   },
 
-  formatCurrency: (amount, currency = 'KES') => {
+  formatCurrency: (amount, currency = 'EUR') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency

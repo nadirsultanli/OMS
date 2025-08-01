@@ -20,7 +20,8 @@ class PaymentStatus(str, Enum):
 class PaymentMethod(str, Enum):
     """Payment method enumeration"""
     CASH = "cash"                    # Cash payment
-    CARD = "card"                    # Credit/debit card
+    CARD = "card"                    # Credit/debit card (Stripe)
+    MPESA = "mpesa"                  # M-Pesa mobile money
     BANK_TRANSFER = "bank_transfer"  # Bank transfer
     CHECK = "check"                  # Check payment
     DIGITAL_WALLET = "digital_wallet" # Digital wallet
@@ -30,6 +31,7 @@ class PaymentMethod(str, Enum):
 class PaymentType(str, Enum):
     """Payment type enumeration"""
     INVOICE_PAYMENT = "invoice_payment"   # Payment for invoice
+    SUBSCRIPTION_PAYMENT = "subscription_payment"  # Payment for SaaS subscription
     DEPOSIT = "deposit"                   # Security deposit
     REFUND = "refund"                     # Refund payment
     ADVANCE = "advance"                   # Advance payment
@@ -69,11 +71,13 @@ class Payment:
     
     # Financial details with defaults
     currency: str = 'EUR'
+    exchange_rate: Optional[Decimal] = None
+    local_amount: Optional[Decimal] = None
     
     # Audit fields
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.now)
     created_by: Optional[UUID] = None
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.now)
     updated_by: Optional[UUID] = None
     processed_by: Optional[UUID] = None
 
@@ -88,6 +92,7 @@ class Payment:
         invoice_id: Optional[UUID] = None,
         order_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
+        currency: str = 'EUR',
         **kwargs
     ) -> "Payment":
         """Create a new payment"""
@@ -104,6 +109,7 @@ class Payment:
             invoice_id=invoice_id,
             order_id=order_id,
             created_by=created_by,
+            currency=currency,
             **kwargs
         )
 
@@ -113,7 +119,7 @@ class Payment:
         self.processed_date = date.today()
         self.processed_by = processed_by
         self.updated_by = processed_by
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now()
         if gateway_response:
             self.gateway_response = gateway_response
 
@@ -123,7 +129,7 @@ class Payment:
         self.processed_date = date.today()
         self.processed_by = processed_by
         self.updated_by = processed_by
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now()
         if gateway_response:
             self.gateway_response = gateway_response
 

@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from fastapi.responses import JSONResponse
 
-from app.domain.entities.payments import PaymentStatus, PaymentMethod
+from app.domain.entities.payments import PaymentStatus, PaymentMethod, PaymentType
 from app.domain.entities.users import User
 from app.domain.exceptions.payments import (
     PaymentNotFoundError,
@@ -59,7 +59,8 @@ async def create_payment(
             invoice_id=request.invoice_id,
             order_id=request.order_id,
             reference_number=request.reference_number,
-            description=request.description
+            description=request.description,
+            currency=request.currency
         )
         
         logger.info(
@@ -157,6 +158,7 @@ async def search_payments(
     payment_no: Optional[str] = Query(None, description="Filter by payment number"),
     status: Optional[PaymentStatus] = Query(None, description="Filter by status"),
     method: Optional[PaymentMethod] = Query(None, description="Filter by payment method"),
+    payment_type: Optional[PaymentType] = Query(None, description="Filter by payment type"),
     customer_id: Optional[UUID] = Query(None, description="Filter by customer ID"),
     from_date: Optional[date] = Query(None, description="Filter from date"),
     to_date: Optional[date] = Query(None, description="Filter to date"),
@@ -172,6 +174,7 @@ async def search_payments(
             payment_no=payment_no,
             status=status,
             method=method,
+            payment_type=payment_type,
             customer_id=customer_id,
             from_date=from_date,
             to_date=to_date,

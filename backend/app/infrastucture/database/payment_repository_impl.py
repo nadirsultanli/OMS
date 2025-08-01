@@ -2,47 +2,115 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import date
 
+from datetime import datetime, date
+from decimal import Decimal
+from typing import List, Optional
+from uuid import UUID
+from sqlalchemy import select, update, delete, and_, or_, func, desc
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.domain.repositories.payment_repository import PaymentRepository
-from app.domain.entities.payments import Payment, PaymentStatus, PaymentMethod
-from app.infrastucture.database.repositories.supabase_repository import SupabaseRepository
-from app.infrastucture.database.connection import db_connection
+from app.domain.entities.payments import Payment, PaymentStatus, PaymentMethod, PaymentType
+from app.infrastucture.database.models.payments import PaymentModel
+from app.infrastucture.logs.logger import default_logger
 
 
-class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
-    """Implementation of PaymentRepository using Supabase"""
+class PaymentRepositoryImpl(PaymentRepository):
+    """SQLAlchemy implementation of PaymentRepository"""
 
-    def __init__(self):
-        super().__init__("payments", None)  # entity_class will be None since we handle conversion manually
+    def __init__(self, session: AsyncSession):
+        self.session = session
+        self.logger = default_logger
+
+    def _to_payment_entity(self, model: PaymentModel) -> Payment:
+        """Convert PaymentModel to Payment entity"""
+        return Payment(
+            id=model.id,
+            tenant_id=model.tenant_id,
+            payment_no=model.payment_no,
+            payment_type=PaymentType(model.payment_type),
+            payment_status=PaymentStatus(model.payment_status),
+            payment_method=PaymentMethod(model.payment_method),
+            amount=model.amount,
+            currency=model.currency,
+            exchange_rate=model.exchange_rate,
+            local_amount=model.local_amount,
+            invoice_id=model.invoice_id,
+            customer_id=model.customer_id,
+            order_id=model.order_id,
+            payment_date=model.payment_date,
+            processed_date=model.processed_date,
+            reference_number=model.reference_number,
+            external_transaction_id=model.external_transaction_id,
+            gateway_provider=model.gateway_provider,
+            gateway_response=model.gateway_response,
+            description=model.description,
+            notes=model.notes,
+            created_at=model.created_at,
+            created_by=model.created_by,
+            updated_at=model.updated_at,
+            updated_by=model.updated_by,
+            processed_by=model.processed_by
+        )
+
+    def _to_payment_model(self, entity: Payment) -> PaymentModel:
+        """Convert Payment entity to PaymentModel"""
+        return PaymentModel(
+            id=entity.id,
+            tenant_id=entity.tenant_id,
+            payment_no=entity.payment_no,
+            payment_type=entity.payment_type.value,
+            payment_status=entity.payment_status.value,
+            payment_method=entity.payment_method.value,
+            amount=entity.amount,
+            currency=entity.currency,
+            exchange_rate=entity.exchange_rate,
+            local_amount=entity.local_amount,
+            invoice_id=entity.invoice_id,
+            customer_id=entity.customer_id,
+            order_id=entity.order_id,
+            payment_date=entity.payment_date,
+            processed_date=entity.processed_date,
+            reference_number=entity.reference_number,
+            external_transaction_id=entity.external_transaction_id,
+            gateway_provider=entity.gateway_provider,
+            gateway_response=entity.gateway_response,
+            description=entity.description,
+            notes=entity.notes,
+            created_by=entity.created_by,
+            updated_by=entity.updated_by,
+            processed_by=entity.processed_by
+        )
 
     async def create_payment(self, payment: Payment) -> Payment:
         """Create a new payment"""
         try:
-            payment_data = payment.to_dict()
+            model = self._to_payment_model(payment)
+            self.session.add(model)
+            await self.session.commit()
+            await self.session.refresh(model)
             
-            result = await self.supabase.table(self.table_name).insert(payment_data).execute()
-            
-            if not result.data:
-                raise Exception("Failed to create payment")
-            
-            return self._dict_to_payment(result.data[0])
+            self.logger.info(f"Created payment {payment.id}")
+            return payment
             
         except Exception as e:
+            await self.session.rollback()
             self.logger.error(f"Error creating payment: {e}")
             raise
 
     async def get_payment_by_id(self, payment_id: str, tenant_id: UUID) -> Optional[Payment]:
         """Get payment by ID"""
         try:
-            result = await self.supabase.table(self.table_name)\
-                .select("*")\
-                .eq("id", payment_id)\
-                .eq("tenant_id", str(tenant_id))\
-                .execute()
+            stmt = select(PaymentModel).where(
+                and_(
+                    PaymentModel.id == UUID(payment_id),
+                    PaymentModel.tenant_id == tenant_id
+                )
+            )
+            result = await self.session.execute(stmt)
+            model = result.scalar_one_or_none()
             
-            if not result.data:
-                return None
-            
-            return self._dict_to_payment(result.data[0])
+            return self._to_payment_entity(model) if model else None
             
         except Exception as e:
             self.logger.error(f"Error getting payment by ID: {e}")
@@ -51,16 +119,16 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     async def get_payment_by_number(self, payment_no: str, tenant_id: UUID) -> Optional[Payment]:
         """Get payment by payment number"""
         try:
-            result = await self.supabase.table(self.table_name)\
-                .select("*")\
-                .eq("payment_no", payment_no)\
-                .eq("tenant_id", str(tenant_id))\
-                .execute()
+            stmt = select(PaymentModel).where(
+                and_(
+                    PaymentModel.payment_no == payment_no,
+                    PaymentModel.tenant_id == tenant_id
+                )
+            )
+            result = await self.session.execute(stmt)
+            model = result.scalar_one_or_none()
             
-            if not result.data:
-                return None
-            
-            return self._dict_to_payment(result.data[0])
+            return self._to_payment_entity(model) if model else None
             
         except Exception as e:
             self.logger.error(f"Error getting payment by number: {e}")
@@ -69,34 +137,62 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     async def update_payment(self, payment_id: str, payment: Payment) -> Payment:
         """Update an existing payment"""
         try:
-            payment_data = payment.to_dict()
+            stmt = (
+                update(PaymentModel)
+                .where(PaymentModel.id == UUID(payment_id))
+                .values(
+                    payment_no=payment.payment_no,
+                    payment_type=payment.payment_type.value,
+                    payment_status=payment.payment_status.value,
+                    payment_method=payment.payment_method.value,
+                    amount=payment.amount,
+                    currency=payment.currency,
+                    exchange_rate=payment.exchange_rate,
+                    local_amount=payment.local_amount,
+                    invoice_id=payment.invoice_id,
+                    customer_id=payment.customer_id,
+                    order_id=payment.order_id,
+                    payment_date=payment.payment_date,
+                    processed_date=payment.processed_date,
+                    reference_number=payment.reference_number,
+                    external_transaction_id=payment.external_transaction_id,
+                    gateway_provider=payment.gateway_provider,
+                    gateway_response=payment.gateway_response,
+                    description=payment.description,
+                    notes=payment.notes,
+                    updated_by=payment.updated_by,
+                    updated_at=datetime.utcnow(),
+                    processed_by=payment.processed_by
+                )
+            )
+            await self.session.execute(stmt)
+            await self.session.commit()
             
-            result = await self.supabase.table(self.table_name)\
-                .update(payment_data)\
-                .eq("id", payment_id)\
-                .execute()
-            
-            if not result.data:
-                raise Exception("Failed to update payment")
-            
-            return self._dict_to_payment(result.data[0])
+            self.logger.info(f"Updated payment {payment_id}")
+            return payment
             
         except Exception as e:
+            await self.session.rollback()
             self.logger.error(f"Error updating payment: {e}")
             raise
 
     async def delete_payment(self, payment_id: str, tenant_id: UUID) -> bool:
         """Delete a payment"""
         try:
-            result = await self.supabase.table(self.table_name)\
-                .delete()\
-                .eq("id", payment_id)\
-                .eq("tenant_id", str(tenant_id))\
-                .execute()
+            stmt = delete(PaymentModel).where(
+                and_(
+                    PaymentModel.id == UUID(payment_id),
+                    PaymentModel.tenant_id == tenant_id
+                )
+            )
+            result = await self.session.execute(stmt)
+            await self.session.commit()
             
-            return True
+            self.logger.info(f"Deleted payment {payment_id}")
+            return result.rowcount > 0
             
         except Exception as e:
+            await self.session.rollback()
             self.logger.error(f"Error deleting payment: {e}")
             return False
 
@@ -109,15 +205,22 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     ) -> List[Payment]:
         """Get payments for an invoice"""
         try:
-            result = await self.supabase.table(self.table_name)\
-                .select("*")\
-                .eq("tenant_id", str(tenant_id))\
-                .eq("invoice_id", str(invoice_id))\
-                .order("created_at", desc=True)\
-                .range(offset, offset + limit - 1)\
-                .execute()
+            stmt = (
+                select(PaymentModel)
+                .where(
+                    and_(
+                        PaymentModel.tenant_id == tenant_id,
+                        PaymentModel.invoice_id == invoice_id
+                    )
+                )
+                .order_by(desc(PaymentModel.created_at))
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await self.session.execute(stmt)
+            models = result.scalars().all()
             
-            return [self._dict_to_payment(payment_data) for payment_data in result.data or []]
+            return [self._to_payment_entity(model) for model in models]
             
         except Exception as e:
             self.logger.error(f"Error getting payments by invoice: {e}")
@@ -132,15 +235,22 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     ) -> List[Payment]:
         """Get payments for a customer"""
         try:
-            result = await self.supabase.table(self.table_name)\
-                .select("*")\
-                .eq("tenant_id", str(tenant_id))\
-                .eq("customer_id", str(customer_id))\
-                .order("created_at", desc=True)\
-                .range(offset, offset + limit - 1)\
-                .execute()
+            stmt = (
+                select(PaymentModel)
+                .where(
+                    and_(
+                        PaymentModel.tenant_id == tenant_id,
+                        PaymentModel.customer_id == customer_id
+                    )
+                )
+                .order_by(desc(PaymentModel.created_at))
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await self.session.execute(stmt)
+            models = result.scalars().all()
             
-            return [self._dict_to_payment(payment_data) for payment_data in result.data or []]
+            return [self._to_payment_entity(model) for model in models]
             
         except Exception as e:
             self.logger.error(f"Error getting payments by customer: {e}")
@@ -155,15 +265,22 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     ) -> List[Payment]:
         """Get payments for an order"""
         try:
-            result = await self.supabase.table(self.table_name)\
-                .select("*")\
-                .eq("tenant_id", str(tenant_id))\
-                .eq("order_id", str(order_id))\
-                .order("created_at", desc=True)\
-                .range(offset, offset + limit - 1)\
-                .execute()
+            stmt = (
+                select(PaymentModel)
+                .where(
+                    and_(
+                        PaymentModel.tenant_id == tenant_id,
+                        PaymentModel.order_id == order_id
+                    )
+                )
+                .order_by(desc(PaymentModel.created_at))
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await self.session.execute(stmt)
+            models = result.scalars().all()
             
-            return [self._dict_to_payment(payment_data) for payment_data in result.data or []]
+            return [self._to_payment_entity(model) for model in models]
             
         except Exception as e:
             self.logger.error(f"Error getting payments by order: {e}")
@@ -175,6 +292,7 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
         payment_no: Optional[str] = None,
         status: Optional[PaymentStatus] = None,
         method: Optional[PaymentMethod] = None,
+        payment_type: Optional[PaymentType] = None,
         customer_id: Optional[UUID] = None,
         from_date: Optional[date] = None,
         to_date: Optional[date] = None,
@@ -183,38 +301,40 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     ) -> List[Payment]:
         """Search payments with filters"""
         try:
-            def build_query(client):
-                query = client.table(self.table_name).select("*")
-                
-                # Apply filters
-                query = query.eq("tenant_id", str(tenant_id))
-                
-                if payment_no:
-                    query = query.ilike("payment_no", f"%{payment_no}%")
-                
-                if status:
-                    query = query.eq("payment_status", status.value)
-                
-                if method:
-                    query = query.eq("payment_method", method.value)
-                
-                if customer_id:
-                    query = query.eq("customer_id", str(customer_id))
-                
-                if from_date:
-                    query = query.gte("payment_date", from_date.isoformat())
-                
-                if to_date:
-                    query = query.lte("payment_date", to_date.isoformat())
-                
-                # Apply pagination and ordering
-                query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
-                
-                return query
+            conditions = [PaymentModel.tenant_id == tenant_id]
             
-            result = await db_connection.execute_query(lambda client: build_query(client).execute())
+            if payment_no:
+                conditions.append(PaymentModel.payment_no.ilike(f"%{payment_no}%"))
             
-            return [self._dict_to_payment(payment_data) for payment_data in result.data or []]
+            if status:
+                conditions.append(PaymentModel.payment_status == status.value)
+            
+            if method:
+                conditions.append(PaymentModel.payment_method == method.value)
+            
+            if payment_type:
+                conditions.append(PaymentModel.payment_type == payment_type.value)
+            
+            if customer_id:
+                conditions.append(PaymentModel.customer_id == customer_id)
+            
+            if from_date:
+                conditions.append(PaymentModel.payment_date >= from_date)
+            
+            if to_date:
+                conditions.append(PaymentModel.payment_date <= to_date)
+            
+            stmt = (
+                select(PaymentModel)
+                .where(and_(*conditions))
+                .order_by(desc(PaymentModel.created_at))
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await self.session.execute(stmt)
+            models = result.scalars().all()
+            
+            return [self._to_payment_entity(model) for model in models]
             
         except Exception as e:
             return []
@@ -223,19 +343,24 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
         """Generate next payment number"""
         try:
             # Get the highest number for this prefix and tenant
-            result = await self.supabase.table(self.table_name)\
-                .select("payment_no")\
-                .eq("tenant_id", str(tenant_id))\
-                .like("payment_no", f"{prefix}%")\
-                .order("payment_no", desc=True)\
-                .limit(1)\
-                .execute()
+            stmt = (
+                select(PaymentModel.payment_no)
+                .where(
+                    and_(
+                        PaymentModel.tenant_id == tenant_id,
+                        PaymentModel.payment_no.like(f"{prefix}%")
+                    )
+                )
+                .order_by(desc(PaymentModel.payment_no))
+                .limit(1)
+            )
+            result = await self.session.execute(stmt)
+            latest_payment_no = result.scalar_one_or_none()
             
-            if result.data:
-                last_no = result.data[0]['payment_no']
+            if latest_payment_no:
                 # Extract number part and increment
                 try:
-                    number_part = int(last_no.split('-')[-1])
+                    number_part = int(latest_payment_no.split('-')[-1])
                     next_number = number_part + 1
                 except (ValueError, IndexError):
                     next_number = 1
@@ -256,18 +381,18 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     ) -> int:
         """Get count of payments"""
         try:
-            query = self.supabase.table(self.table_name)\
-                .select("id", count="exact")\
-                .eq("tenant_id", str(tenant_id))
+            conditions = [PaymentModel.tenant_id == tenant_id]
             
             if status:
-                query = query.eq("payment_status", status.value)
+                conditions.append(PaymentModel.payment_status == status.value)
             
             if method:
-                query = query.eq("payment_method", method.value)
+                conditions.append(PaymentModel.payment_method == method.value)
             
-            result = await query.execute()
-            return result.count or 0
+            stmt = select(func.count(PaymentModel.id)).where(and_(*conditions))
+            result = await self.session.execute(stmt)
+            
+            return result.scalar()
             
         except Exception as e:
             self.logger.error(f"Error getting payments count: {e}")
@@ -282,15 +407,22 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
     ) -> List[Payment]:
         """Get payments by status"""
         try:
-            result = await self.supabase.table(self.table_name)\
-                .select("*")\
-                .eq("tenant_id", str(tenant_id))\
-                .eq("payment_status", status.value)\
-                .order("created_at", desc=True)\
-                .range(offset, offset + limit - 1)\
-                .execute()
+            stmt = (
+                select(PaymentModel)
+                .where(
+                    and_(
+                        PaymentModel.tenant_id == tenant_id,
+                        PaymentModel.payment_status == status.value
+                    )
+                )
+                .order_by(desc(PaymentModel.created_at))
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await self.session.execute(stmt)
+            models = result.scalars().all()
             
-            return [self._dict_to_payment(payment_data) for payment_data in result.data or []]
+            return [self._to_payment_entity(model) for model in models]
             
         except Exception as e:
             self.logger.error(f"Error getting payments by status: {e}")
@@ -312,23 +444,25 @@ class PaymentRepositoryImpl(PaymentRepository, SupabaseRepository):
             
             cutoff_date = as_of_date.replace(day=as_of_date.day - 30)
             
-            result = await self.supabase.table(self.table_name)\
-                .select("*")\
-                .eq("tenant_id", str(tenant_id))\
-                .eq("payment_status", PaymentStatus.PENDING.value)\
-                .lt("payment_date", cutoff_date.isoformat())\
-                .order("payment_date", desc=False)\
-                .range(offset, offset + limit - 1)\
-                .execute()
+            stmt = (
+                select(PaymentModel)
+                .where(
+                    and_(
+                        PaymentModel.tenant_id == tenant_id,
+                        PaymentModel.payment_status == PaymentStatus.PENDING.value,
+                        PaymentModel.payment_date < cutoff_date
+                    )
+                )
+                .order_by(PaymentModel.payment_date)
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await self.session.execute(stmt)
+            models = result.scalars().all()
             
-            return [self._dict_to_payment(payment_data) for payment_data in result.data or []]
+            return [self._to_payment_entity(model) for model in models]
             
         except Exception as e:
             self.logger.error(f"Error getting overdue payments: {e}")
             return []
 
-    def _dict_to_payment(self, payment_data: dict) -> Payment:
-        """Convert dictionary to Payment entity"""
-        # This is a simplified conversion - in a real implementation,
-        # you would properly map all fields and handle type conversions
-        return Payment(**payment_data)

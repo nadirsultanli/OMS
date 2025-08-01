@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import date
 
-from app.domain.entities.payments import Payment, PaymentStatus, PaymentMethod
+from app.domain.entities.payments import Payment, PaymentStatus, PaymentMethod, PaymentType
 
 
 class PaymentRepository(ABC):
@@ -74,6 +74,7 @@ class PaymentRepository(ABC):
         payment_no: Optional[str] = None,
         status: Optional[PaymentStatus] = None,
         method: Optional[PaymentMethod] = None,
+        payment_type: Optional[PaymentType] = None,
         customer_id: Optional[UUID] = None,
         from_date: Optional[date] = None,
         to_date: Optional[date] = None,

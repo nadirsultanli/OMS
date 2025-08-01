@@ -33,6 +33,7 @@ const Payments = () => {
     payment_no: '',
     status: '',
     method: '',
+    payment_type: '',
     customer_id: '',
     from_date: '',
     to_date: ''
@@ -178,6 +179,63 @@ const Payments = () => {
     }
   };
 
+  const handleProcessPayment = async (payment) => {
+    try {
+      const result = await paymentService.processPayment(payment.id, {
+        auto_apply_to_invoice: true
+      });
+      if (result.success) {
+        loadPayments();
+        if (showPaymentDetail && selectedPayment?.id === payment.id) {
+          // Refresh selected payment
+          const paymentResult = await paymentService.getPaymentById(payment.id);
+          if (paymentResult.success) {
+            setSelectedPayment(paymentResult.data);
+          }
+        }
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError('Failed to process payment');
+      console.error('Error processing payment:', err);
+    }
+  };
+
+  const handleFailPayment = async (payment) => {
+    try {
+      const result = await paymentService.failPayment(payment.id, {
+        reason: 'Marked as failed by user'
+      });
+      if (result.success) {
+        loadPayments();
+        if (showPaymentDetail && selectedPayment?.id === payment.id) {
+          // Refresh selected payment
+          const paymentResult = await paymentService.getPaymentById(payment.id);
+          if (paymentResult.success) {
+            setSelectedPayment(paymentResult.data);
+          }
+        }
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError('Failed to mark payment as failed');
+      console.error('Error failing payment:', err);
+    }
+  };
+
+  const handleSendReceipt = async (payment) => {
+    try {
+      // This would typically call an API to send a receipt email
+      // For now, we'll just show a success message
+      alert(`Receipt for payment ${payment.payment_no} would be sent to the customer.`);
+    } catch (err) {
+      setError('Failed to send receipt');
+      console.error('Error sending receipt:', err);
+    }
+  };
+
   const getCustomerName = (customerId) => {
     const customer = customers.find(c => c.id === customerId);
     return customer ? customer.name : 'Unknown Customer';
@@ -189,6 +247,11 @@ const Payments = () => {
   };
 
   const renderPaymentRow = (payment) => {
+    // Check for different possible status field names
+    const status = payment.payment_status || payment.status || 'UNKNOWN';
+    const statusLabel = paymentService.getPaymentStatusLabel(status);
+    const statusColor = paymentService.getPaymentStatusColor(status);
+    
     return (
       <tr 
         key={payment.id} 
@@ -196,22 +259,70 @@ const Payments = () => {
         onClick={() => handlePaymentClick(payment)}
       >
         <td>{payment.payment_no}</td>
+        <td>
+          <span className={`payment-type-badge ${payment.payment_type?.toLowerCase()}`}>
+            {paymentService.getPaymentTypeLabel(payment.payment_type)}
+          </span>
+        </td>
         <td>{getCustomerName(payment.customer_id)}</td>
         <td>{payment.invoice_id ? getInvoiceNumber(payment.invoice_id) : '-'}</td>
-        <td>{paymentService.formatCurrency(payment.amount)}</td>
+        <td>{paymentService.formatCurrency(payment.amount, payment.currency)}</td>
         <td>{paymentService.getPaymentMethodLabel(payment.payment_method)}</td>
         <td>{paymentService.formatDate(payment.payment_date)}</td>
         <td>
-          <span 
-            className="status-badge"
-            style={{ backgroundColor: paymentService.getPaymentStatusColor(payment.status) }}
-          >
-            {paymentService.getPaymentStatusLabel(payment.status)}
-          </span>
+          <div className="status-indicator">
+            <span 
+              className="status-badge"
+              style={{ backgroundColor: statusColor }}
+            >
+              {statusLabel}
+            </span>
+            <div 
+              className="status-dot"
+              style={{ backgroundColor: statusColor }}
+            ></div>
+          </div>
         </td>
         <td>
           <div className="action-buttons">
-            {payment.status === 'COMPLETED' && payment.payment_type !== 'REFUND' && (
+            <button 
+              className="btn btn-sm btn-info"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePaymentClick(payment);
+              }}
+              title="View Details"
+            >
+              <i className="fas fa-eye"></i>
+            </button>
+            
+            {(payment.payment_status || payment.status) === 'pending' && (
+              <button 
+                className="btn btn-sm btn-success"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleProcessPayment(payment);
+                }}
+                title="Process Payment"
+              >
+                <i className="fas fa-check"></i>
+              </button>
+            )}
+            
+            {(payment.payment_status || payment.status) === 'pending' && (
+              <button 
+                className="btn btn-sm btn-danger"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleFailPayment(payment);
+                }}
+                title="Mark as Failed"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            )}
+            
+            {(payment.payment_status || payment.status) === 'completed' && payment.payment_type !== 'REFUND' && (
               <button 
                 className="btn btn-sm btn-warning"
                 onClick={(e) => {
@@ -219,8 +330,22 @@ const Payments = () => {
                   setSelectedPayment(payment);
                   setShowRefundModal(true);
                 }}
+                title="Create Refund"
               >
-                Refund
+                <i className="fas fa-undo"></i>
+              </button>
+            )}
+            
+            {payment.invoice_id && (
+              <button 
+                className="btn btn-sm btn-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSendReceipt(payment);
+                }}
+                title="Send Receipt"
+              >
+                <i className="fas fa-envelope"></i>
               </button>
             )}
           </div>
@@ -236,7 +361,17 @@ const Payments = () => {
       <div className="payment-detail-modal">
         <div className="modal-content">
           <div className="modal-header">
-            <h2>Payment #{selectedPayment.payment_no}</h2>
+            <div className="header-content">
+              <h2>Payment #{selectedPayment.payment_no}</h2>
+              <div className="header-status">
+                <span 
+                  className="status-badge"
+                  style={{ backgroundColor: paymentService.getPaymentStatusColor(selectedPayment.payment_status || selectedPayment.status) }}
+                >
+                  {paymentService.getPaymentStatusLabel(selectedPayment.payment_status || selectedPayment.status)}
+                </span>
+              </div>
+            </div>
             <button 
               className="close-btn"
               onClick={() => setShowPaymentDetail(false)}
@@ -247,66 +382,121 @@ const Payments = () => {
           
           <div className="modal-body">
             <div className="payment-info">
-              <div className="info-row">
-                <span className="label">Customer:</span>
-                <span className="value">{getCustomerName(selectedPayment.customer_id)}</span>
-              </div>
-              <div className="info-row">
-                <span className="label">Invoice:</span>
-                <span className="value">
-                  {selectedPayment.invoice_id ? getInvoiceNumber(selectedPayment.invoice_id) : 'N/A'}
-                </span>
-              </div>
-              <div className="info-row">
+              <div className="info-section">
+                <h3>Payment Details</h3>
+                <div className="info-grid">
+                  <div className="info-row">
+                    <span className="label">Customer:</span>
+                    <span className="value">{getCustomerName(selectedPayment.customer_id)}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Invoice:</span>
+                    <span className="value">
+                      {selectedPayment.invoice_id ? getInvoiceNumber(selectedPayment.invoice_id) : 'N/A'}
+                    </span>
+                  </div>
+                                <div className="info-row">
                 <span className="label">Amount:</span>
-                <span className="value">{paymentService.formatCurrency(selectedPayment.amount)}</span>
+                <span className="value amount-value">{paymentService.formatCurrency(selectedPayment.amount, selectedPayment.currency)}</span>
               </div>
-              <div className="info-row">
+                                <div className="info-row">
                 <span className="label">Payment Method:</span>
                 <span className="value">{paymentService.getPaymentMethodLabel(selectedPayment.payment_method)}</span>
               </div>
               <div className="info-row">
-                <span className="label">Payment Date:</span>
-                <span className="value">{paymentService.formatDateTime(selectedPayment.payment_date)}</span>
+                <span className="label">Currency:</span>
+                <span className="value">{selectedPayment.currency}</span>
               </div>
-              <div className="info-row">
-                <span className="label">Status:</span>
-                <span className="value">
-                  <span 
-                    className="status-badge"
-                    style={{ backgroundColor: paymentService.getPaymentStatusColor(selectedPayment.status) }}
-                  >
-                    {paymentService.getPaymentStatusLabel(selectedPayment.status)}
-                  </span>
-                </span>
-              </div>
-              <div className="info-row">
-                <span className="label">Type:</span>
-                <span className="value">{paymentService.getPaymentTypeLabel(selectedPayment.payment_type)}</span>
-              </div>
-              {selectedPayment.reference_number && (
-                <div className="info-row">
-                  <span className="label">Reference:</span>
-                  <span className="value">{selectedPayment.reference_number}</span>
+                  <div className="info-row">
+                    <span className="label">Payment Date:</span>
+                    <span className="value">{paymentService.formatDateTime(selectedPayment.payment_date)}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Type:</span>
+                    <span className="value">{paymentService.getPaymentTypeLabel(selectedPayment.payment_type)}</span>
+                  </div>
                 </div>
-              )}
-              {selectedPayment.notes && (
-                <div className="info-row">
-                  <span className="label">Notes:</span>
-                  <span className="value">{selectedPayment.notes}</span>
+              </div>
+
+              <div className="info-section">
+                <h3>Additional Information</h3>
+                <div className="info-grid">
+                  {selectedPayment.reference_number && (
+                    <div className="info-row">
+                      <span className="label">Reference:</span>
+                      <span className="value">{selectedPayment.reference_number}</span>
+                    </div>
+                  )}
+                  {selectedPayment.description && (
+                    <div className="info-row">
+                      <span className="label">Description:</span>
+                      <span className="value">{selectedPayment.description}</span>
+                    </div>
+                  )}
+                  {selectedPayment.notes && (
+                    <div className="info-row">
+                      <span className="label">Notes:</span>
+                      <span className="value">{selectedPayment.notes}</span>
+                    </div>
+                  )}
+                  {selectedPayment.processed_date && (
+                    <div className="info-row">
+                      <span className="label">Processed Date:</span>
+                      <span className="value">{paymentService.formatDateTime(selectedPayment.processed_date)}</span>
+                    </div>
+                  )}
+                  {selectedPayment.external_transaction_id && (
+                    <div className="info-row">
+                      <span className="label">Transaction ID:</span>
+                      <span className="value">{selectedPayment.external_transaction_id}</span>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="payment-actions">
-              {selectedPayment.status === 'COMPLETED' && selectedPayment.payment_type !== 'REFUND' && (
+              {(selectedPayment.payment_status || selectedPayment.status) === 'pending' && (
+                <>
+                  <button 
+                    className="btn btn-success"
+                    onClick={() => handleProcessPayment(selectedPayment)}
+                  >
+                    <i className="fas fa-check"></i> Process Payment
+                  </button>
+                  <button 
+                    className="btn btn-danger"
+                    onClick={() => handleFailPayment(selectedPayment)}
+                  >
+                    <i className="fas fa-times"></i> Mark as Failed
+                  </button>
+                </>
+              )}
+              
+              {(selectedPayment.payment_status || selectedPayment.status) === 'completed' && selectedPayment.payment_type !== 'REFUND' && (
                 <button 
                   className="btn btn-warning"
                   onClick={() => setShowRefundModal(true)}
                 >
-                  Create Refund
+                  <i className="fas fa-undo"></i> Create Refund
                 </button>
               )}
+              
+              {selectedPayment.invoice_id && (
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => handleSendReceipt(selectedPayment)}
+                >
+                  <i className="fas fa-envelope"></i> Send Receipt
+                </button>
+              )}
+              
+              <button 
+                className="btn btn-secondary"
+                onClick={() => setShowPaymentDetail(false)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -585,6 +775,21 @@ const Payments = () => {
               <option value="PAYPAL">PayPal</option>
             </select>
           </div>
+          
+          <div className="filter-group">
+            <label>Type:</label>
+            <select
+              value={filters.payment_type}
+              onChange={(e) => handleFilterChange('payment_type', e.target.value)}
+            >
+              <option value="">All Types</option>
+              <option value="INVOICE_PAYMENT">Customer Payments</option>
+              <option value="SUBSCRIPTION_PAYMENT">Subscription Payments</option>
+              <option value="DEPOSIT">Deposits</option>
+              <option value="REFUND">Refunds</option>
+              <option value="ADVANCE">Advance Payments</option>
+            </select>
+          </div>
         </div>
         
         <div className="filter-row">
@@ -629,6 +834,7 @@ const Payments = () => {
                   payment_no: '',
                   status: '',
                   method: '',
+                  payment_type: '',
                   customer_id: '',
                   from_date: '',
                   to_date: ''
@@ -647,6 +853,7 @@ const Payments = () => {
           <thead>
             <tr>
               <th>Payment No</th>
+              <th>Type</th>
               <th>Customer</th>
               <th>Invoice</th>
               <th>Amount</th>

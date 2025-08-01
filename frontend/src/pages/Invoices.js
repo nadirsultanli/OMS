@@ -17,10 +17,12 @@ const Invoices = () => {
   const [showSendModal, setShowSendModal] = useState(false);
   const [showGenerateInvoiceModal, setShowGenerateInvoiceModal] = useState(false);
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
+  const [showPaymentDropdown, setShowPaymentDropdown] = useState(null);
   const [paymentData, setPaymentData] = useState({
     payment_amount: '',
     payment_date: new Date().toISOString().split('T')[0],
-    payment_reference: ''
+    payment_reference: '',
+    payment_method: 'cash'
   });
   const [emailData, setEmailData] = useState({
     email: '',
@@ -75,6 +77,20 @@ const Invoices = () => {
       setError('Payment was canceled');
     }
   }, [filters, pagination.offset]);
+
+  // Close payment dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showPaymentDropdown && !event.target.closest('.payment-dropdown')) {
+        setShowPaymentDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showPaymentDropdown]);
 
   const loadInvoices = async () => {
     setLoading(true);
@@ -144,28 +160,79 @@ const Invoices = () => {
     if (!selectedInvoice || !paymentData.payment_amount) return;
 
     try {
-      const result = await invoiceService.recordPayment(selectedInvoice.id, paymentData);
-      if (result.success) {
-        setShowPaymentModal(false);
-        setPaymentData({
-          payment_amount: '',
-          payment_date: new Date().toISOString().split('T')[0],
-          payment_reference: ''
+      // Handle different payment methods
+      if (paymentData.payment_method === 'cash') {
+        // Cash payment - use new process payment endpoint with payment module
+        const result = await invoiceService.processPayment(selectedInvoice.id, {
+          amount: parseFloat(paymentData.payment_amount),
+          payment_method: 'cash',
+          payment_date: paymentData.payment_date || new Date().toISOString().split('T')[0],
+          reference_number: paymentData.payment_reference
         });
-        loadInvoices();
-        if (showInvoiceDetail) {
-          // Refresh selected invoice
-          const invoiceResult = await invoiceService.getInvoiceById(selectedInvoice.id);
-          if (invoiceResult.success) {
-            setSelectedInvoice(invoiceResult.data);
+        
+        if (result.success) {
+          setShowPaymentModal(false);
+          setPaymentData({
+            payment_amount: '',
+            payment_date: new Date().toISOString().split('T')[0],
+            payment_reference: '',
+            payment_method: 'cash'
+          });
+          loadInvoices();
+          if (showInvoiceDetail) {
+            // Refresh selected invoice
+            const invoiceResult = await invoiceService.getInvoiceById(selectedInvoice.id);
+            if (invoiceResult.success) {
+              setSelectedInvoice(invoiceResult.data);
+            }
           }
+        } else {
+          setError(result.error);
         }
-      } else {
-        setError(result.error);
+      } else if (paymentData.payment_method === 'card') {
+        // Stripe payment - use new process payment endpoint
+        const result = await invoiceService.processPayment(selectedInvoice.id, {
+          amount: parseFloat(paymentData.payment_amount),
+          payment_method: 'card',
+          payment_date: paymentData.payment_date || new Date().toISOString().split('T')[0],
+          reference_number: paymentData.payment_reference
+        });
+        
+        if (result.success) {
+          if (result.data.client_secret) {
+            // Redirect to Stripe payment
+            const stripe = window.Stripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+            const { error } = await stripe.confirmCardPayment(result.data.client_secret, {
+              payment_method: {
+                card: null, // Will be collected by Stripe
+                billing_details: {
+                  name: selectedInvoice.customer_name || 'Customer'
+                }
+              }
+            });
+            
+            if (error) {
+              setError(`Payment failed: ${error.message}`);
+            } else {
+              setShowPaymentModal(false);
+              setPaymentData({
+                payment_amount: '',
+                payment_date: new Date().toISOString().split('T')[0],
+                payment_reference: '',
+                payment_method: 'cash'
+              });
+              loadInvoices();
+            }
+          }
+        } else {
+          setError(result.error);
+        }
+      } else if (paymentData.payment_method === 'mpesa') {
+        setError('M-Pesa integration coming soon!');
       }
     } catch (err) {
-      setError('Failed to record payment');
-      console.error('Error recording payment:', err);
+      setError('Failed to process payment');
+      console.error('Error processing payment:', err);
     }
   };
 
@@ -233,6 +300,115 @@ const Invoices = () => {
       console.error('Error downloading PDF:', error);
       setError('Failed to download PDF');
     }
+  };
+
+  const handleStatusClick = async (invoice, currentStatus) => {
+    // Don't allow changing PAID invoices
+    if (currentStatus === 'paid') {
+      alert('Cannot change status of paid invoices');
+      return;
+    }
+
+    // Define status flow
+    const statusFlow = {
+      'draft': ['generated', 'sent'],
+      'generated': ['sent', 'draft'],
+      'sent': ['draft', 'generated'],
+      'partial_paid': ['draft', 'generated', 'sent'],
+      'overdue': ['draft', 'generated', 'sent']
+    };
+
+    const availableStatuses = statusFlow[currentStatus] || ['draft', 'generated', 'sent'];
+    
+    // Create status options
+    const statusOptions = availableStatuses.map(status => ({
+      value: status,
+      label: invoiceService.getInvoiceStatusLabel(status),
+      color: invoiceService.getInvoiceStatusColor(status)
+    }));
+
+    // Show status selection dialog
+    const newStatus = await showStatusSelectionDialog(statusOptions, currentStatus);
+    
+    if (newStatus && newStatus !== currentStatus) {
+      try {
+        const result = await invoiceService.updateStatus(invoice.id, newStatus);
+        if (result.success) {
+          loadInvoices();
+          setError(null);
+        } else {
+          setError(result.error);
+        }
+      } catch (error) {
+        setError('Failed to update invoice status');
+        console.error('Error updating invoice status:', error);
+      }
+    }
+  };
+
+  const showStatusSelectionDialog = (statusOptions, currentStatus) => {
+    return new Promise((resolve) => {
+      const dialog = document.createElement('div');
+      dialog.className = 'status-selection-dialog';
+      dialog.innerHTML = `
+        <div class="status-selection-content">
+          <h3>Change Invoice Status</h3>
+          <p>Current status: <strong>${invoiceService.getInvoiceStatusLabel(currentStatus)}</strong></p>
+          <div class="status-options">
+            ${statusOptions.map(option => `
+              <button 
+                class="status-option-btn" 
+                style="background-color: ${option.color}; color: white; border: none; padding: 8px 16px; margin: 4px; border-radius: 4px; cursor: pointer;"
+                onclick="window.selectedStatus = '${option.value}'; this.parentElement.parentElement.parentElement.remove();"
+              >
+                ${option.label}
+              </button>
+            `).join('')}
+          </div>
+          <button 
+            class="cancel-btn" 
+            style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; margin-top: 10px; border-radius: 4px; cursor: pointer;"
+            onclick="window.selectedStatus = null; this.parentElement.parentElement.remove();"
+          >
+            Cancel
+          </button>
+        </div>
+      `;
+      
+      // Add styles
+      dialog.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      `;
+      
+      const content = dialog.querySelector('.status-selection-content');
+      content.style.cssText = `
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        max-width: 400px;
+      `;
+      
+      document.body.appendChild(dialog);
+      
+      // Listen for removal
+      const checkRemoval = setInterval(() => {
+        if (!document.body.contains(dialog)) {
+          clearInterval(checkRemoval);
+          resolve(window.selectedStatus || null);
+          delete window.selectedStatus;
+        }
+      }, 100);
+    });
   };
 
   const handleGenerateInvoice = () => {
@@ -409,12 +585,17 @@ const Invoices = () => {
         <td>{getCustomerName(invoice.customer_id)}</td>
         <td>{invoiceService.formatDate(invoice.invoice_date)}</td>
         <td>{invoiceService.formatDate(invoice.due_date)}</td>
-        <td>{invoiceService.formatCurrency(invoice.total_amount, invoice.currency || 'KES')}</td>
-        <td>{invoiceService.formatCurrency(remainingAmount, invoice.currency || 'KES')}</td>
+        <td>{invoiceService.formatCurrency(invoice.total_amount, invoice.currency)}</td>
+        <td>{invoiceService.formatCurrency(remainingAmount, invoice.currency)}</td>
         <td>
           <span 
-            className="status-badge"
+            className="status-badge clickable"
             style={{ backgroundColor: invoiceService.getInvoiceStatusColor(invoiceStatus) }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleStatusClick(invoice, invoiceStatus);
+            }}
+            title="Click to change status"
           >
             {invoiceService.getInvoiceStatusLabel(invoiceStatus)}
           </span>
@@ -430,28 +611,72 @@ const Invoices = () => {
             >
               PDF
             </button>
-            {invoiceStatus === 'SENT' && remainingAmount > 0 && (
-              <>
+            {remainingAmount > 0 && (
+              <div className="payment-dropdown">
                 <button 
-                  className="btn btn-sm btn-success"
+                  className="btn btn-sm btn-success dropdown-toggle"
                   onClick={(e) => {
                     e.stopPropagation();
+                    // Toggle payment dropdown for this invoice
                     setSelectedInvoice(invoice);
-                    setShowPaymentModal(true);
+                    setShowPaymentDropdown(invoice.id);
                   }}
                 >
                   Pay
                 </button>
-                <button 
-                  className="btn btn-sm btn-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStripeCheckout(invoice);
-                  }}
-                >
-                  Stripe
-                </button>
-              </>
+                {showPaymentDropdown === invoice.id && (
+                  <div className="payment-dropdown-menu">
+                    <button 
+                      className="dropdown-item"
+                                             onClick={(e) => {
+                         e.stopPropagation();
+                         setSelectedInvoice(invoice);
+                         setPaymentData(prev => ({ 
+                           ...prev, 
+                           payment_method: 'cash',
+                           payment_amount: calculateRemainingAmount(invoice).toString()
+                         }));
+                         setShowPaymentModal(true);
+                         setShowPaymentDropdown(null);
+                       }}
+                    >
+                      💰 Cash
+                    </button>
+                    <button 
+                      className="dropdown-item"
+                                             onClick={(e) => {
+                         e.stopPropagation();
+                         setSelectedInvoice(invoice);
+                         setPaymentData(prev => ({ 
+                           ...prev, 
+                           payment_method: 'card',
+                           payment_amount: calculateRemainingAmount(invoice).toString()
+                         }));
+                         setShowPaymentModal(true);
+                         setShowPaymentDropdown(null);
+                       }}
+                    >
+                      💳 Stripe
+                    </button>
+                    <button 
+                      className="dropdown-item"
+                                             onClick={(e) => {
+                         e.stopPropagation();
+                         setSelectedInvoice(invoice);
+                         setPaymentData(prev => ({ 
+                           ...prev, 
+                           payment_method: 'mpesa',
+                           payment_amount: calculateRemainingAmount(invoice).toString()
+                         }));
+                         setShowPaymentModal(true);
+                         setShowPaymentDropdown(null);
+                       }}
+                    >
+                      📱 M-Pesa
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
             {invoiceStatus === 'GENERATED' && (
               <button 
@@ -541,11 +766,11 @@ const Invoices = () => {
               )}
               <div className="info-row">
                 <span className="label">Total Amount:</span>
-                <span className="value">{invoiceService.formatCurrency(selectedInvoice.total_amount)}</span>
+                <span className="value">{invoiceService.formatCurrency(selectedInvoice.total_amount, selectedInvoice.currency)}</span>
               </div>
               <div className="info-row">
                 <span className="label">Remaining Amount:</span>
-                <span className="value">{invoiceService.formatCurrency(remainingAmount)}</span>
+                <span className="value">{invoiceService.formatCurrency(remainingAmount, selectedInvoice.currency)}</span>
               </div>
             </div>
 
@@ -564,7 +789,7 @@ const Invoices = () => {
                     {payments.map((payment, index) => (
                       <tr key={index}>
                         <td>{invoiceService.formatDate(payment.payment_date)}</td>
-                        <td>{invoiceService.formatCurrency(payment.payment_amount)}</td>
+                        <td>{invoiceService.formatCurrency(payment.payment_amount, selectedInvoice.currency)}</td>
                         <td>{payment.payment_reference || '-'}</td>
                       </tr>
                     ))}
@@ -610,7 +835,12 @@ const Invoices = () => {
       <div className="modal-overlay">
         <div className="modal-content">
           <div className="modal-header">
-            <h3>Record Payment</h3>
+            <h3>
+              {paymentData.payment_method === 'cash' ? '💰 Cash Payment' : 
+               paymentData.payment_method === 'card' ? '💳 Stripe Payment' : 
+               paymentData.payment_method === 'mpesa' ? '📱 M-Pesa Payment' : 
+               'Record Payment'}
+            </h3>
             <button 
               className="close-btn"
               onClick={() => setShowPaymentModal(false)}
@@ -620,15 +850,62 @@ const Invoices = () => {
           </div>
           
           <div className="modal-body">
+            {/* Invoice Summary */}
+            <div className="invoice-summary">
+              <h4>Invoice #{selectedInvoice.invoice_no}</h4>
+              <div className="invoice-details">
+                <div className="detail-row">
+                  <span className="label">Customer:</span>
+                  <span className="value">{getCustomerName(selectedInvoice.customer_id)}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="label">Total Amount:</span>
+                  <span className="value">{invoiceService.formatCurrency(selectedInvoice.total_amount, selectedInvoice.currency)}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="label">Remaining Balance:</span>
+                  <span className="value highlight">{invoiceService.formatCurrency(calculateRemainingAmount(selectedInvoice), selectedInvoice.currency)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Payment Method:</label>
+              <div className="payment-method-display">
+                <span className="payment-method-icon">
+                  {paymentData.payment_method === 'cash' ? '💰' : 
+                   paymentData.payment_method === 'card' ? '💳' : 
+                   paymentData.payment_method === 'mpesa' ? '📱' : '💳'}
+                </span>
+                <span className="payment-method-text">
+                  {paymentData.payment_method === 'cash' ? 'Cash Payment' : 
+                   paymentData.payment_method === 'card' ? 'Credit/Debit Card (Stripe)' : 
+                   paymentData.payment_method === 'mpesa' ? 'M-Pesa (Coming Soon)' : 'Select Method'}
+                </span>
+              </div>
+              <select
+                value={paymentData.payment_method}
+                onChange={(e) => setPaymentData(prev => ({ ...prev, payment_method: e.target.value }))}
+              >
+                <option value="cash">Cash</option>
+                <option value="card">Credit/Debit Card (Stripe)</option>
+                <option value="mpesa">M-Pesa (Coming Soon)</option>
+              </select>
+            </div>
+            
             <div className="form-group">
               <label>Payment Amount:</label>
               <input
                 type="number"
                 step="0.01"
-                value={paymentData.payment_amount}
+                value={paymentData.payment_amount || calculateRemainingAmount(selectedInvoice)}
                 onChange={(e) => setPaymentData(prev => ({ ...prev, payment_amount: e.target.value }))}
                 placeholder="Enter payment amount"
+                className="payment-amount-input"
               />
+              <small className="form-help">
+                Suggested: {invoiceService.formatCurrency(calculateRemainingAmount(selectedInvoice), selectedInvoice.currency)}
+              </small>
             </div>
             
             <div className="form-group">
@@ -662,7 +939,9 @@ const Invoices = () => {
                 onClick={handleRecordPayment}
                 disabled={!paymentData.payment_amount}
               >
-                Record Payment
+                {paymentData.payment_method === 'cash' ? 'Record Cash Payment' : 
+                 paymentData.payment_method === 'card' ? 'Process Card Payment' : 
+                 'Process Payment'}
               </button>
             </div>
           </div>

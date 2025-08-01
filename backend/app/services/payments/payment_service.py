@@ -8,6 +8,8 @@ from app.domain.entities.users import User, UserRoleType
 from app.domain.entities.invoices import Invoice
 from app.domain.repositories.payment_repository import PaymentRepository
 from app.services.invoices.invoice_service import InvoiceService
+from app.services.audit.audit_service import AuditService
+from app.domain.entities.audit_events import AuditObjectType, AuditEventType, AuditActorType
 from app.domain.exceptions.payments import (
     PaymentNotFoundError,
     PaymentPermissionError,
@@ -19,9 +21,10 @@ from app.domain.exceptions.payments import (
 class PaymentService:
     """Service for payment business logic and integration with invoicing"""
 
-    def __init__(self, payment_repository: PaymentRepository, invoice_service: InvoiceService):
+    def __init__(self, payment_repository: PaymentRepository, invoice_service: InvoiceService, audit_service: Optional[AuditService] = None):
         self.payment_repository = payment_repository
         self.invoice_service = invoice_service
+        self.audit_service = audit_service
 
     # ============================================================================
     # PERMISSION CHECKS
@@ -54,6 +57,7 @@ class PaymentService:
         order_id: Optional[UUID] = None,
         reference_number: Optional[str] = None,
         description: Optional[str] = None,
+        currency: str = 'EUR',
         **kwargs
     ) -> Payment:
         """Create a new payment"""
@@ -79,6 +83,7 @@ class PaymentService:
             order_id=order_id,
             reference_number=reference_number,
             description=description,
+            currency=currency,
             created_by=user.id,
             **kwargs
         )
@@ -100,10 +105,54 @@ class PaymentService:
         # Get the invoice to validate
         invoice = await self.invoice_service.get_invoice_by_id(user, invoice_id)
         
+        # Check if invoice can accept payments
+        if not invoice.can_be_paid():
+            raise PaymentValidationError(
+                f"Cannot process payment: Invoice {invoice.invoice_no} is in status '{invoice.invoice_status.value}' "
+                f"and cannot accept payments. Invoice total: {invoice.total_amount}, "
+                f"Paid amount: {invoice.paid_amount}, Balance due: {invoice.balance_due}"
+            )
+        
+        # Log payment attempt details to audit system
+        if self.audit_service:
+            try:
+                await self.audit_service.log_event(
+                    tenant_id=user.tenant_id,
+                    actor_id=user.id,
+                    actor_type=AuditActorType.USER,
+                    object_type=AuditObjectType.INVOICE,
+                    object_id=invoice.id,
+                    event_type=AuditEventType.ERROR,
+                    context={
+                        "payment_attempt": True,
+                        "invoice_no": invoice.invoice_no,
+                        "payment_amount": float(amount),
+                        "balance_due": float(invoice.balance_due),
+                        "invoice_total": float(invoice.total_amount),
+                        "paid_amount": float(invoice.paid_amount),
+                        "invoice_status": invoice.invoice_status.value,
+                        "payment_method": payment_method.value
+                    }
+                )
+            except Exception as audit_error:
+                # Don't fail payment processing if audit logging fails
+                print(f"Failed to log payment attempt to audit: {audit_error}")
+        
         if amount > invoice.balance_due:
-            raise PaymentValidationError(f"Payment amount ({amount}) exceeds invoice balance due ({invoice.balance_due})")
+            if invoice.balance_due == 0:
+                raise PaymentValidationError(
+                    f"Cannot process payment: Invoice {invoice.invoice_no} has already been fully paid. "
+                    f"Invoice total: {invoice.total_amount}, Paid amount: {invoice.paid_amount}, "
+                    f"Balance due: {invoice.balance_due}, Status: {invoice.invoice_status.value}"
+                )
+            else:
+                raise PaymentValidationError(
+                    f"Payment amount ({amount}) exceeds invoice balance due ({invoice.balance_due}). "
+                    f"Invoice total: {invoice.total_amount}, Paid amount: {invoice.paid_amount}, "
+                    f"Invoice status: {invoice.invoice_status.value}"
+                )
 
-        # Create the payment
+        # Create the payment with invoice currency
         payment = await self.create_payment(
             user=user,
             amount=amount,
@@ -113,7 +162,8 @@ class PaymentService:
             invoice_id=UUID(invoice_id),
             order_id=invoice.order_id,
             reference_number=reference_number,
-            description=f"Payment for invoice {invoice.invoice_no}"
+            description=f"Payment for invoice {invoice.invoice_no}",
+            currency=invoice.currency
         )
 
         # Auto-apply payment to invoice if requested
@@ -144,6 +194,31 @@ class PaymentService:
         
         # Update payment in repository
         payment = await self.payment_repository.update_payment(payment_id, payment)
+        
+        # Log successful payment processing to audit system
+        if self.audit_service:
+            try:
+                await self.audit_service.log_event(
+                    tenant_id=user.tenant_id,
+                    actor_id=user.id,
+                    actor_type=AuditActorType.USER,
+                    object_type=AuditObjectType.PAYMENT,
+                    object_id=payment.id,
+                    event_type=AuditEventType.PAYMENT_PROCESSED,
+                    context={
+                        "payment_no": payment.payment_no,
+                        "amount": float(payment.amount),
+                        "currency": payment.currency,
+                        "payment_method": payment.payment_method.value,
+                        "payment_status": payment.payment_status.value,
+                        "invoice_id": str(payment.invoice_id) if payment.invoice_id else None,
+                        "customer_id": str(payment.customer_id) if payment.customer_id else None,
+                        "gateway_response": gateway_response
+                    }
+                )
+            except Exception as audit_error:
+                # Don't fail payment processing if audit logging fails
+                print(f"Failed to log payment processing to audit: {audit_error}")
 
         # Apply payment to invoice if specified
         if auto_apply_to_invoice and payment.invoice_id:
@@ -183,7 +258,36 @@ class PaymentService:
         if reason:
             payment.notes = f"{payment.notes or ''}\nFailure reason: {reason}".strip()
 
-        return await self.payment_repository.update_payment(payment_id, payment)
+        # Update payment in repository
+        payment = await self.payment_repository.update_payment(payment_id, payment)
+        
+        # Log payment failure to audit system
+        if self.audit_service:
+            try:
+                await self.audit_service.log_event(
+                    tenant_id=user.tenant_id,
+                    actor_id=user.id,
+                    actor_type=AuditActorType.USER,
+                    object_type=AuditObjectType.PAYMENT,
+                    object_id=payment.id,
+                    event_type=AuditEventType.PAYMENT_FAILED,
+                    context={
+                        "payment_no": payment.payment_no,
+                        "amount": float(payment.amount),
+                        "currency": payment.currency,
+                        "payment_method": payment.payment_method.value,
+                        "payment_status": payment.payment_status.value,
+                        "invoice_id": str(payment.invoice_id) if payment.invoice_id else None,
+                        "customer_id": str(payment.customer_id) if payment.customer_id else None,
+                        "failure_reason": reason,
+                        "gateway_response": gateway_response
+                    }
+                )
+            except Exception as audit_error:
+                # Don't fail payment processing if audit logging fails
+                print(f"Failed to log payment failure to audit: {audit_error}")
+
+        return payment
 
     # ============================================================================
     # PAYMENT RETRIEVAL
@@ -232,6 +336,7 @@ class PaymentService:
         payment_no: Optional[str] = None,
         status: Optional[PaymentStatus] = None,
         method: Optional[PaymentMethod] = None,
+        payment_type: Optional[PaymentType] = None,
         customer_id: Optional[UUID] = None,
         from_date: Optional[date] = None,
         to_date: Optional[date] = None,
@@ -244,6 +349,7 @@ class PaymentService:
             payment_no=payment_no,
             status=status,
             method=method,
+            payment_type=payment_type,
             customer_id=customer_id,
             from_date=from_date,
             to_date=to_date,

@@ -25,7 +25,10 @@ class SQLAlchemyOrderRepository(OrderRepository):
 
     def _to_order_entity(self, model: OrderModel) -> Order:
         """Convert OrderModel to Order entity"""
-        order_lines = [self._to_order_line_entity(line) for line in model.order_lines]
+        # Handle case where order_lines might not be loaded (for performance optimization)
+        order_lines = []
+        if hasattr(model, 'order_lines') and model.order_lines is not None:
+            order_lines = [self._to_order_line_entity(line) for line in model.order_lines]
         
         return Order(
             id=model.id,
@@ -188,10 +191,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
         return self._to_order_entity(model) if model else None
 
     async def get_orders_by_customer(self, customer_id: str, tenant_id: UUID) -> List[Order]:
-        """Get all orders for a specific customer"""
+        """Get all orders for a specific customer (optimized - no order lines)"""
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.order_lines))
             .where(
                 and_(
                     OrderModel.customer_id == UUID(customer_id),
@@ -207,10 +209,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
         return [self._to_order_entity(model) for model in models]
 
     async def get_orders_by_status(self, status: OrderStatus, tenant_id: UUID) -> List[Order]:
-        """Get all orders with a specific status"""
+        """Get all orders with a specific status (optimized - no order lines)"""
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.order_lines))
             .where(
                 and_(
                     OrderModel.order_status == (status.value if isinstance(status, OrderStatus) else status),
@@ -226,11 +227,10 @@ class SQLAlchemyOrderRepository(OrderRepository):
         return [self._to_order_entity(model) for model in models]
 
     async def get_orders_by_statuses(self, statuses: List[OrderStatus], tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
-        """Get all orders with any of the specified statuses"""
+        """Get all orders with any of the specified statuses (optimized - no order lines)"""
         status_values = [status.value if isinstance(status, OrderStatus) else status for status in statuses]
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.order_lines))
             .where(
                 and_(
                     OrderModel.order_status.in_(status_values),
@@ -278,10 +278,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
         limit: int = 100, 
         offset: int = 0
     ) -> List[Order]:
-        """Get all orders with pagination"""
+        """Get all orders with pagination (optimized for list view - no order lines)"""
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.order_lines))
             .where(
                 and_(
                     OrderModel.tenant_id == tenant_id,
@@ -576,7 +575,6 @@ class SQLAlchemyOrderRepository(OrderRepository):
         
         stmt = (
             select(OrderModel)
-            .options(selectinload(OrderModel.order_lines))
             .where(and_(*conditions))
             .order_by(OrderModel.created_at.desc())
             .limit(limit)

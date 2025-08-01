@@ -740,4 +740,147 @@
     font-size: 0.7rem;
     padding: 3px 6px;
   }
+}
+
+/* Payment Dropdown Styles */
+.payment-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.payment-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  z-index: 1000;
+  min-width: 150px;
+  margin-top: 2px;
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #333;
+  transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+.dropdown-item:first-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.dropdown-item:last-child {
+  border-radius: 0 0 4px 4px;
+}
+
+.dropdown-toggle {
+  position: relative;
+}
+
+.dropdown-toggle::after {
+  content: '▼';
+  margin-left: 5px;
+  font-size: 0.7rem;
+}
+
+/* Payment Method Display */
+.payment-method-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.payment-method-icon {
+  font-size: 1.2rem;
+}
+
+.payment-method-text {
+  font-weight: 500;
+  color: #495057;
+}
+
+/* Invoice Summary in Payment Modal */
+.invoice-summary {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.invoice-summary h4 {
+  margin: 0 0 12px 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.invoice-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.detail-row .label {
+  font-weight: 500;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.detail-row .value {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 0.9rem;
+}
+
+.detail-row .value.highlight {
+  color: #28a745;
+  font-size: 1rem;
+}
+
+/* Payment Amount Input */
+.payment-amount-input {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  border: 2px solid #007bff;
+  background-color: #f8f9fa;
+}
+
+.payment-amount-input:focus {
+  border-color: #0056b3;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.form-help {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #6c757d;
+  font-style: italic;
 } 

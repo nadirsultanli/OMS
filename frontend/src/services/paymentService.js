@@ -203,6 +203,9 @@ const paymentService = {
 
   // Helper functions for UI
   getPaymentStatusLabel: (status) => {
+    // Normalize status to uppercase for comparison
+    const normalizedStatus = status?.toUpperCase();
+    
     const labels = {
       'PENDING': 'Pending',
       'PROCESSING': 'Processing',
@@ -212,10 +215,13 @@ const paymentService = {
       'REFUNDED': 'Refunded',
       'PARTIAL_REFUND': 'Partially Refunded'
     };
-    return labels[status] || status;
+    return labels[normalizedStatus] || status || 'Unknown';
   },
 
   getPaymentStatusColor: (status) => {
+    // Normalize status to uppercase for comparison
+    const normalizedStatus = status?.toUpperCase();
+    
     const colors = {
       'PENDING': '#ffc107',
       'PROCESSING': '#17a2b8',
@@ -225,10 +231,13 @@ const paymentService = {
       'REFUNDED': '#6f42c1',
       'PARTIAL_REFUND': '#fd7e14'
     };
-    return colors[status] || '#6c757d';
+    return colors[normalizedStatus] || '#6c757d';
   },
 
   getPaymentMethodLabel: (method) => {
+    // Normalize method to uppercase for comparison
+    const normalizedMethod = method?.toUpperCase();
+    
     const labels = {
       'CASH': 'Cash',
       'CARD': 'Card',
@@ -237,23 +246,36 @@ const paymentService = {
       'STRIPE': 'Stripe',
       'PAYPAL': 'PayPal'
     };
-    return labels[method] || method;
+    return labels[normalizedMethod] || method || 'Unknown';
   },
 
   getPaymentTypeLabel: (type) => {
+    // Normalize type to uppercase for comparison
+    const normalizedType = type?.toUpperCase();
+    
     const labels = {
-      'INVOICE_PAYMENT': 'Invoice Payment',
+      'INVOICE_PAYMENT': 'Customer Payment',
+      'SUBSCRIPTION_PAYMENT': 'Subscription',
       'REFUND': 'Refund',
       'DEPOSIT': 'Deposit',
       'ADVANCE': 'Advance Payment'
     };
-    return labels[type] || type;
+    return labels[normalizedType] || type || 'Unknown';
   },
 
-  formatCurrency: (amount, currency = 'KES') => {
+  formatCurrency: (amount, currency = 'EUR') => {
+    // Handle different currency formats
+    const currencyMap = {
+      'KES': 'KES',
+      'EUR': 'EUR',
+      'USD': 'USD'
+    };
+    
+    const displayCurrency = currencyMap[currency] || currency;
+    
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency
+      currency: displayCurrency
     }).format(amount);
   },
 

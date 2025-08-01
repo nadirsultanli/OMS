@@ -247,7 +247,7 @@ class InvoiceRepositoryImpl(InvoiceRepository):
     async def update_invoice(self, invoice_id: str, invoice: Invoice) -> Invoice:
         """Update an existing invoice"""
         try:
-            invoice_data = invoice.to_dict()
+            invoice_data = invoice.to_dict(include_computed=False)
             lines_data = invoice_data.pop('invoice_lines', [])
             
             # Update invoice

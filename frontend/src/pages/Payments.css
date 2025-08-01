@@ -140,6 +140,12 @@
   background-color: #f8f9fa;
 }
 
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .status-badge {
   display: inline-block;
   padding: 4px 8px;
@@ -149,12 +155,67 @@
   color: white;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+.payment-type-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: white;
+  min-width: 80px;
+  text-align: center;
+}
+
+.payment-type-badge.invoice_payment {
+  background-color: #007bff;
+}
+
+.payment-type-badge.subscription_payment {
+  background-color: #6f42c1;
+}
+
+.payment-type-badge.refund {
+  background-color: #fd7e14;
+}
+
+.payment-type-badge.deposit {
+  background-color: #20c997;
+}
+
+.payment-type-badge.advance {
+  background-color: #17a2b8;
 }
 
 .action-buttons {
   display: flex;
   gap: 5px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.action-buttons .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.action-buttons .btn i {
+  font-size: 0.8rem;
 }
 
 .btn {
@@ -212,6 +273,15 @@
 
 .btn-warning:hover {
   background-color: #e0a800;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
 }
 
 .btn-info {
@@ -290,6 +360,17 @@
   background-color: #f8f9fa;
 }
 
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+}
+
 .modal-header h2,
 .modal-header h3 {
   margin: 0;
@@ -326,16 +407,32 @@
   margin-bottom: 30px;
 }
 
+.info-section {
+  margin-bottom: 25px;
+}
+
+.info-section h3 {
+  color: #2c3e50;
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
 .info-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f1f3f4;
-}
-
-.info-row:last-child {
-  border-bottom: none;
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
 }
 
 .info-row .label {
@@ -347,6 +444,13 @@
 .info-row .value {
   color: #2c3e50;
   text-align: right;
+  font-weight: 500;
+}
+
+.amount-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #28a745;
 }
 
 .payment-actions {
@@ -445,6 +549,11 @@
     gap: 3px;
   }
   
+  .action-buttons .btn {
+    min-width: 28px;
+    height: 28px;
+  }
+  
   .btn-sm {
     min-width: 40px;
     padding: 3px 6px;
@@ -459,6 +568,16 @@
   
   .modal-body {
     padding: 16px;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
   }
   
   .info-row {
