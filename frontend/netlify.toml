@@ -31,7 +31,7 @@
     X-Frame-Options = "DENY"
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
-    Content-Security-Policy = "default-src 'self'; style-src 'self' 'unsafe-inline' https://api.mapbox.com https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-eval' https://api.mapbox.com https://api.tiles.mapbox.com blob:; worker-src 'self' blob:; child-src 'self' blob:; img-src 'self' data: https: blob:; connect-src 'self' http://localhost:8000 https://aware-endurance-production.up.railway.app https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://api.tiles.mapbox.com https://*.supabase.co wss://*.supabase.co https://*.railway.app; font-src 'self' data: https://cdnjs.cloudflare.com;"
+    Content-Security-Policy = "default-src 'self'; style-src 'self' 'unsafe-inline' https://api.mapbox.com https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-eval' 'unsafe-hashes' https://api.mapbox.com https://api.tiles.mapbox.com blob:; worker-src 'self' blob:; child-src 'self' blob:; img-src 'self' data: https: blob:; connect-src 'self' http://localhost:8000 https://aware-endurance-production.up.railway.app https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://api.tiles.mapbox.com https://*.supabase.co wss://*.supabase.co https://*.railway.app; font-src 'self' data: https://cdnjs.cloudflare.com;"
 
 # Cache static assets
 [[headers]]
