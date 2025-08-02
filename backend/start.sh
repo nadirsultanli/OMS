@@ -37,12 +37,16 @@ echo "📋 Log level: $LOG_LEVEL"
 echo "🚀 Max requests per worker: ${MAX_REQUESTS:-1000}"
 
 # Start the application
-exec python -m uvicorn app.cmd.main:app \
-    --host 0.0.0.0 \
-    --port $PORT \
-    --workers ${WORKERS:-4} \
-    --worker-class uvicorn.workers.UvicornWorker \
+# Use Gunicorn with Uvicorn workers for better production performance
+exec python -m gunicorn app.cmd.main:app \
+    -w ${WORKERS:-4} \
+    -k uvicorn.workers.UvicornWorker \
+    --bind 0.0.0.0:$PORT \
     --max-requests ${MAX_REQUESTS:-1000} \
     --max-requests-jitter ${MAX_REQUESTS_JITTER:-100} \
-    --access-log \
-    --log-level info
+    --access-logfile - \
+    --error-logfile - \
+    --log-level info \
+    --timeout 120 \
+    --keep-alive 2 \
+    --preload
