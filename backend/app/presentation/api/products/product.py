@@ -136,8 +136,27 @@ async def get_products(
         return response
     except Exception as e:
         total_time = time.time() - start_time
-        logger.error(f"Get products failed after {total_time:.3f}s: {str(e)}")
-        raise
+        logger.error(
+            f"Get products failed after {total_time:.3f}s",
+            tenant_id=tenant_id,
+            error=str(e),
+            error_type=type(e).__name__,
+            limit=limit,
+            offset=offset,
+            category=category
+        )
+        
+        # Return user-friendly error instead of exposing internal details
+        if "timeout" in str(e).lower():
+            raise HTTPException(
+                status_code=408, 
+                detail="Request timeout - please try again with smaller limit or contact support"
+            )
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail="Unable to fetch products - please try again later"
+            )
 
 @router.put("/{product_id}/", response_model=ProductResponse)
 async def update_product(
