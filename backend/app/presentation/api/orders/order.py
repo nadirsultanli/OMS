@@ -1247,7 +1247,11 @@ async def get_orders_dashboard_summary(
         summary = await order_service.get_orders_summary(UUID(tenant_id))
         return {
             "success": True,
-            "data": summary
+            "data": summary,
+            "cache": {
+                "ttl": 30,  # Cache for 30 seconds
+                "timestamp": int(__import__('time').time())
+            }
         }
     except Exception as e:
         logger.error(f"Error getting orders dashboard summary: {str(e)}")

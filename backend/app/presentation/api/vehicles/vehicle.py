@@ -64,12 +64,16 @@ async def get_vehicles_dashboard_summary(
     Get optimized vehicles summary for dashboard (cached and lightweight)
     """
     try:
-        # Use optimized summary method (COUNT queries only)
+        # Use optimized summary method (single COUNT query with CASE WHEN)
         summary = await vehicle_service.get_vehicle_summary(tenant_id)
         
         return {
             "success": True,
-            "data": summary
+            "data": summary,
+            "cache": {
+                "ttl": 30,  # Cache for 30 seconds
+                "timestamp": int(__import__('time').time())
+            }
         }
     except Exception as e:
         default_logger.error(f"Error getting vehicles dashboard summary: {str(e)}")
@@ -85,8 +89,8 @@ async def list_vehicles(
 ):
     vehicles = await vehicle_service.get_all_vehicles(tenant_id, active, limit, offset)
     
-    # Simple approach - use length of vehicles for now
-    total = len(vehicles)
+    # Get accurate total count for pagination
+    total = await vehicle_service.get_vehicle_count(tenant_id, active)
     
     return VehicleListResponse(
         vehicles=[VehicleResponse(**v.__dict__) for v in vehicles], 

@@ -22,13 +22,15 @@ class VehicleService:
 
     async def get_all_vehicles(self, tenant_id: UUID, active: Optional[bool] = None, limit: int = 100, offset: int = 0) -> List[Vehicle]:
         """Get all vehicles with pagination for better performance"""
-        vehicles = await self.vehicle_repository.get_all(tenant_id, active, limit, offset)
-        print(f"DEBUG: Vehicle service returned {len(vehicles)} vehicles for tenant {tenant_id}")
-        return vehicles
+        return await self.vehicle_repository.get_all(tenant_id, active, limit, offset)
     
     async def get_vehicle_summary(self, tenant_id: UUID) -> dict:
         """Get optimized vehicle summary for dashboard"""
         return await self.vehicle_repository.get_vehicle_summary(tenant_id)
+    
+    async def get_vehicle_count(self, tenant_id: UUID, active: Optional[bool] = None) -> int:
+        """Get total count of vehicles for pagination"""
+        return await self.vehicle_repository.get_vehicle_count(tenant_id, active)
 
     async def create_vehicle(self, vehicle: Vehicle) -> Vehicle:
         return await self.vehicle_repository.create_vehicle(vehicle)

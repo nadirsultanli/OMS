@@ -30,4 +30,8 @@ class VehicleRepository(ABC):
     
     @abstractmethod
     async def get_vehicle_summary(self, tenant_id: UUID) -> dict:
+        pass
+    
+    @abstractmethod
+    async def get_vehicle_count(self, tenant_id: UUID, active: Optional[bool] = None) -> int:
         pass 

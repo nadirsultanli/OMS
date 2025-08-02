@@ -127,7 +127,20 @@ export const mockStockDocumentData = {
 // Test API connectivity
 export const testStockAPIConnectivity = async () => {
   try {
-    const response = await fetch('http://localhost:8000/health');
+    // Get API URL based on environment (same logic as api.js)
+    const getApiUrl = () => {
+      const environment = process.env.REACT_APP_ENVIRONMENT || 'development';
+      
+      // For production (Netlify), always use Railway URL
+      if (environment === 'production' || window.location.hostname.includes('netlify.app')) {
+        return 'https://aware-endurance-production.up.railway.app';
+      }
+      
+      // For development, use localhost
+      return 'http://localhost:8000';
+    };
+    
+    const response = await fetch(`${getApiUrl()}/health`);
     if (response.ok) {
       const data = await response.json();
       return {

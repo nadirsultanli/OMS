@@ -141,7 +141,20 @@ const Users = () => {
   const handleResendInvitation = async (userId, email) => {
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1'}/users/${userId}/resend-invitation`, {
+      // Get API URL based on environment (same logic as api.js)
+      const getApiUrl = () => {
+        const environment = process.env.REACT_APP_ENVIRONMENT || 'development';
+        
+        // For production (Netlify), always use Railway URL
+        if (environment === 'production' || window.location.hostname.includes('netlify.app')) {
+          return 'https://aware-endurance-production.up.railway.app/api/v1';
+        }
+        
+        // For development, use localhost
+        return 'http://localhost:8000/api/v1';
+      };
+      
+      const response = await fetch(`${getApiUrl()}/users/${userId}/resend-invitation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
