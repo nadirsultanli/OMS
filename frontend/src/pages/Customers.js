@@ -323,21 +323,37 @@ const Customers = () => {
         // If file was uploaded with temp ID, move it to the real customer ID
         if (fileUploadPath && incorporationFile) {
           try {
+            console.log('Starting file move process...');
+            console.log('Original file path:', fileUploadPath);
+            console.log('Customer result:', result);
+            
             const realCustomerId = result.data.id;
+            console.log('Real customer ID:', realCustomerId);
+            
             const newFilePath = await fileUploadService.moveFile(fileUploadPath, realCustomerId, tenantId);
+            console.log('File move result:', newFilePath);
             
             if (newFilePath.success) {
+              console.log('File moved successfully, updating customer record...');
               // Update the customer with the new file path
-              await customerService.updateCustomer(realCustomerId, {
+              const updateResult = await customerService.updateCustomer(realCustomerId, {
                 incorporation_doc: newFilePath.path
               });
-              console.log('File moved successfully to:', newFilePath.path);
+              console.log('Customer update result:', updateResult);
+              
+              if (updateResult.success) {
+                console.log('Customer updated successfully with new file path:', newFilePath.path);
+              } else {
+                console.error('Failed to update customer with new file path:', updateResult.error);
+              }
             } else {
-              console.warn('Failed to move file to correct path:', newFilePath.error);
+              console.error('Failed to move file to correct path:', newFilePath.error);
             }
           } catch (error) {
-            console.warn('Error moving file to correct path:', error);
+            console.error('Error in file move process:', error);
           }
+        } else {
+          console.log('No file to move - fileUploadPath:', fileUploadPath, 'incorporationFile:', incorporationFile);
         }
         
         // Check if file upload failed but customer was created

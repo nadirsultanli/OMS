@@ -101,18 +101,23 @@ class FileUploadService {
   // Move file from temp path to real customer path
   async moveFile(oldPath, realCustomerId, tenantId) {
     try {
-      console.log('Moving file from:', oldPath, 'to customer:', realCustomerId);
+      console.log('=== FILE MOVE PROCESS START ===');
+      console.log('Moving file from:', oldPath, 'to customer:', realCustomerId, 'tenant:', tenantId);
       
       // Get JWT token from localStorage
       const token = localStorage.getItem('accessToken');
       if (!token) {
         throw new Error('No authentication token found');
       }
+      console.log('JWT token found, length:', token.length);
       
       // Create a new Supabase client with our custom JWT token
       const { createClient } = await import('@supabase/supabase-js');
       const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
       const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      
+      console.log('Supabase URL:', supabaseUrl);
+      console.log('Supabase Anon Key length:', supabaseAnonKey?.length || 0);
       
       const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
         global: {
@@ -122,7 +127,10 @@ class FileUploadService {
         }
       });
       
+      console.log('Supabase client created with auth headers');
+      
       // Download the file from old path
+      console.log('Attempting to download file from:', oldPath);
       const { data: fileData, error: downloadError } = await supabaseWithAuth.storage
         .from(this.bucketName)
         .download(oldPath);
@@ -131,6 +139,8 @@ class FileUploadService {
         console.error('Error downloading file for move:', downloadError);
         throw downloadError;
       }
+      
+      console.log('File downloaded successfully, size:', fileData?.size || 'unknown');
       
       // Create new path with real customer ID
       const fileExt = oldPath.split('.').pop();
@@ -151,7 +161,10 @@ class FileUploadService {
         throw uploadError;
       }
       
+      console.log('File uploaded to new path successfully:', uploadData);
+      
       // Delete the old file
+      console.log('Attempting to delete old file:', oldPath);
       const { error: deleteError } = await supabaseWithAuth.storage
         .from(this.bucketName)
         .remove([oldPath]);
@@ -159,8 +172,11 @@ class FileUploadService {
       if (deleteError) {
         console.warn('Warning: Could not delete old file:', deleteError);
         // Don't throw error here as the move was successful
+      } else {
+        console.log('Old file deleted successfully');
       }
       
+      console.log('=== FILE MOVE PROCESS COMPLETE ===');
       console.log('File moved successfully from', oldPath, 'to', newPath);
       
       return {
@@ -168,7 +184,13 @@ class FileUploadService {
         path: newPath
       };
     } catch (error) {
+      console.error('=== FILE MOVE PROCESS FAILED ===');
       console.error('File move error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
       return {
         success: false,
         error: error.message || 'File move failed'

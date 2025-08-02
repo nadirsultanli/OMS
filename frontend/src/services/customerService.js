@@ -102,7 +102,7 @@ class CustomerService {
     try {
       console.log('customerService - Updating customer:', customerId, 'with data:', updateData);
       
-      const response = await api.patch(`/customers/${customerId}`, updateData);
+      const response = await api.put(`/customers/${customerId}`, updateData);
       
       console.log('customerService - Update response:', response.data);
       
