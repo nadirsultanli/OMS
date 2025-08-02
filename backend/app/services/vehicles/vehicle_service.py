@@ -22,7 +22,9 @@ class VehicleService:
 
     async def get_all_vehicles(self, tenant_id: UUID, active: Optional[bool] = None, limit: int = 100, offset: int = 0) -> List[Vehicle]:
         """Get all vehicles with pagination for better performance"""
-        return await self.vehicle_repository.get_all(tenant_id, active, limit, offset)
+        vehicles = await self.vehicle_repository.get_all(tenant_id, active, limit, offset)
+        print(f"DEBUG: Vehicle service returned {len(vehicles)} vehicles for tenant {tenant_id}")
+        return vehicles
     
     async def get_vehicle_summary(self, tenant_id: UUID) -> dict:
         """Get optimized vehicle summary for dashboard"""

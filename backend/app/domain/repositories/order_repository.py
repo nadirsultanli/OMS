@@ -187,4 +187,9 @@ class OrderRepository(ABC):
     @abstractmethod
     async def get_orders_by_gas_type(self, gas_type: str, tenant_id: UUID) -> List[Order]:
         """Get all orders containing a specific gas type"""
+        pass
+    
+    @abstractmethod
+    async def get_orders_summary(self, tenant_id: UUID) -> dict:
+        """Get optimized orders summary for dashboard"""
         pass 

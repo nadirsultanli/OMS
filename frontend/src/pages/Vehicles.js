@@ -48,7 +48,7 @@ const Vehicles = () => {
 
   const [pagination, setPagination] = useState({
     total: 0,
-    limit: 20,
+    limit: 10, // Reduced from 20 to 10 for faster loading
     offset: 0,
     currentPage: 1,
     totalPages: 1
@@ -76,9 +76,52 @@ const Vehicles = () => {
     applyFilters();
   }, [vehicles, filters]);
 
+  const loadVehicleInventoryBatch = async (vehiclesData) => {
+    // Load inventory data for all vehicles in parallel (much faster than sequential)
+    try {
+      const inventoryPromises = vehiclesData.map(async (vehicle) => {
+        try {
+          const inventoryResult = await vehicleService.getVehicleInventory(vehicle.id);
+          return {
+            vehicleId: vehicle.id,
+            current_load_kg: inventoryResult.success && inventoryResult.data?.vehicle?.current_load_kg || 0,
+            current_volume_m3: inventoryResult.success && inventoryResult.data?.vehicle?.current_volume_m3 || 0
+          };
+        } catch (error) {
+          console.warn(`Failed to fetch inventory for vehicle ${vehicle.id}:`, error);
+          return {
+            vehicleId: vehicle.id,
+            current_load_kg: 0,
+            current_volume_m3: 0
+          };
+        }
+      });
+
+      const inventoryResults = await Promise.allSettled(inventoryPromises);
+      
+      // Update vehicles with inventory data
+      setVehicles(prev => prev.map(vehicle => {
+        const inventoryData = inventoryResults.find(result => 
+          result.status === 'fulfilled' && result.value.vehicleId === vehicle.id
+        );
+        
+        if (inventoryData) {
+          return {
+            ...vehicle,
+            current_load_kg: inventoryData.value.current_load_kg,
+            current_volume_m3: inventoryData.value.current_volume_m3
+          };
+        }
+        return vehicle;
+      }));
+    } catch (error) {
+      console.warn('Failed to load vehicle inventory batch:', error);
+    }
+  };
+
   const fetchVehicles = async () => {
     setLoading(true);
-    setMessage({ type: 'info', text: 'Loading vehicles and inventory data...' });
+    setMessage({ type: 'info', text: 'Loading vehicles...' });
     try {
       const result = await vehicleService.getVehicles(tenantId, {
         limit: pagination.limit,
@@ -88,26 +131,17 @@ const Vehicles = () => {
       if (result.success) {
         const vehiclesData = result.data.results || [];
         
-        // Fetch current load data for each vehicle
-        const vehiclesWithLoad = await Promise.all(
-          vehiclesData.map(async (vehicle) => {
-            try {
-              const inventoryResult = await vehicleService.getVehicleInventory(vehicle.id);
-              if (inventoryResult.success && inventoryResult.data) {
-                return {
-                  ...vehicle,
-                  current_load_kg: inventoryResult.data.vehicle?.current_load_kg || 0,
-                  current_volume_m3: inventoryResult.data.vehicle?.current_volume_m3 || 0
-                };
-              }
-            } catch (error) {
-              console.warn(`Failed to fetch inventory for vehicle ${vehicle.id}:`, error);
-            }
-            return vehicle;
-          })
-        );
+        // Set vehicles initially without inventory, then load inventory in batch
+        const vehiclesWithDefaults = vehiclesData.map(vehicle => ({
+          ...vehicle,
+          current_load_kg: 0, // Default values
+          current_volume_m3: 0
+        }));
         
-        setVehicles(vehiclesWithLoad);
+        setVehicles(vehiclesWithDefaults);
+        
+        // Load inventory data in parallel for all vehicles (more efficient than N+1 calls)
+        loadVehicleInventoryBatch(vehiclesData);
         setPagination(prev => ({
           ...prev,
           total: result.data.count || 0,

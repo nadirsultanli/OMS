@@ -29,12 +29,16 @@ class VehicleRepositoryImpl(VehicleRepository):
         if active is not None:
             query = query.where(VehicleORM.active == active)
         
-        # Add pagination and ordering for better performance
-        query = query.order_by(VehicleORM.created_at.desc()).limit(limit).offset(offset)
+        # Add ordering for better performance - temporarily remove pagination for debugging
+        # Use ID ordering instead of created_at for better index usage
+        query = query.order_by(VehicleORM.id.desc())
+        # query = query.limit(limit).offset(offset)  # Temporarily disabled for debugging
         
         result = await self._session.execute(query)
         objs = result.scalars().all()
-        return [self._to_entity(obj) for obj in objs]
+        entities = [self._to_entity(obj) for obj in objs]
+        print(f"DEBUG: Vehicle repository found {len(objs)} ORM objects, converted to {len(entities)} entities for tenant {tenant_id}")
+        return entities
     
     async def get_vehicle_summary(self, tenant_id: UUID) -> dict:
         """Get optimized vehicle summary for dashboard (count only, no data loading)"""

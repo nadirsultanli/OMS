@@ -85,12 +85,11 @@ async def list_vehicles(
 ):
     vehicles = await vehicle_service.get_all_vehicles(tenant_id, active, limit, offset)
     
-    # Apply pagination
+    # Simple approach - use length of vehicles for now
     total = len(vehicles)
-    paginated_vehicles = vehicles[offset:offset + limit]
     
     return VehicleListResponse(
-        vehicles=[VehicleResponse(**v.__dict__) for v in paginated_vehicles], 
+        vehicles=[VehicleResponse(**v.__dict__) for v in vehicles], 
         total=total,
         limit=limit,
         offset=offset
