@@ -98,6 +98,84 @@ class FileUploadService {
     }
   }
 
+  // Move file from temp path to real customer path
+  async moveFile(oldPath, realCustomerId, tenantId) {
+    try {
+      console.log('Moving file from:', oldPath, 'to customer:', realCustomerId);
+      
+      // Get JWT token from localStorage
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      // Create a new Supabase client with our custom JWT token
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      
+      const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      });
+      
+      // Download the file from old path
+      const { data: fileData, error: downloadError } = await supabaseWithAuth.storage
+        .from(this.bucketName)
+        .download(oldPath);
+      
+      if (downloadError) {
+        console.error('Error downloading file for move:', downloadError);
+        throw downloadError;
+      }
+      
+      // Create new path with real customer ID
+      const fileExt = oldPath.split('.').pop();
+      const newPath = `${tenantId}/${realCustomerId}/incorporation_doc_${Date.now()}.${fileExt}`;
+      
+      console.log('Uploading file to new path:', newPath);
+      
+      // Upload to new path
+      const { data: uploadData, error: uploadError } = await supabaseWithAuth.storage
+        .from(this.bucketName)
+        .upload(newPath, fileData, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (uploadError) {
+        console.error('Error uploading file to new path:', uploadError);
+        throw uploadError;
+      }
+      
+      // Delete the old file
+      const { error: deleteError } = await supabaseWithAuth.storage
+        .from(this.bucketName)
+        .remove([oldPath]);
+      
+      if (deleteError) {
+        console.warn('Warning: Could not delete old file:', deleteError);
+        // Don't throw error here as the move was successful
+      }
+      
+      console.log('File moved successfully from', oldPath, 'to', newPath);
+      
+      return {
+        success: true,
+        path: newPath
+      };
+    } catch (error) {
+      console.error('File move error:', error);
+      return {
+        success: false,
+        error: error.message || 'File move failed'
+      };
+    }
+  }
+
   // Download file as blob to force download instead of opening in browser
   async downloadFileAsBlob(filePath) {
     try {

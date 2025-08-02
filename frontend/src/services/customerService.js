@@ -98,15 +98,29 @@ class CustomerService {
     }
   }
 
-  async updateCustomer(customerId, customerData) {
+  async updateCustomer(customerId, updateData) {
     try {
-      const response = await api.put(`/customers/${customerId}`, customerData);
-      return response.data;
+      console.log('customerService - Updating customer:', customerId, 'with data:', updateData);
+      
+      const response = await api.patch(`/customers/${customerId}`, updateData);
+      
+      console.log('customerService - Update response:', response.data);
+      
+      return {
+        success: true,
+        data: response.data
+      };
     } catch (error) {
-      console.error('Error updating customer:', error);
-      throw error;
+      console.error('Update customer error:', error);
+      console.error('Error response data:', error.response?.data);
+      return {
+        success: false,
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to update customer.'
+      };
     }
   }
+
+
 
   async deleteCustomer(customerId) {
     try {

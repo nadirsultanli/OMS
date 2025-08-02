@@ -320,6 +320,26 @@ const Customers = () => {
       const result = await customerService.createCustomer(customerData);
       
       if (result.success) {
+        // If file was uploaded with temp ID, move it to the real customer ID
+        if (fileUploadPath && incorporationFile) {
+          try {
+            const realCustomerId = result.data.id;
+            const newFilePath = await fileUploadService.moveFile(fileUploadPath, realCustomerId, tenantId);
+            
+            if (newFilePath.success) {
+              // Update the customer with the new file path
+              await customerService.updateCustomer(realCustomerId, {
+                incorporation_doc: newFilePath.path
+              });
+              console.log('File moved successfully to:', newFilePath.path);
+            } else {
+              console.warn('Failed to move file to correct path:', newFilePath.error);
+            }
+          } catch (error) {
+            console.warn('Error moving file to correct path:', error);
+          }
+        }
+        
         // Check if file upload failed but customer was created
         const fileUploadFailed = incorporationFile && !fileUploadPath;
         const message = fileUploadFailed 
