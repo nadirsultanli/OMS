@@ -264,21 +264,27 @@ const Customers = () => {
       const tempCustomerId = `temp_${Date.now()}`;
       let fileUploadPath = null;
 
-      // Upload file if present
+      // Upload file if present (make it optional)
       if (incorporationFile) {
-        const uploadResult = await fileUploadService.uploadFile(
-          incorporationFile,
-          tempCustomerId,
-          tenantId
-        );
+        try {
+          const uploadResult = await fileUploadService.uploadFile(
+            incorporationFile,
+            tempCustomerId,
+            tenantId
+          );
 
-        if (!uploadResult.success) {
-          setErrors({ general: `File upload failed: ${uploadResult.error}` });
-          setLoading(false);
-          return;
+          if (uploadResult.success) {
+            fileUploadPath = uploadResult.path;
+          } else {
+            console.warn('File upload failed, continuing without file:', uploadResult.error);
+            // Continue without file upload - don't block customer creation
+            fileUploadPath = null;
+          }
+        } catch (error) {
+          console.warn('File upload error, continuing without file:', error);
+          // Continue without file upload - don't block customer creation
+          fileUploadPath = null;
         }
-
-        fileUploadPath = uploadResult.path;
       }
 
       const customerData = {
@@ -308,7 +314,13 @@ const Customers = () => {
       const result = await customerService.createCustomer(customerData);
       
       if (result.success) {
-        setMessage('Customer created successfully!');
+        // Check if file upload failed but customer was created
+        const fileUploadFailed = incorporationFile && !fileUploadPath;
+        const message = fileUploadFailed 
+          ? 'Customer created successfully! (Note: File upload failed, but customer was saved without the document.)'
+          : 'Customer created successfully!';
+        
+        setMessage(message);
 
         // Reset form and close modal
         setFormData({
