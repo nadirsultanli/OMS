@@ -47,7 +47,8 @@ const invoiceService = {
         order_id: orderId,
         invoice_date: invoiceData.invoice_date,
         due_date: invoiceData.due_date,
-        payment_terms: invoiceData.payment_terms
+        payment_terms: invoiceData.payment_terms,
+        invoice_amount: invoiceData.invoice_amount
       });
       return { success: true, data: response.data };
     } catch (error) {

@@ -66,8 +66,11 @@ async def get_orders_ready_for_invoicing(
                 'id': str(order.id),
                 'order_no': order.order_no,
                 'customer_id': str(order.customer_id),
+                'customer_name': order.customer_name if hasattr(order, 'customer_name') else 'Unknown Customer',
                 'total_amount': float(order.total_amount),
-                'status': order.order_status.value
+                'status': order.order_status.value,
+                'requested_date': order.requested_date.isoformat() if order.requested_date else None,
+                'ready_for_invoicing': True  # All orders returned are ready for invoicing
             })
         
         return order_list
@@ -100,12 +103,20 @@ async def generate_invoice_from_order(
     )
     
     try:
+        logger.info(
+            "Generating invoice from order with data",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            order_id=request.order_id,
+            invoice_amount=request.invoice_amount
+        )
         invoice = await invoice_service.generate_invoice_from_order(
             user=current_user,
             order_id=request.order_id,
             invoice_date=request.invoice_date,
             due_date=request.due_date,
-            payment_terms=request.payment_terms
+            payment_terms=request.payment_terms,
+            invoice_amount=request.invoice_amount
         )
         
         logger.info(

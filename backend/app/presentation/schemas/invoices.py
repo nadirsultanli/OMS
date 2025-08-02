@@ -38,6 +38,7 @@ class InvoiceFromOrderRequest(BaseModel):
     invoice_date: Optional[date] = Field(None, description="Invoice date (defaults to today)")
     due_date: Optional[date] = Field(None, description="Due date (defaults to 30 days from invoice date)")
     payment_terms: Optional[str] = Field(None, description="Payment terms")
+    invoice_amount: Optional[float] = Field(None, description="Invoice amount (if not provided, uses order total)")
 
 
 class RecordPaymentRequest(BaseModel):

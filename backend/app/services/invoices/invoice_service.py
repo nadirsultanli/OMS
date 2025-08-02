@@ -15,6 +15,7 @@ from app.domain.entities.users import User, UserRoleType
 from app.domain.entities.customers import Customer
 from app.domain.repositories.invoice_repository import InvoiceRepository
 from app.domain.repositories.order_repository import OrderRepository
+from app.services.orders.order_service import OrderService
 from app.domain.exceptions.invoices import (
     InvoiceNotFoundError,
     InvoiceAlreadyExistsError,
@@ -27,9 +28,10 @@ from app.domain.exceptions.invoices import (
 class InvoiceService:
     """Service for invoice business logic"""
     
-    def __init__(self, invoice_repository: InvoiceRepository, order_repository: OrderRepository, tenant_service=None):
+    def __init__(self, invoice_repository: InvoiceRepository, order_repository: OrderRepository, order_service: OrderService = None, tenant_service=None):
         self.invoice_repository = invoice_repository
         self.order_repository = order_repository
+        self.order_service = order_service
         self.tenant_service = tenant_service
 
     # ============================================================================
@@ -64,7 +66,8 @@ class InvoiceService:
         order_id: str,
         invoice_date: Optional[date] = None,
         due_date: Optional[date] = None,
-        payment_terms: Optional[str] = None
+        payment_terms: Optional[str] = None,
+        invoice_amount: Optional[float] = None
     ) -> Invoice:
         """Generate an invoice from a delivered order"""
         
@@ -126,26 +129,50 @@ class InvoiceService:
         )
 
         # Convert order lines to invoice lines
-        for order_line in order.order_lines:
+        print(f"DEBUG: invoice_amount received: {invoice_amount}, type: {type(invoice_amount)}")
+        if invoice_amount and invoice_amount > 0:
+            print(f"DEBUG: Creating invoice with custom amount: {invoice_amount}")
+            # If a specific invoice amount is provided, create a single line with that amount (no tax)
             invoice_line = InvoiceLine.create(
                 invoice_id=invoice.id,
-                order_line_id=order_line.id,
-                description=self._generate_line_description(order_line),
-                quantity=order_line.qty_delivered or order_line.qty_ordered,
-                unit_price=order_line.manual_unit_price or order_line.list_price,
-                tax_code=order_line.tax_code,
-                tax_rate=order_line.tax_rate,
-                component_type=order_line.component_type,
-                variant_sku=order_line.variant_id  # Would get SKU from variant service
+                order_line_id=None,
+                description=f"Invoice for Order {order.order_no}",
+                quantity=1,
+                unit_price=Decimal(str(invoice_amount)),
+                tax_code='TX_STD',
+                tax_rate=Decimal('0.00'),  # No tax - amount is already inclusive
+                component_type='STANDARD'
             )
             invoice.add_line(invoice_line)
+            print(f"DEBUG: Invoice line created with unit_price: {invoice_line.unit_price}")
+        else:
+            print(f"DEBUG: Using original order lines, invoice_amount was: {invoice_amount}")
+            # Use original order lines
+            for order_line in order.order_lines:
+                invoice_line = InvoiceLine.create(
+                    invoice_id=invoice.id,
+                    order_line_id=order_line.id,
+                    description=self._generate_line_description(order_line),
+                    quantity=order_line.qty_delivered or order_line.qty_ordered,
+                    unit_price=order_line.manual_unit_price or order_line.list_price,
+                    tax_code=order_line.tax_code,
+                    tax_rate=order_line.tax_rate,
+                    component_type=order_line.component_type,
+                    variant_sku=order_line.variant_id  # Would get SKU from variant service
+                )
+                invoice.add_line(invoice_line)
 
         # Set delivery date from order
         if hasattr(order, 'delivery_date') and order.delivery_date:
             invoice.delivery_date = order.delivery_date
 
         # Save the invoice
-        return await self.invoice_repository.create_invoice(invoice)
+        saved_invoice = await self.invoice_repository.create_invoice(invoice)
+        print(f"DEBUG: Invoice saved with total_amount: {saved_invoice.total_amount}")
+        print(f"DEBUG: Invoice lines count: {len(saved_invoice.invoice_lines)}")
+        for i, line in enumerate(saved_invoice.invoice_lines):
+            print(f"DEBUG: Line {i}: unit_price={line.unit_price}, line_total={line.line_total}")
+        return saved_invoice
 
     async def generate_invoice_pdf(self, invoice: Invoice) -> bytes:
         """Generate professional PDF content for an invoice with Circl Technologies branding"""
@@ -652,6 +679,23 @@ class InvoiceService:
         # Update invoice in repository
         updated_invoice = await self.invoice_repository.update_invoice(invoice_id, invoice)
         
+        # Check if invoice is now fully paid and close associated order
+        if updated_invoice.invoice_status == InvoiceStatus.PAID and updated_invoice.order_id and self.order_service:
+            try:
+                # Get the order
+                order = await self.order_repository.get_order_by_id(str(updated_invoice.order_id))
+                if order and order.order_status == OrderStatus.DELIVERED:
+                    # Update order status to CLOSED
+                    await self.order_service.update_order_status(
+                        user=user,
+                        order_id=str(order.id),
+                        new_status=OrderStatus.CLOSED
+                    )
+                    print(f"Order {order.order_no} automatically closed after payment completion")
+            except Exception as e:
+                # Log error but don't fail payment processing
+                print(f"Failed to close order after payment: {e}")
+        
         return updated_invoice
 
     # ============================================================================
@@ -700,13 +744,42 @@ class InvoiceService:
         limit: int = 100,
         offset: int = 0
     ) -> List[Order]:
-        """Get orders that are ready for invoicing (delivered or closed)"""
-        return await self.order_repository.get_orders_by_statuses(
+        """Get orders that are ready for invoicing (delivered or closed) and don't have invoices yet"""
+        
+        # Get all delivered or closed orders
+        orders = await self.order_repository.get_orders_by_statuses(
             [OrderStatus.DELIVERED, OrderStatus.CLOSED],
             user.tenant_id,
-            limit=limit,
+            limit=limit * 2,  # Get more to account for filtering
             offset=offset
         )
+        
+        # Filter out orders that already have invoices or are already paid
+        orders_ready_for_invoicing = []
+        for order in orders:
+            # Check if order already has an invoice
+            existing_invoices = await self.invoice_repository.get_invoices_by_order(
+                order_id=order.id,
+                tenant_id=user.tenant_id
+            )
+            
+            # Check if any existing invoice is already paid
+            has_paid_invoice = False
+            if existing_invoices:
+                for invoice in existing_invoices:
+                    if invoice.invoice_status == InvoiceStatus.PAID:
+                        has_paid_invoice = True
+                        break
+            
+            # Only include orders that don't have any invoices OR don't have paid invoices
+            if not existing_invoices or not has_paid_invoice:
+                orders_ready_for_invoicing.append(order)
+                
+                # Stop if we have enough orders
+                if len(orders_ready_for_invoicing) >= limit:
+                    break
+        
+        return orders_ready_for_invoicing
 
     async def generate_invoices_for_delivered_orders(
         self,

@@ -33,7 +33,8 @@ const Invoices = () => {
     order_id: '',
     invoice_date: new Date().toISOString().split('T')[0],
     due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    payment_terms: '30 days'
+    payment_terms: '30 days',
+    invoice_amount: ''
   });
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -463,12 +464,27 @@ const Invoices = () => {
         return;
       }
 
+      // Validate invoice amount
+      if (!generateInvoiceData.invoice_amount || parseFloat(generateInvoiceData.invoice_amount) <= 0) {
+        setError('Please enter a valid invoice amount');
+        return;
+      }
+
+      console.log('DEBUG: Sending invoice data:', {
+        order_id: generateInvoiceData.order_id,
+        invoice_date: generateInvoiceData.invoice_date,
+        due_date: generateInvoiceData.due_date,
+        payment_terms: generateInvoiceData.payment_terms,
+        invoice_amount: parseFloat(generateInvoiceData.invoice_amount)
+      });
+      
       const result = await invoiceService.generateInvoiceFromOrder(
         generateInvoiceData.order_id,
         {
           invoice_date: generateInvoiceData.invoice_date,
           due_date: generateInvoiceData.due_date,
-          payment_terms: generateInvoiceData.payment_terms
+          payment_terms: generateInvoiceData.payment_terms,
+          invoice_amount: parseFloat(generateInvoiceData.invoice_amount)
         }
       );
 
@@ -479,7 +495,8 @@ const Invoices = () => {
           mode: '',
           invoice_date: new Date().toISOString().split('T')[0],
           due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          payment_terms: '30 days'
+          payment_terms: '30 days',
+          invoice_amount: ''
         });
         setSelectedOrder(null);
         loadInvoices(); // Refresh the list
@@ -1148,6 +1165,21 @@ const Invoices = () => {
                 onChange={(e) => setGenerateInvoiceData(prev => ({ ...prev, payment_terms: e.target.value }))}
                 placeholder="e.g., 30 days"
               />
+            </div>
+
+            <div className="form-group">
+              <label>Invoice Amount:</label>
+              <input
+                type="number"
+                step="0.01"
+                value={generateInvoiceData.invoice_amount}
+                onChange={(e) => setGenerateInvoiceData(prev => ({ ...prev, invoice_amount: e.target.value }))}
+                placeholder="Enter invoice amount"
+                className="invoice-amount-input"
+              />
+              <small className="form-help">
+                {selectedOrder && `Order Total: ${invoiceService.formatCurrency(selectedOrder.total_amount)}`}
+              </small>
             </div>
           </div>
           <div className="modal-footer">
