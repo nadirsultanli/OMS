@@ -21,7 +21,7 @@ class InvoiceRepositoryImpl(InvoiceRepository):
         """Create a new invoice"""
         try:
             # Insert invoice
-            invoice_data = invoice.to_dict(include_lines=False)
+            invoice_data = invoice.to_dict(include_lines=False, include_computed=False)
             lines_data = []
             
             # Extract invoice lines data

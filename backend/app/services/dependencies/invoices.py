@@ -7,6 +7,8 @@ from app.infrastucture.database.invoice_repository_impl import InvoiceRepository
 from app.services.dependencies.repositories import get_order_repository
 from app.services.tenants.tenant_service import TenantService
 from app.services.dependencies.tenants import get_tenant_service
+from app.services.orders.order_service import OrderService
+from app.services.dependencies.orders import get_order_service
 
 
 def get_invoice_repository() -> InvoiceRepository:
@@ -17,7 +19,8 @@ def get_invoice_repository() -> InvoiceRepository:
 def get_invoice_service(
     invoice_repository: InvoiceRepository = Depends(get_invoice_repository),
     order_repository: OrderRepository = Depends(get_order_repository),
+    order_service: OrderService = Depends(get_order_service),
     tenant_service: TenantService = Depends(get_tenant_service)
 ) -> InvoiceService:
     """Get the invoice service with dependencies"""
-    return InvoiceService(invoice_repository, order_repository, tenant_service)
+    return InvoiceService(invoice_repository, order_repository, order_service, tenant_service)

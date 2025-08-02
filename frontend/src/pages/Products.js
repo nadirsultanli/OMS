@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import productService from '../services/productService';
 import { extractErrorMessage } from '../utils/errorUtils';
-import { Search, Plus, Edit2, Trash2, Package } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Package, Layers } from 'lucide-react';
 import './Products.css';
 
 const Products = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -43,10 +45,6 @@ const Products = () => {
   useEffect(() => {
     fetchProducts();
     fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    fetchProducts();
   }, [pagination.offset, pagination.limit]);
 
   useEffect(() => {
@@ -514,6 +512,14 @@ const Products = () => {
                     <td>{product.density_kg_per_l || '-'}</td>
                     <td className="date-cell">{formatDate(product.created_at)}</td>
                     <td className="actions-cell">
+                      <button
+                        onClick={() => navigate('/variants')}
+                        className="action-icon-btn"
+                        title="View variants"
+                        disabled={loading}
+                      >
+                        <Layers size={16} />
+                      </button>
                       <button
                         onClick={() => handleEditClick(product)}
                         className="action-icon-btn"
