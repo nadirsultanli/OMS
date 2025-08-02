@@ -68,6 +68,27 @@ const orderService = {
     }
   },
 
+  // Get orders summary for dashboard
+  getOrdersSummary: async (tenantId = null) => {
+    try {
+      const actualTenantId = tenantId || authService.getCurrentTenantId();
+      console.log('Getting orders summary for tenant:', actualTenantId);
+      
+      if (!actualTenantId) {
+        console.error('No tenant ID found when fetching orders summary');
+        return { success: false, error: 'No tenant ID found' };
+      }
+
+      const response = await api.get(`/orders/summary/dashboard?tenant_id=${actualTenantId}`);
+      console.log('Orders summary API response:', response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error fetching orders summary:', error);
+      console.error('Error response:', error.response?.data);
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to fetch orders summary' };
+    }
+  },
+
   // Create new order
   createOrder: async (orderData) => {
     try {

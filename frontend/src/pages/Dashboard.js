@@ -91,7 +91,7 @@ const Dashboard = () => {
         customerService.getCustomers({ limit: 10, offset: 0 }),
         
         // Load orders summary - use optimized dashboard endpoint
-        api.get(`/orders/summary/dashboard?tenant_id=${tenantId}`),
+        orderService.getOrdersSummary(tenantId),
         
         // Load stock levels - use smaller limit
         stockService.getStockLevels({ limit: 50 }),
@@ -124,7 +124,7 @@ const Dashboard = () => {
 
       // Process orders data (optimized endpoint)
       console.log('Orders API Response:', ordersResponse);
-      if (ordersResponse.status === 'fulfilled' && ordersResponse.value.data.success) {
+      if (ordersResponse.status === 'fulfilled' && ordersResponse.value.success) {
         const summary = ordersResponse.value.data.data;
         console.log('Orders Summary Data:', summary);
         setDashboardData(prev => ({
