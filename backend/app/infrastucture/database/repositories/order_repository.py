@@ -295,6 +295,42 @@ class SQLAlchemyOrderRepository(OrderRepository):
         models = result.scalars().all()
         
         return [self._to_order_entity(model) for model in models]
+    
+    async def get_orders_summary(self, tenant_id: UUID) -> dict:
+        """Get optimized orders summary for dashboard (count only, no data loading)"""
+        from sqlalchemy import func, case
+        
+        # Single query to get all counts at once using CASE WHEN
+        stmt = select(
+            func.count(OrderModel.id).label('total'),
+            func.sum(case(
+                (OrderModel.order_status.in_(['draft', 'submitted']), 1),
+                else_=0
+            )).label('pending'),
+            func.sum(case(
+                (OrderModel.order_status.in_(['delivered', 'closed']), 1),
+                else_=0
+            )).label('completed'),
+            func.sum(case(
+                (OrderModel.order_status.in_(['approved', 'allocated', 'loaded', 'in_transit']), 1),
+                else_=0
+            )).label('in_progress')
+        ).where(
+            and_(
+                OrderModel.tenant_id == tenant_id,
+                OrderModel.deleted_at.is_(None)
+            )
+        )
+        
+        result = await self.session.execute(stmt)
+        row = result.first()
+        
+        return {
+            'total': int(row.total or 0),
+            'pending': int(row.pending or 0),
+            'completed': int(row.completed or 0),
+            'in_progress': int(row.in_progress or 0)
+        }
 
     async def update_order(self, order_id: str, order: Order) -> Optional[Order]:
         """Update an existing order"""

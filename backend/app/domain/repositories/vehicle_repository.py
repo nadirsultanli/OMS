@@ -26,4 +26,8 @@ class VehicleRepository(ABC):
 
     @abstractmethod
     async def delete_vehicle(self, vehicle_id: UUID) -> bool:
+        pass
+    
+    @abstractmethod
+    async def get_vehicle_summary(self, tenant_id: UUID) -> dict:
         pass 

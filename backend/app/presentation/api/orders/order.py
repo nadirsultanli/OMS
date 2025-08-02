@@ -1234,6 +1234,25 @@ async def search_orders(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to search orders")
 
 
+@router.get("/summary/dashboard")
+async def get_orders_dashboard_summary(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    order_service: OrderService = Depends(get_order_service)
+):
+    """
+    Get optimized orders summary for dashboard (cached and lightweight)
+    """
+    try:
+        from uuid import UUID
+        summary = await order_service.get_orders_summary(UUID(tenant_id))
+        return {
+            "success": True,
+            "data": summary
+        }
+    except Exception as e:
+        logger.error(f"Error getting orders dashboard summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get orders summary")
+
 @router.get("/stats/count", response_model=OrderCountResponse)
 async def get_order_count(
     status: Optional[str] = Query(None, description="Filter by status"),

@@ -20,8 +20,13 @@ class VehicleService:
             raise VehicleNotFoundError(f"Vehicle with plate {plate} not found for tenant {tenant_id}")
         return vehicle
 
-    async def get_all_vehicles(self, tenant_id: UUID, active: Optional[bool] = None) -> List[Vehicle]:
-        return await self.vehicle_repository.get_all(tenant_id, active)
+    async def get_all_vehicles(self, tenant_id: UUID, active: Optional[bool] = None, limit: int = 100, offset: int = 0) -> List[Vehicle]:
+        """Get all vehicles with pagination for better performance"""
+        return await self.vehicle_repository.get_all(tenant_id, active, limit, offset)
+    
+    async def get_vehicle_summary(self, tenant_id: UUID) -> dict:
+        """Get optimized vehicle summary for dashboard"""
+        return await self.vehicle_repository.get_vehicle_summary(tenant_id)
 
     async def create_vehicle(self, vehicle: Vehicle) -> Vehicle:
         return await self.vehicle_repository.create_vehicle(vehicle)

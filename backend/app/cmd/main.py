@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.openapi.utils import get_openapi
@@ -166,6 +167,9 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# Add compression middleware for better performance
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 default_logger.info(f"CORS middleware configured with origins: {ALLOWED_ORIGINS}")
 

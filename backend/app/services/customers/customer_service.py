@@ -31,8 +31,9 @@ class CustomerService:
 
     async def get_all_customers(self, limit: int = 100, offset: int = 0) -> List[Customer]:
         customers = await self.customer_repository.get_all(limit, offset)
-        for customer in customers:
-            customer.addresses = await self.address_service.get_addresses_by_customer(str(customer.id))
+        # Only load addresses if needed (dashboard doesn't need addresses)
+        # for customer in customers:
+        #     customer.addresses = await self.address_service.get_addresses_by_customer(str(customer.id))
         return customers
 
     async def get_active_customers(self) -> List[Customer]:
@@ -47,7 +48,8 @@ class CustomerService:
         offset: int = 0,
         status: Optional[str] = None,
         customer_type: Optional[str] = None,
-        search: Optional[str] = None
+        search: Optional[str] = None,
+        include_addresses: bool = False
     ) -> tuple[List[Customer], int]:
         """Get customers with optional filters and return both customers and total count"""
         customers, total = await self.customer_repository.get_with_filters(
@@ -58,9 +60,10 @@ class CustomerService:
             search=search
         )
         
-        # Load addresses for each customer
-        for customer in customers:
-            customer.addresses = await self.address_service.get_addresses_by_customer(str(customer.id))
+        # Only load addresses if explicitly requested
+        if include_addresses:
+            for customer in customers:
+                customer.addresses = await self.address_service.get_addresses_by_customer(str(customer.id))
         
         return customers, total
 

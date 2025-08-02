@@ -23,13 +23,45 @@ class VehicleRepositoryImpl(VehicleRepository):
         obj = result.scalar_one_or_none()
         return self._to_entity(obj) if obj else None
 
-    async def get_all(self, tenant_id: UUID, active: Optional[bool] = None) -> List[Vehicle]:
+    async def get_all(self, tenant_id: UUID, active: Optional[bool] = None, limit: int = 100, offset: int = 0) -> List[Vehicle]:
+        """Get all vehicles with pagination for better performance"""
         query = select(VehicleORM).where(VehicleORM.tenant_id == tenant_id, VehicleORM.deleted_at == None)
         if active is not None:
             query = query.where(VehicleORM.active == active)
+        
+        # Add pagination and ordering for better performance
+        query = query.order_by(VehicleORM.created_at.desc()).limit(limit).offset(offset)
+        
         result = await self._session.execute(query)
         objs = result.scalars().all()
         return [self._to_entity(obj) for obj in objs]
+    
+    async def get_vehicle_summary(self, tenant_id: UUID) -> dict:
+        """Get optimized vehicle summary for dashboard (count only, no data loading)"""
+        from sqlalchemy import func
+        
+        # Use COUNT queries instead of loading all data
+        total_query = select(func.count(VehicleORM.id)).where(
+            VehicleORM.tenant_id == tenant_id, 
+            VehicleORM.deleted_at == None
+        )
+        
+        active_query = select(func.count(VehicleORM.id)).where(
+            VehicleORM.tenant_id == tenant_id, 
+            VehicleORM.deleted_at == None,
+            VehicleORM.active == True
+        )
+        
+        total_result = await self._session.execute(total_query)
+        active_result = await self._session.execute(active_query)
+        
+        total_count = total_result.scalar() or 0
+        active_count = active_result.scalar() or 0
+        
+        return {
+            "total": total_count,
+            "active": active_count
+        }
 
     async def create_vehicle(self, vehicle: Vehicle) -> Vehicle:
         # Check for unique constraint

@@ -110,6 +110,15 @@ class OrderService:
         """Get all orders for a tenant with pagination"""
         return await self.order_repository.get_all_orders(tenant_id, limit, offset)
 
+    async def get_orders_summary(
+        self, 
+        tenant_id: UUID, 
+        limit: int = 50
+    ) -> dict:
+        """Get orders summary for dashboard (optimized for performance)"""
+        # Use optimized repository method (single COUNT query with CASE WHEN)
+        return await self.order_repository.get_orders_summary(tenant_id)
+
     async def update_order(
         self,
         user: User,

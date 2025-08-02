@@ -54,123 +54,199 @@ const Dashboard = () => {
 
   const loadDashboardData = async () => {
     try {
-      // Load customers count
-      customerService.getCustomers({ limit: 1, offset: 0 })
-        .then(response => {
-          if (response.success) {
-            setDashboardData(prev => ({
-              ...prev,
-              customers: { total: response.data.total || 0, loading: false }
-            }));
-          } else {
-            setDashboardData(prev => ({
-              ...prev,
-              customers: { total: 0, loading: false }
-            }));
-          }
-        })
-        .catch(() => {
-          setDashboardData(prev => ({
-            ...prev,
-            customers: { total: 0, loading: false }
-          }));
-        });
-
-      // Load orders summary
-      orderService.getOrders(null, { limit: 1000 })
-        .then(response => {
-          if (response.success) {
-            const orders = response.data.orders || [];
-            const pending = orders.filter(o => o.status === 'pending').length;
-            const completed = orders.filter(o => o.status === 'completed').length;
-            setDashboardData(prev => ({
-              ...prev,
-              orders: { total: orders.length, pending, completed, loading: false }
-            }));
-          } else {
-            setDashboardData(prev => ({
-              ...prev,
-              orders: { total: 0, pending: 0, completed: 0, loading: false }
-            }));
-          }
-        })
-        .catch(() => {
-          setDashboardData(prev => ({
-            ...prev,
-            orders: { total: 0, pending: 0, completed: 0, loading: false }
-          }));
-        });
-
-      // Load stock levels
-      stockService.getStockLevels({ limit: 1000 })
-        .then(response => {
-          const stockLevels = response.stock_levels || [];
-          const lowStock = stockLevels.filter(s => s.current_quantity <= (s.minimum_quantity || 0)).length;
-          setDashboardData(prev => ({
-            ...prev,
-            stock: { lowStock, totalProducts: stockLevels.length, loading: false }
-          }));
-        })
-        .catch(() => {
-          setDashboardData(prev => ({
-            ...prev,
-            stock: { lowStock: 0, totalProducts: 0, loading: false }
-          }));
-        });
-
-      // Load trips summary
-      tripService.getTrips({ limit: 1000 })
-        .then(response => {
-          if (response.success) {
-            const trips = response.data.results || [];
-            const active = trips.filter(t => t.status === 'IN_PROGRESS').length;
-            const pending = trips.filter(t => t.status === 'PLANNED').length;
-            setDashboardData(prev => ({
-              ...prev,
-              trips: { active, pending, loading: false }
-            }));
-          } else {
-            setDashboardData(prev => ({
-              ...prev,
-              trips: { active: 0, pending: 0, loading: false }
-            }));
-          }
-        })
-        .catch(() => {
-          setDashboardData(prev => ({
-            ...prev,
-            trips: { active: 0, pending: 0, loading: false }
-          }));
-        });
-
-      // Load vehicles summary
       const currentUser = authService.getCurrentUser();
       const tenantId = currentUser?.tenant_id;
-      vehicleService.getVehicles(tenantId, { limit: 1000 })
-        .then(response => {
-          if (response.success) {
-            const vehicles = response.data.results || [];
-            const active = vehicles.filter(v => v.status === 'active').length;
-            setDashboardData(prev => ({
-              ...prev,
-              vehicles: { total: vehicles.length, active, loading: false }
-            }));
-          } else {
-            setDashboardData(prev => ({
-              ...prev,
-              vehicles: { total: 0, active: 0, loading: false }
-            }));
+
+      // Clear cache for debugging - remove this later
+      const cacheKey = `dashboard_data_${tenantId}`;
+      sessionStorage.removeItem(cacheKey);
+      sessionStorage.removeItem(`${cacheKey}_time`);
+      
+      // Check for cached data first (cache for 30 seconds)
+      // const cachedData = sessionStorage.getItem(cacheKey);
+      // const cacheTime = sessionStorage.getItem(`${cacheKey}_time`);
+      
+      // if (cachedData && cacheTime && (Date.now() - parseInt(cacheTime)) < 30000) {
+      //   try {
+      //     const parsedData = JSON.parse(cachedData);
+      //     setDashboardData(parsedData);
+      //     return;
+      //   } catch (e) {
+      //     // Invalid cache, continue with fresh data
+      //   }
+      // }
+
+      // Make all API calls in parallel for better performance
+      // Use optimized summary endpoints for better performance
+      const [
+        customersResponse,
+        ordersResponse,
+        stockResponse,
+        tripsResponse,
+        vehiclesResponse,
+        invoiceSummaryResponse,
+        paymentSummaryResponse
+      ] = await Promise.allSettled([
+        // Load customers count - use smaller limit since we only need total
+        customerService.getCustomers({ limit: 10, offset: 0 }),
+        
+        // Load orders summary - use optimized dashboard endpoint
+        api.get(`/orders/summary/dashboard?tenant_id=${tenantId}`),
+        
+        // Load stock levels - use smaller limit
+        stockService.getStockLevels({ limit: 50 }),
+        
+        // Load trips summary - use smaller limit
+        tripService.getTrips({ limit: 50 }),
+        
+        // Load vehicles summary - use optimized dashboard endpoint
+        api.get(`/vehicles/summary/dashboard?tenant_id=${tenantId}`),
+        
+        // Load invoice summary (optimized endpoint)
+        api.get('/invoices/summary/dashboard'),
+        
+        // Load payment summary (optimized endpoint)
+        api.get('/payments/summary/dashboard')
+      ]);
+
+      // Process customers data
+      if (customersResponse.status === 'fulfilled' && customersResponse.value.success) {
+        setDashboardData(prev => ({
+          ...prev,
+          customers: { total: customersResponse.value.data.total || 0, loading: false }
+        }));
+      } else {
+        setDashboardData(prev => ({
+          ...prev,
+          customers: { total: 0, loading: false }
+        }));
+      }
+
+      // Process orders data (optimized endpoint)
+      console.log('Orders API Response:', ordersResponse);
+      if (ordersResponse.status === 'fulfilled' && ordersResponse.value.data.success) {
+        const summary = ordersResponse.value.data.data;
+        console.log('Orders Summary Data:', summary);
+        setDashboardData(prev => ({
+          ...prev,
+          orders: { 
+            total: summary.total || 0, 
+            pending: summary.pending || 0, 
+            completed: summary.completed || 0, 
+            loading: false 
           }
-        })
-        .catch(() => {
-          setDashboardData(prev => ({
-            ...prev,
-            vehicles: { total: 0, active: 0, loading: false }
-          }));
-        });
+        }));
+      } else {
+        console.error('Orders API Error:', ordersResponse);
+        setDashboardData(prev => ({
+          ...prev,
+          orders: { total: 0, pending: 0, completed: 0, loading: false }
+        }));
+      }
+
+      // Process stock data
+      if (stockResponse.status === 'fulfilled') {
+        const stockLevels = stockResponse.value.stock_levels || [];
+        const lowStock = stockLevels.filter(s => s.current_quantity <= (s.minimum_quantity || 0)).length;
+        setDashboardData(prev => ({
+          ...prev,
+          stock: { lowStock, totalProducts: stockLevels.length, loading: false }
+        }));
+      } else {
+        setDashboardData(prev => ({
+          ...prev,
+          stock: { lowStock: 0, totalProducts: 0, loading: false }
+        }));
+      }
+
+      // Process trips data
+      if (tripsResponse.status === 'fulfilled' && tripsResponse.value.data.success) {
+        const trips = tripsResponse.value.data.data.results || [];
+        const active = trips.filter(t => t.status === 'IN_PROGRESS').length;
+        const pending = trips.filter(t => t.status === 'PLANNED').length;
+        setDashboardData(prev => ({
+          ...prev,
+          trips: { active, pending, loading: false }
+        }));
+      } else {
+        setDashboardData(prev => ({
+          ...prev,
+          trips: { active: 0, pending: 0, loading: false }
+        }));
+      }
+
+            // Process vehicles data (optimized endpoint)
+      console.log('Vehicles API Response:', vehiclesResponse);
+      if (vehiclesResponse.status === 'fulfilled' && vehiclesResponse.value.data.success) {
+        const summary = vehiclesResponse.value.data.data;
+        console.log('Vehicles Summary Data:', summary);
+        setDashboardData(prev => ({
+          ...prev,
+          vehicles: { 
+            total: summary.total || 0, 
+            active: summary.active || 0, 
+            loading: false 
+          }
+        }));
+      } else {
+        console.error('Vehicles API Error:', vehiclesResponse);
+        setDashboardData(prev => ({
+          ...prev,
+          vehicles: { total: 0, active: 0, loading: false }
+        }));
+      }
+
+      // Cache the final dashboard data
+      const finalData = {
+        customers: { total: 0, loading: false },
+        orders: { total: 0, pending: 0, completed: 0, loading: false },
+        stock: { lowStock: 0, totalProducts: 0, loading: false },
+        trips: { active: 0, pending: 0, loading: false },
+        vehicles: { total: 0, active: 0, loading: false }
+      };
+
+      // Update final data based on responses
+      if (customersResponse.status === 'fulfilled' && customersResponse.value.success) {
+        finalData.customers = { total: customersResponse.value.data.total || 0, loading: false };
+      }
+      if (ordersResponse.status === 'fulfilled' && ordersResponse.value.success) {
+        const orders = ordersResponse.value.data.orders || [];
+        const pending = orders.filter(o => o.status === 'pending').length;
+        const completed = orders.filter(o => o.status === 'completed').length;
+        finalData.orders = { total: orders.length, pending, completed, loading: false };
+      }
+      if (stockResponse.status === 'fulfilled') {
+        const stockLevels = stockResponse.value.stock_levels || [];
+        const lowStock = stockLevels.filter(s => s.current_quantity <= (s.minimum_quantity || 0)).length;
+        finalData.stock = { lowStock, totalProducts: stockLevels.length, loading: false };
+      }
+      if (tripsResponse.status === 'fulfilled' && tripsResponse.value.success) {
+        const trips = tripsResponse.value.data.results || [];
+        const active = trips.filter(t => t.status === 'IN_PROGRESS').length;
+        const pending = trips.filter(t => t.status === 'PLANNED').length;
+        finalData.trips = { active, pending, loading: false };
+      }
+      if (vehiclesResponse.status === 'fulfilled' && vehiclesResponse.value.success) {
+        const vehicles = vehiclesResponse.value.data.results || [];
+        const active = vehicles.filter(v => v.status === 'active').length;
+        finalData.vehicles = { total: vehicles.length, active, loading: false };
+      }
+
+      // Save to cache
+      sessionStorage.setItem(cacheKey, JSON.stringify(finalData));
+      sessionStorage.setItem(`${cacheKey}_time`, Date.now().toString());
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      // Set all loading states to false on error
+      setDashboardData(prev => ({
+        ...prev,
+        customers: { ...prev.customers, loading: false },
+        orders: { ...prev.orders, loading: false },
+        stock: { ...prev.stock, loading: false },
+        trips: { ...prev.trips, loading: false },
+        vehicles: { ...prev.vehicles, loading: false }
+      }));
     }
   };
 
@@ -182,7 +258,13 @@ const Dashboard = () => {
       <div className="metric-content">
         <h3 className="metric-title">{title}</h3>
         <div className="metric-value">
-          {loading ? '...' : value}
+          {loading ? (
+            <div className="loading-skeleton">
+              <div className="skeleton-bar"></div>
+            </div>
+          ) : (
+            value
+          )}
         </div>
         {subtitle && <p className="metric-subtitle">{subtitle}</p>}
         {link && (

@@ -55,6 +55,26 @@ async def get_vehicle(vehicle_id: UUID, vehicle_service: VehicleService = Depend
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return VehicleResponse(**vehicle.__dict__)
 
+@router.get("/summary/dashboard")
+async def get_vehicles_dashboard_summary(
+    tenant_id: UUID = Query(...),
+    vehicle_service: VehicleService = Depends(get_vehicle_service)
+):
+    """
+    Get optimized vehicles summary for dashboard (cached and lightweight)
+    """
+    try:
+        # Use optimized summary method (COUNT queries only)
+        summary = await vehicle_service.get_vehicle_summary(tenant_id)
+        
+        return {
+            "success": True,
+            "data": summary
+        }
+    except Exception as e:
+        default_logger.error(f"Error getting vehicles dashboard summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get vehicles summary")
+
 @router.get("/", response_model=VehicleListResponse)
 async def list_vehicles(
     tenant_id: UUID = Query(...),
@@ -63,7 +83,7 @@ async def list_vehicles(
     offset: int = Query(0, ge=0),
     vehicle_service: VehicleService = Depends(get_vehicle_service)
 ):
-    vehicles = await vehicle_service.get_all_vehicles(tenant_id, active)
+    vehicles = await vehicle_service.get_all_vehicles(tenant_id, active, limit, offset)
     
     # Apply pagination
     total = len(vehicles)
