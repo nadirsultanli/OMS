@@ -44,8 +44,21 @@ const Login = () => {
     try {
       setIsLoading(true);
       
+      // Get API URL based on environment (same logic as api.js)
+      const getApiUrl = () => {
+        const environment = process.env.REACT_APP_ENVIRONMENT || 'development';
+        
+        // For production (Netlify), always use Railway URL
+        if (environment === 'production' || window.location.hostname.includes('netlify.app')) {
+          return 'https://aware-endurance-production.up.railway.app/api/v1';
+        }
+        
+        // For development, use localhost
+        return 'http://localhost:8000/api/v1';
+      };
+      
       // Process the magic link token through your backend
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1'}/auth/magic-link`, {
+      const response = await fetch(`${getApiUrl()}/auth/magic-link`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,8 +197,21 @@ const Login = () => {
     try {
       setIsLoading(true);
       
+      // Get API URL based on environment (same logic as api.js)
+      const getApiUrl = () => {
+        const environment = process.env.REACT_APP_ENVIRONMENT || 'development';
+        
+        // For production (Netlify), always use Railway URL
+        if (environment === 'production' || window.location.hostname.includes('netlify.app')) {
+          return 'https://aware-endurance-production.up.railway.app/api/v1';
+        }
+        
+        // For development, use localhost
+        return 'http://localhost:8000/api/v1';
+      };
+      
       // Get the Google OAuth URL from backend
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1'}/auth/google/login`, {
+      const response = await fetch(`${getApiUrl()}/auth/google/login`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
