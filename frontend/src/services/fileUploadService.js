@@ -74,16 +74,40 @@ class FileUploadService {
     }
   }
 
-  // Download file from Supabase Storage
+  // Download file from Supabase Storage with custom JWT token
   async downloadFile(filePath) {
     try {
-      const supabase = this.getSupabaseClient();
+      console.log('Downloading file with custom JWT:', filePath);
       
-      const { data, error } = await supabase.storage
+      // Get JWT token from localStorage
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      // Create a new Supabase client with our custom JWT token
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      
+      const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      });
+      
+      const { data, error } = await supabaseWithAuth.storage
         .from(this.bucketName)
         .download(filePath);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase download error:', error);
+        throw error;
+      }
+
+      console.log('File downloaded successfully, size:', data?.size || 'unknown');
 
       return {
         success: true,
@@ -201,10 +225,29 @@ class FileUploadService {
   // Download file as blob to force download instead of opening in browser
   async downloadFileAsBlob(filePath) {
     try {
-      const supabase = this.getSupabaseClient();
+      console.log('Downloading file as blob with custom JWT:', filePath);
+      
+      // Get JWT token from localStorage
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      // Create a new Supabase client with our custom JWT token
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      
+      const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      });
       
       // Download the file as a blob
-      const { data, error } = await supabase.storage
+      const { data, error } = await supabaseWithAuth.storage
         .from(this.bucketName)
         .download(filePath);
 
@@ -212,6 +255,8 @@ class FileUploadService {
         console.error('File download error:', error);
         throw error;
       }
+
+      console.log('File downloaded as blob successfully, size:', data?.size || 'unknown');
 
       // Create a blob URL and trigger download
       const url = URL.createObjectURL(data);
@@ -246,13 +291,37 @@ class FileUploadService {
   // Get signed URL for private file access
   async getSignedUrl(filePath, expiresIn = 3600) {
     try {
-      const supabase = this.getSupabaseClient();
+      console.log('Getting signed URL with custom JWT:', filePath);
       
-      const { data, error } = await supabase.storage
+      // Get JWT token from localStorage
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      // Create a new Supabase client with our custom JWT token
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      
+      const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      });
+      
+      const { data, error } = await supabaseWithAuth.storage
         .from(this.bucketName)
         .createSignedUrl(filePath, expiresIn);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase signed URL error:', error);
+        throw error;
+      }
+
+      console.log('Signed URL created successfully');
 
       return {
         success: true,
@@ -324,19 +393,40 @@ class FileUploadService {
   // Get a download URL that forces download instead of opening in browser
   async getDownloadUrl(filePath) {
     try {
-      const supabase = this.getSupabaseClient();
+      console.log('Getting download URL with custom JWT:', filePath);
+      
+      // Get JWT token from localStorage
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      // Create a new Supabase client with our custom JWT token
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      
+      const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      });
       
       // Get a signed URL with a download parameter
-      const { data, error } = await supabase.storage
+      const { data, error } = await supabaseWithAuth.storage
         .from(this.bucketName)
         .createSignedUrl(filePath, 3600, {
           download: true
         });
 
       if (error) {
-        console.error('Get download URL error:', error);
+        console.error('Supabase download URL error:', error);
         throw error;
       }
+
+      console.log('Download URL created successfully');
 
       return {
         success: true,
