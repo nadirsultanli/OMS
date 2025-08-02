@@ -77,27 +77,50 @@ const Vehicles = () => {
   }, [vehicles, filters]);
 
   const loadVehicleInventoryBatch = async (vehiclesData) => {
-    // Load inventory data for all vehicles in parallel (much faster than sequential)
+    // Load inventory data with controlled concurrency to avoid overwhelming server
+    console.log(`Loading inventory for ${vehiclesData.length} vehicles...`);
+    
     try {
-      const inventoryPromises = vehiclesData.map(async (vehicle) => {
-        try {
-          const inventoryResult = await vehicleService.getVehicleInventory(vehicle.id);
-          return {
-            vehicleId: vehicle.id,
-            current_load_kg: inventoryResult.success && inventoryResult.data?.vehicle?.current_load_kg || 0,
-            current_volume_m3: inventoryResult.success && inventoryResult.data?.vehicle?.current_volume_m3 || 0
-          };
-        } catch (error) {
-          console.warn(`Failed to fetch inventory for vehicle ${vehicle.id}:`, error);
+      // Limit concurrent requests to 3 at a time to avoid server overload
+      const batchSize = 3;
+      const results = [];
+      
+      for (let i = 0; i < vehiclesData.length; i += batchSize) {
+        const batch = vehiclesData.slice(i, i + batchSize);
+        console.log(`Processing batch ${Math.floor(i/batchSize) + 1}:`, batch.map(v => v.plate));
+        
+        const batchPromises = batch.map(async (vehicle) => {
+          try {
+            console.log(`Fetching inventory for ${vehicle.plate}...`);
+            const inventoryResult = await vehicleService.getVehicleInventory(vehicle.id);
+            console.log(`Inventory result for ${vehicle.plate}:`, inventoryResult);
+            
+            return {
+              vehicleId: vehicle.id,
+              current_load_kg: inventoryResult.success && inventoryResult.data?.vehicle?.current_load_kg || 0,
+              current_volume_m3: inventoryResult.success && inventoryResult.data?.vehicle?.current_volume_m3 || 0
+            };
+                  } catch (error) {
+          console.warn(`Failed to fetch inventory for vehicle ${vehicle.plate}:`, error);
+          // Return default values if inventory fetch fails
           return {
             vehicleId: vehicle.id,
             current_load_kg: 0,
             current_volume_m3: 0
           };
         }
-      });
+        });
 
-      const inventoryResults = await Promise.allSettled(inventoryPromises);
+        const batchResults = await Promise.allSettled(batchPromises);
+        results.push(...batchResults);
+        
+        // Small delay between batches to reduce server load
+        if (i + batchSize < vehiclesData.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      const inventoryResults = results;
       
       // Update vehicles with inventory data
       setVehicles(prev => prev.map(vehicle => {

@@ -133,10 +133,18 @@ const vehicleService = {
   // Get vehicle inventory
   getVehicleInventory: async (vehicleId) => {
     try {
-      const response = await api.get(`/vehicles/${vehicleId}/inventory-as-warehouse`);
+      // Add timeout to prevent 30-second hangs on server
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 10000); // 10 second timeout
+      });
+      
+      const apiPromise = api.get(`/vehicles/${vehicleId}/inventory-as-warehouse`);
+      
+      const response = await Promise.race([apiPromise, timeoutPromise]);
       return { success: true, data: response.data };
     } catch (error) {
-      return { success: false, error: extractErrorMessage(error.response?.data) };
+      console.warn(`Vehicle inventory timeout for ${vehicleId}:`, error.message);
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Request timeout' };
     }
   },
 
