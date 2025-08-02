@@ -10,37 +10,30 @@ class FileUploadService {
     return supabaseAuthService.getClient();
   }
 
-  // Upload file to Supabase Storage
+  // Upload file to Supabase Storage with custom JWT token
   async uploadFile(file, customerId, tenantId) {
     try {
-      const supabase = this.getSupabaseClient();
+      console.log('Uploading file to Supabase:', file.name, 'for customer:', customerId);
       
-      // Check if user is authenticated
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('Session error:', sessionError);
-        throw new Error(`Session error: ${sessionError.message}`);
+      // Get JWT token from localStorage
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No authentication token found');
       }
       
-      if (!session) {
-        console.error('No session found. Attempting to refresh session...');
-        
-        // Try to refresh the session
-        const refreshResult = await supabaseAuthService.refreshSession();
-        if (refreshResult.success && refreshResult.session) {
-          console.log('Session refreshed successfully');
-          // Continue with the refreshed session
-        } else {
-          // Try to get user from localStorage as fallback
-          const user = JSON.parse(localStorage.getItem('user') || '{}');
-          console.log('User from localStorage:', user);
-          throw new Error('User not authenticated. Please log in again.');
+      // Create a new Supabase client with our custom JWT token
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      
+      const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         }
-      }
+      });
       
-      console.log('Current session user:', session.user.email, 'Role:', session.user.user_metadata?.role);
-
       // Create a unique file name
       const fileExt = file.name.split('.').pop();
       const fileName = `${tenantId}/${customerId}/incorporation_doc_${Date.now()}.${fileExt}`;
@@ -48,7 +41,7 @@ class FileUploadService {
       console.log('Uploading file:', fileName, 'to bucket:', this.bucketName);
 
       // Upload file to Supabase Storage
-      const { data, error } = await supabase.storage
+      const { data, error } = await supabaseWithAuth.storage
         .from(this.bucketName)
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -63,7 +56,7 @@ class FileUploadService {
       console.log('File uploaded successfully:', data);
 
       // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = supabaseWithAuth.storage
         .from(this.bucketName)
         .getPublicUrl(fileName);
 
