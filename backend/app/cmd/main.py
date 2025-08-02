@@ -36,6 +36,8 @@ from app.presentation.api.tenant_subscriptions.tenant_subscription import router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
 from app.core.audit_middleware import AuditMiddleware
+import time
+from collections import defaultdict
 
 # Get configuration from environment
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")
@@ -169,7 +171,37 @@ app.add_middleware(
 )
 
 # Add compression middleware for better performance
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(GZipMiddleware, minimum_size=500)  # Reduced from 1000 to compress more responses
+
+# Simple in-memory rate limiting
+request_counts = defaultdict(list)
+RATE_LIMIT_WINDOW = 60  # 60 seconds
+RATE_LIMIT_MAX_REQUESTS = 100  # 100 requests per minute per IP
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Simple rate limiting middleware to prevent traffic spikes"""
+    client_ip = request.client.host if request.client else "unknown"
+    current_time = time.time()
+    
+    # Clean old requests outside the window
+    request_counts[client_ip] = [req_time for req_time in request_counts[client_ip] 
+                                if current_time - req_time < RATE_LIMIT_WINDOW]
+    
+    # Check if rate limit exceeded
+    if len(request_counts[client_ip]) >= RATE_LIMIT_MAX_REQUESTS:
+        default_logger.warning(f"Rate limit exceeded for IP {client_ip}: {len(request_counts[client_ip])} requests")
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests. Please try again later."},
+            headers={"Retry-After": "60"}
+        )
+    
+    # Add current request to count
+    request_counts[client_ip].append(current_time)
+    
+    # Continue with request
+    return await call_next(request)
 
 # Add performance monitoring middleware for production
 @app.middleware("http")
