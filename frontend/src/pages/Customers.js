@@ -266,6 +266,7 @@ const Customers = () => {
 
       // Upload file if present (make it optional)
       if (incorporationFile) {
+        console.log('File selected for upload:', incorporationFile.name, 'Size:', incorporationFile.size);
         try {
           const uploadResult = await fileUploadService.uploadFile(
             incorporationFile,
@@ -273,8 +274,11 @@ const Customers = () => {
             tenantId
           );
 
+          console.log('File upload result:', uploadResult);
+
           if (uploadResult.success) {
             fileUploadPath = uploadResult.path;
+            console.log('File uploaded successfully, path:', fileUploadPath);
           } else {
             console.warn('File upload failed, continuing without file:', uploadResult.error);
             // Continue without file upload - don't block customer creation
@@ -285,6 +289,8 @@ const Customers = () => {
           // Continue without file upload - don't block customer creation
           fileUploadPath = null;
         }
+      } else {
+        console.log('No file selected for upload');
       }
 
       const customerData = {
