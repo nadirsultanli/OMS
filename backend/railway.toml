@@ -9,4 +9,9 @@ restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
 [env]
-PYTHON_VERSION = "3.11" 
+PYTHON_VERSION = "3.11"
+WORKERS = "4"
+MAX_REQUESTS = "1000"
+MAX_REQUESTS_JITTER = "100"
+ENVIRONMENT = "production"
+LOG_LEVEL = "INFO" 

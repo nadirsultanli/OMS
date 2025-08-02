@@ -171,6 +171,27 @@ app.add_middleware(
 # Add compression middleware for better performance
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Add performance monitoring middleware for production
+@app.middleware("http")
+async def performance_middleware(request: Request, call_next):
+    start_time = datetime.now()
+    response = await call_next(request)
+    process_time = (datetime.now() - start_time).total_seconds()
+    
+    # Add performance headers
+    response.headers["X-Process-Time"] = str(process_time)
+    
+    # Add caching headers for dashboard endpoints
+    if "/summary/dashboard" in str(request.url):
+        response.headers["Cache-Control"] = "public, max-age=30"
+        response.headers["X-Cache-TTL"] = "30"
+    
+    # Log slow requests in production
+    if process_time > 1.0:  # Log requests taking more than 1 second
+        default_logger.warning(f"Slow request: {request.method} {request.url} took {process_time:.3f}s")
+    
+    return response
+
 default_logger.info(f"CORS middleware configured with origins: {ALLOWED_ORIGINS}")
 
 # Add audit middleware for automatic request/response logging (if enabled)

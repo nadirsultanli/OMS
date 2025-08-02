@@ -169,7 +169,28 @@ class DirectDatabaseConnection:
 
     def configure(self, url: str):
         self._url = url
-        self._engine = create_async_engine(url, echo=False, future=True)
+        # Optimize database connection for production performance
+        self._engine = create_async_engine(
+            url, 
+            echo=False, 
+            future=True,
+            # Connection pool settings for better performance
+            pool_size=10,           # Maintain 10 connections
+            max_overflow=20,        # Allow up to 30 total connections
+            pool_pre_ping=True,     # Validate connections before use
+            pool_recycle=3600,      # Recycle connections every hour
+            # Query performance settings
+            connect_args={
+                "statement_cache_size": 0,  # Disable statement cache for pooled connections
+                "prepared_statement_cache_size": 0,
+                "server_settings": {
+                    "application_name": "oms_backend_production",
+                    "tcp_keepalives_idle": "60",
+                    "tcp_keepalives_interval": "30", 
+                    "tcp_keepalives_count": "3"
+                }
+            }
+        )
         self._sessionmaker = async_sessionmaker(self._engine, expire_on_commit=False, class_=AsyncSession)
         default_logger.info("Direct SQLAlchemy connection configured", url=url[:20] + "...")
 

@@ -31,14 +31,18 @@ if [ -z "$SUPABASE_KEY" ] && [ -z "$SUPABASE_ANON_KEY" ]; then
 fi
 
 echo "✅ Environment variables validated"
-echo "📡 Starting server on port $PORT"
+echo "📡 Starting server on port $PORT with ${WORKERS:-4} workers"
 echo "🌍 Environment: $ENVIRONMENT"
 echo "📋 Log level: $LOG_LEVEL"
+echo "🚀 Max requests per worker: ${MAX_REQUESTS:-1000}"
 
 # Start the application
 exec python -m uvicorn app.cmd.main:app \
     --host 0.0.0.0 \
     --port $PORT \
-    --workers 1 \
+    --workers ${WORKERS:-4} \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --max-requests ${MAX_REQUESTS:-1000} \
+    --max-requests-jitter ${MAX_REQUESTS_JITTER:-100} \
     --access-log \
     --log-level info
