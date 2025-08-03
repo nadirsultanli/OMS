@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import variantService from '../services/variantService';
 import productService from '../services/productService';
 import { extractErrorMessage } from '../utils/errorUtils';
@@ -8,23 +8,26 @@ import './Variants.css';
 
 const Variants = () => {
   const navigate = useNavigate();
-  
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const productIdFromUrl = searchParams.get('productId');
+
   const [variants, setVariants] = useState([]);
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   
   // Filter state - separate immediate search from dropdown filters
   const [searchText, setSearchText] = useState('');
   const [dropdownFilters, setDropdownFilters] = useState({
-    productId: '',
+    productId: productIdFromUrl || '',
     skuType: '',
     isStockItem: ''
   });
   const [appliedFilters, setAppliedFilters] = useState({
     search: '',
-    productId: '',
+    productId: productIdFromUrl || '',
     skuType: '',
     isStockItem: ''
   });
@@ -147,13 +150,13 @@ const Variants = () => {
   const handleResetFilters = () => {
     setSearchText('');
     setDropdownFilters({
-      productId: '',
+      productId: productIdFromUrl || '',
       skuType: '',
       isStockItem: ''
     });
     setAppliedFilters({
       search: '',
-      productId: '',
+      productId: productIdFromUrl || '',
       skuType: '',
       isStockItem: ''
     });

@@ -541,7 +541,7 @@ const Vehicles = () => {
                           <span className="plate-number">{vehicle.plate_number || vehicle.plate}</span>
                         </div>
                         <div className="vehicle-sub">
-                          {vehicle.make} {vehicle.model} {vehicle.year}
+                          {vehicle.vehicle_type === 'CYLINDER_TRUCK' ? 'Cylinder Truck' : 'Bulk Tanker'}
                         </div>
                       </div>
                     </td>
@@ -745,8 +745,6 @@ const Vehicles = () => {
 const CreateVehicleModal = ({ warehouses, onClose, onSubmit, errors }) => {
   const [formData, setFormData] = useState({
     plate_number: '',
-    make: '',
-    model: '',
     year: new Date().getFullYear(),
     vehicle_type: 'CYLINDER_TRUCK',
     capacity_kg: '',
@@ -808,46 +806,6 @@ const CreateVehicleModal = ({ warehouses, onClose, onSubmit, errors }) => {
             </div>
 
             <div className="form-group">
-              <label>Make *</label>
-              <input
-                type="text"
-                value={formData.make}
-                onChange={(e) => setFormData({ ...formData, make: e.target.value })}
-                required
-                className={errors.make ? 'error' : ''}
-                placeholder="e.g., Isuzu, Mitsubishi"
-              />
-              {errors.make && <span className="error-text">{errors.make}</span>}
-            </div>
-
-            <div className="form-group">
-              <label>Model *</label>
-              <input
-                type="text"
-                value={formData.model}
-                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                required
-                className={errors.model ? 'error' : ''}
-                placeholder="e.g., FVZ, Canter"
-              />
-              {errors.model && <span className="error-text">{errors.model}</span>}
-            </div>
-
-            <div className="form-group">
-              <label>Year *</label>
-              <input
-                type="number"
-                value={formData.year}
-                onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
-                required
-                min="1900"
-                max={new Date().getFullYear() + 5}
-                className={errors.year ? 'error' : ''}
-              />
-              {errors.year && <span className="error-text">{errors.year}</span>}
-            </div>
-
-            <div className="form-group">
               <label>Capacity (kg) *</label>
               <input
                 type="number"
@@ -900,25 +858,18 @@ const CreateVehicleModal = ({ warehouses, onClose, onSubmit, errors }) => {
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows="3"
                 placeholder="Any additional notes about the vehicle..."
+                rows="3"
               />
             </div>
           </div>
-
-          {errors.submit && (
-            <div className="form-error">
-              <AlertCircle size={16} />
-              {errors.submit}
-            </div>
-          )}
 
           <div className="form-actions">
             <button type="button" className="cancel-btn" onClick={onClose}>
               Cancel
             </button>
             <button type="submit" className="submit-btn">
-              Add Vehicle
+              Create Vehicle
             </button>
           </div>
         </form>
@@ -930,9 +881,6 @@ const CreateVehicleModal = ({ warehouses, onClose, onSubmit, errors }) => {
 const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) => {
   const [formData, setFormData] = useState({
     plate_number: vehicle.plate_number || vehicle.plate || '',
-    make: vehicle.make || '',
-    model: vehicle.model || '',
-    year: vehicle.year || new Date().getFullYear(),
     vehicle_type: vehicle.vehicle_type || 'CYLINDER_TRUCK',
     capacity_kg: vehicle.capacity_kg || '',
     capacity_m3: vehicle.capacity_m3 || '',
@@ -941,8 +889,27 @@ const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) =>
     active: vehicle.active
   });
 
+  // Update form data when vehicle prop changes
+  useEffect(() => {
+    setFormData({
+      plate_number: vehicle.plate_number || vehicle.plate || '',
+      vehicle_type: vehicle.vehicle_type || 'CYLINDER_TRUCK',
+      capacity_kg: vehicle.capacity_kg || '',
+      capacity_m3: vehicle.capacity_m3 || '',
+      depot_id: vehicle.depot_id || '',
+      notes: vehicle.notes || '',
+      active: vehicle.active
+    });
+  }, [vehicle]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.plate_number || !formData.capacity_kg || !formData.capacity_m3 || !formData.depot_id) {
+      return; // Let HTML5 validation handle it
+    }
+    
     onSubmit({
       ...formData,
       capacity_kg: parseFloat(formData.capacity_kg) || 0,
@@ -985,46 +952,6 @@ const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) =>
                 <option value="BULK_TANKER">Bulk Tanker</option>
               </select>
               {errors.vehicle_type && <span className="error-text">{errors.vehicle_type}</span>}
-            </div>
-
-            <div className="form-group">
-              <label>Make *</label>
-              <input
-                type="text"
-                value={formData.make}
-                onChange={(e) => setFormData({ ...formData, make: e.target.value })}
-                required
-                className={errors.make ? 'error' : ''}
-                placeholder="e.g., Isuzu, Mitsubishi"
-              />
-              {errors.make && <span className="error-text">{errors.make}</span>}
-            </div>
-
-            <div className="form-group">
-              <label>Model *</label>
-              <input
-                type="text"
-                value={formData.model}
-                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                required
-                className={errors.model ? 'error' : ''}
-                placeholder="e.g., FVZ, Canter"
-              />
-              {errors.model && <span className="error-text">{errors.model}</span>}
-            </div>
-
-            <div className="form-group">
-              <label>Year *</label>
-              <input
-                type="number"
-                value={formData.year}
-                onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
-                required
-                min="1900"
-                max={new Date().getFullYear() + 5}
-                className={errors.year ? 'error' : ''}
-              />
-              {errors.year && <span className="error-text">{errors.year}</span>}
             </div>
 
             <div className="form-group">
@@ -1091,18 +1018,11 @@ const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) =>
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows="3"
                 placeholder="Any additional notes about the vehicle..."
+                rows="3"
               />
             </div>
           </div>
-
-          {errors.submit && (
-            <div className="form-error">
-              <AlertCircle size={16} />
-              {errors.submit}
-            </div>
-          )}
 
           <div className="form-actions">
             <button type="button" className="cancel-btn" onClick={onClose}>
@@ -1119,83 +1039,111 @@ const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) =>
 };
 
 const VehicleInventoryModal = ({ vehicle, onClose }) => {
+  const [inventoryData, setInventoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchInventoryWithNames = async () => {
+      try {
+        setLoading(true);
+        const inventory = (vehicle.truck_inventory && vehicle.truck_inventory.length > 0) 
+          ? vehicle.truck_inventory 
+          : vehicle.inventory || [];
+
+        // Fetch product and variant names for better display
+        const enrichedInventory = await Promise.all(
+          inventory.map(async (item) => {
+            try {
+              // Fetch product name
+              let productName = 'Unknown Product';
+              if (item.product_id) {
+                const productResponse = await fetch(`/api/products/${item.product_id}`);
+                if (productResponse.ok) {
+                  const productData = await productResponse.json();
+                  productName = productData.name || 'Unknown Product';
+                }
+              }
+
+              // Fetch variant name
+              let variantName = 'Unknown Variant';
+              if (item.variant_id) {
+                const variantResponse = await fetch(`/api/variants/${item.variant_id}`);
+                if (variantResponse.ok) {
+                  const variantData = await variantResponse.json();
+                  variantName = variantData.sku || 'Unknown Variant';
+                }
+              }
+
+              return {
+                ...item,
+                product_name: productName,
+                variant_name: variantName,
+                // Calculate costs if not present
+                unit_cost: item.unit_cost || 0,
+                total_cost: item.total_cost || (item.unit_cost * (item.quantity || item.loaded_qty || 0)) || 0
+              };
+            } catch (error) {
+              console.error('Error fetching product/variant details:', error);
+              return {
+                ...item,
+                product_name: 'Unknown Product',
+                variant_name: 'Unknown Variant',
+                unit_cost: item.unit_cost || 0,
+                total_cost: item.total_cost || 0
+              };
+            }
+          })
+        );
+
+        setInventoryData(enrichedInventory);
+      } catch (error) {
+        console.error('Error fetching inventory data:', error);
+        setInventoryData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInventoryWithNames();
+  }, [vehicle]);
+
   return (
     <div className="modal-overlay">
-      <div className="modal-content large">
+      <div className="modal-content">
         <div className="modal-header">
-          <div>
-            <h2>Vehicle Inventory</h2>
-            <p className="modal-subtitle">{vehicle.plate_number || vehicle.plate}</p>
-          </div>
+          <h2>Vehicle Inventory - {vehicle.plate_number || vehicle.plate}</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
         
-        <div className="inventory-content">
-          <div className="inventory-summary">
-            <div className="summary-card">
-              <div className="summary-icon">
-                <Weight size={24} />
-              </div>
-              <div className="summary-info">
-                <div className="summary-value">
-                  {(() => {
-                    // Use current_load_kg from backend if available, otherwise calculate from inventory
-                    if (vehicle.current_load_kg && vehicle.current_load_kg > 0) {
-                      return `${vehicle.current_load_kg.toFixed(1)} kg`;
-                    }
-                    const totalWeight = (vehicle.inventory || []).reduce((sum, item) => {
-                      return sum + ((item.quantity || 0) * (item.unit_weight_kg || 0));
-                    }, 0);
-                    return totalWeight > 0 ? `${totalWeight.toFixed(1)} kg` : '0 kg';
-                  })()}
-                </div>
-                <div className="summary-label">Current Load</div>
-              </div>
+        <div className="modal-body">
+          <div className="vehicle-info">
+            <div className="info-row">
+              <span className="label">Vehicle:</span>
+              <span className="value">{vehicle.plate_number || vehicle.plate}</span>
             </div>
-            
-            <div className="summary-card">
-              <div className="summary-icon">
-                <Gauge size={24} />
-              </div>
-              <div className="summary-info">
-                <div className="summary-value">{vehicle.capacity_kg || 0} kg</div>
-                <div className="summary-label">Total Capacity</div>
-              </div>
+            <div className="info-row">
+              <span className="label">Type:</span>
+              <span className="value">{vehicle.vehicle_type === 'CYLINDER_TRUCK' ? 'Cylinder Truck' : 'Bulk Tanker'}</span>
             </div>
-
-            <div className="summary-card">
-              <div className="summary-icon">
-                <TrendingUp size={24} />
-              </div>
-              <div className="summary-info">
-                <div className="summary-value">
-                  {(() => {
-                    // Use current_load_kg from backend if available, otherwise calculate from inventory
-                    let currentLoad = 0;
-                    if (vehicle.current_load_kg && vehicle.current_load_kg > 0) {
-                      currentLoad = vehicle.current_load_kg;
-                    } else {
-                      currentLoad = (vehicle.inventory || []).reduce((sum, item) => {
-                        return sum + ((item.quantity || 0) * (item.unit_weight_kg || 0));
-                      }, 0);
-                    }
-                    const capacity = vehicle.capacity_kg || 1;
-                    return Math.round((currentLoad / capacity) * 100);
-                  })()}%
-                </div>
-                <div className="summary-label">Utilization</div>
-              </div>
+            <div className="info-row">
+              <span className="label">Capacity:</span>
+              <span className="value">{vehicle.capacity_kg || 0} kg / {vehicle.capacity_m3 || 0} m³</span>
             </div>
           </div>
 
           <div className="inventory-details">
             <h3>Inventory Items</h3>
-            {(vehicle.inventory && vehicle.inventory.length > 0) || (vehicle.truck_inventory && vehicle.truck_inventory.length > 0) ? (
+            {loading ? (
+              <div className="loading-state">
+                <div className="loading-spinner"></div>
+                <p>Loading inventory...</p>
+              </div>
+            ) : inventoryData.length > 0 ? (
               <table className="inventory-table">
                 <thead>
                   <tr>
-                    <th>Product ID</th>
-                    <th>Variant ID</th>
+                    <th>Product</th>
+                    <th>Variant</th>
                     <th>Quantity</th>
                     <th>Unit Weight</th>
                     <th>Total Weight</th>
@@ -1205,11 +1153,10 @@ const VehicleInventoryModal = ({ vehicle, onClose }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Show truck inventory if available, otherwise show stock levels */}
-                  {(vehicle.truck_inventory && vehicle.truck_inventory.length > 0 ? vehicle.truck_inventory : vehicle.inventory).map((item, index) => (
+                  {inventoryData.map((item, index) => (
                     <tr key={index}>
-                      <td>{item.product_id}</td>
-                      <td>{item.variant_id}</td>
+                      <td>{item.product_name}</td>
+                      <td>{item.variant_name}</td>
                       <td>{item.quantity || item.loaded_qty || 0}</td>
                       <td>{(item.unit_weight_kg || 0).toFixed(1)} kg</td>
                       <td>{(item.total_weight_kg || 0).toFixed(1)} kg</td>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import productService from '../services/productService';
 import { extractErrorMessage } from '../utils/errorUtils';
+import variantService from '../services/variantService';
 import { Search, Plus, Edit2, Trash2, Package, Layers } from 'lucide-react';
 import './Products.css';
 
@@ -9,38 +10,34 @@ const Products = () => {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
-
-  // Filters
   const [filters, setFilters] = useState({
     search: '',
     category: ''
   });
-
-  // Form data for creating/editing product
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 1,
+    offset: 0
+  });
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showVariantsModal, setShowVariantsModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productVariants, setProductVariants] = useState([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     category: '',
-    unit_of_measure: 'PCS',
+    unit_of_measure: '',
     min_price: '',
-    taxable: true,
+    max_price: '',
     density_kg_per_l: ''
   });
-
-  // Pagination
-  const [pagination, setPagination] = useState({
-    total: 0,
-    limit: 20,
-    offset: 0,
-    currentPage: 1,
-    totalPages: 1
-  });
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     fetchProducts();
@@ -197,54 +194,50 @@ const Products = () => {
       newErrors.min_price = 'Minimum price cannot be negative';
     }
 
-    if (formData.density_kg_per_l && parseFloat(formData.density_kg_per_l) <= 0) {
-      newErrors.density_kg_per_l = 'Density must be greater than 0';
+    if (formData.max_price && parseFloat(formData.max_price) < 0) {
+      newErrors.max_price = 'Maximum price cannot be negative';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (formData.min_price && formData.max_price && 
+        parseFloat(formData.min_price) > parseFloat(formData.max_price)) {
+      newErrors.max_price = 'Maximum price must be greater than minimum price';
+    }
+
+    if (formData.density_kg_per_l && parseFloat(formData.density_kg_per_l) < 0) {
+      newErrors.density_kg_per_l = 'Density cannot be negative';
+    }
+
+    return newErrors;
   };
 
   const handleCreateProduct = async (e) => {
     e.preventDefault();
-    setMessage('');
-
-    if (!validateForm()) {
+    
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
     setLoading(true);
+    setErrors({});
 
     try {
-      const productData = {
-        name: formData.name.trim(),
-        category: formData.category || null,
-        unit_of_measure: formData.unit_of_measure,
-        min_price: formData.min_price ? parseFloat(formData.min_price) : 0,
-        taxable: formData.taxable,
-        density_kg_per_l: formData.density_kg_per_l ? parseFloat(formData.density_kg_per_l) : null
-      };
-      
-      console.log('Creating product with data:', productData);
-      const result = await productService.createProduct(productData);
-      console.log('Product creation result:', result);
+      const result = await productService.createProduct(formData);
       
       if (result.success) {
-        console.log('Product created successfully, refreshing product list...');
-        setMessage('Product created successfully!');
+        setShowCreateModal(false);
         resetForm();
-        setShowCreateForm(false);
-        await fetchProducts();
-        console.log('Product list refresh completed');
+        fetchProducts();
+        // Show success message
+        console.log('Product created successfully');
       } else {
-        console.error('Product creation failed:', result.error);
-        const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
-        setErrors({ general: errorMessage || 'Failed to create product' });
+        setErrors({ submit: result.error || 'Failed to create product' });
       }
     } catch (error) {
-      console.error('Product creation error:', error);
-      const errorMessage = extractErrorMessage(error.response?.data) || 'An unexpected error occurred. Please try again.';
-      setErrors({ general: errorMessage });
+      console.error('Error creating product:', error);
+      const errorMessage = extractErrorMessage(error.response?.data) || 'Failed to create product';
+      setErrors({ submit: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -252,40 +245,33 @@ const Products = () => {
 
   const handleEditProduct = async (e) => {
     e.preventDefault();
-    setMessage('');
-
-    if (!validateForm()) {
+    
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
     setLoading(true);
+    setErrors({});
 
     try {
-      const productData = {
-        name: formData.name.trim(),
-        category: formData.category || null,
-        unit_of_measure: formData.unit_of_measure,
-        min_price: formData.min_price ? parseFloat(formData.min_price) : 0,
-        taxable: formData.taxable,
-        density_kg_per_l: formData.density_kg_per_l ? parseFloat(formData.density_kg_per_l) : null
-      };
-      
-      const result = await productService.updateProduct(selectedProduct.id, productData);
+      const result = await productService.updateProduct(selectedProduct.id, formData);
       
       if (result.success) {
-        setMessage('Product updated successfully!');
-        resetForm();
-        setShowEditForm(false);
+        setShowEditModal(false);
         setSelectedProduct(null);
+        resetForm();
         fetchProducts();
+        // Show success message
+        console.log('Product updated successfully');
       } else {
-        const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
-        setErrors({ general: errorMessage || 'Failed to update product' });
+        setErrors({ submit: result.error || 'Failed to update product' });
       }
     } catch (error) {
-      console.error('Product update error:', error);
-      const errorMessage = extractErrorMessage(error.response?.data) || 'An unexpected error occurred. Please try again.';
-      setErrors({ general: errorMessage });
+      console.error('Error updating product:', error);
+      const errorMessage = extractErrorMessage(error.response?.data) || 'Failed to update product';
+      setErrors({ submit: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -301,8 +287,8 @@ const Products = () => {
       const result = await productService.deleteProduct(productId);
       
       if (result.success) {
-        setMessage('Product deleted successfully!');
         fetchProducts();
+        console.log('Product deleted successfully');
       } else {
         const errorMessage = typeof result.error === 'string' ? result.error : extractErrorMessage(result.error);
         setErrors({ general: errorMessage || 'Failed to delete product' });
@@ -333,6 +319,33 @@ const Products = () => {
     }));
   };
 
+  const handleViewVariants = async (product) => {
+    setSelectedProduct(product);
+    setShowVariantsModal(true);
+    setVariantsLoading(true);
+    setProductVariants([]);
+
+    try {
+      // Use variantService to properly handle tenant_id and other parameters
+      const result = await variantService.getVariants(null, {
+        product_id: product.id,
+        limit: 100
+      });
+      
+      if (result.success) {
+        setProductVariants(result.data.variants || []);
+      } else {
+        console.error('Failed to fetch variants:', result.error);
+        setProductVariants([]);
+      }
+    } catch (error) {
+      console.error('Error fetching variants:', error);
+      setProductVariants([]);
+    } finally {
+      setVariantsLoading(false);
+    }
+  };
+
   const handleEditClick = (product) => {
     setSelectedProduct(product);
     setFormData({
@@ -343,7 +356,7 @@ const Products = () => {
       taxable: product.taxable,
       density_kg_per_l: product.density_kg_per_l || ''
     });
-    setShowEditForm(true);
+    setShowEditModal(true);
   };
 
   const resetForm = () => {
@@ -395,7 +408,7 @@ const Products = () => {
           </div>
         </div>
         <button
-          onClick={() => setShowCreateForm(true)}
+          onClick={() => setShowCreateModal(true)}
           className="create-product-btn"
           disabled={loading}
         >
@@ -404,15 +417,15 @@ const Products = () => {
         </button>
       </div>
 
-      {message && (
-        <div className="message success-message">
-          {message}
+      {errors.general && (
+        <div className="error-message">
+          {errors.general}
         </div>
       )}
 
-      {errors.general && (
-        <div className="message error-message">
-          {errors.general}
+      {errors.submit && (
+        <div className="error-message">
+          <span>{errors.submit}</span>
         </div>
       )}
 
@@ -513,7 +526,7 @@ const Products = () => {
                     <td className="date-cell">{formatDate(product.created_at)}</td>
                     <td className="actions-cell">
                       <button
-                        onClick={() => navigate('/variants')}
+                        onClick={() => handleViewVariants(product)}
                         className="action-icon-btn"
                         title="View variants"
                         disabled={loading}
@@ -615,21 +628,21 @@ const Products = () => {
       </div>
 
       {/* Create/Edit Product Modal */}
-      {(showCreateForm || showEditForm) && (
+      {(showCreateModal || showEditModal) && (
         <div className="modal-overlay" onClick={() => {
-          setShowCreateForm(false);
-          setShowEditForm(false);
+          setShowCreateModal(false);
+          setShowEditModal(false);
           setSelectedProduct(null);
           resetForm();
         }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{showEditForm ? 'Edit Product' : 'Create New Product'}</h2>
+              <h2>{showEditModal ? 'Edit Product' : 'Create New Product'}</h2>
               <button
                 className="close-btn"
                 onClick={() => {
-                  setShowCreateForm(false);
-                  setShowEditForm(false);
+                  setShowCreateModal(false);
+                  setShowEditModal(false);
                   setSelectedProduct(null);
                   resetForm();
                 }}
@@ -638,7 +651,7 @@ const Products = () => {
               </button>
             </div>
 
-            <form onSubmit={showEditForm ? handleEditProduct : handleCreateProduct} className="product-form">
+            <form onSubmit={showEditModal ? handleEditProduct : handleCreateProduct} className="product-form">
               <div className="form-grid">
                 <div className="form-group">
                   <label htmlFor="name">Product Name *</label>
@@ -741,8 +754,8 @@ const Products = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowCreateForm(false);
-                    setShowEditForm(false);
+                    setShowCreateModal(false);
+                    setShowEditModal(false);
                     setSelectedProduct(null);
                     resetForm();
                   }}
@@ -756,10 +769,222 @@ const Products = () => {
                   className="submit-btn"
                   disabled={loading}
                 >
-                  {loading ? 'Saving...' : (showEditForm ? 'Update Product' : 'Create Product')}
+                  {loading ? 'Saving...' : (showEditModal ? 'Update Product' : 'Create Product')}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => {
+          setShowEditModal(false);
+          setSelectedProduct(null);
+          resetForm();
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit Product</h2>
+              <button
+                className="close-btn"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setSelectedProduct(null);
+                  resetForm();
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleEditProduct} className="product-form">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Product Name *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    className={errors.name ? 'error' : ''}
+                    placeholder="Enter product name"
+                  />
+                  {errors.name && <span className="error-text">{errors.name}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Category *</label>
+                  <select
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    required
+                    className={errors.category ? 'error' : ''}
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map(category => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.category && <span className="error-text">{errors.category}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Unit of Measure *</label>
+                  <select
+                    name="unit_of_measure"
+                    value={formData.unit_of_measure}
+                    onChange={handleInputChange}
+                    required
+                    className={errors.unit_of_measure ? 'error' : ''}
+                  >
+                    <option value="">Select Unit</option>
+                    <option value="PCS">Pieces</option>
+                    <option value="KG">Kilograms</option>
+                    <option value="L">Liters</option>
+                    <option value="M3">Cubic Meters</option>
+                    <option value="M">Meters</option>
+                    <option value="BOX">Box</option>
+                    <option value="BOTTLE">Bottle</option>
+                    <option value="CYLINDER">Cylinder</option>
+                  </select>
+                  {errors.unit_of_measure && <span className="error-text">{errors.unit_of_measure}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Minimum Price</label>
+                  <input
+                    type="number"
+                    name="min_price"
+                    value={formData.min_price}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.01"
+                    className={errors.min_price ? 'error' : ''}
+                    placeholder="0.00"
+                  />
+                  {errors.min_price && <span className="error-text">{errors.min_price}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Maximum Price</label>
+                  <input
+                    type="number"
+                    name="max_price"
+                    value={formData.max_price}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.01"
+                    className={errors.max_price ? 'error' : ''}
+                    placeholder="0.00"
+                  />
+                  {errors.max_price && <span className="error-text">{errors.max_price}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label>Density (kg/L)</label>
+                  <input
+                    type="number"
+                    name="density_kg_per_l"
+                    value={formData.density_kg_per_l}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.001"
+                    className={errors.density_kg_per_l ? 'error' : ''}
+                    placeholder="0.000"
+                  />
+                  {errors.density_kg_per_l && <span className="error-text">{errors.density_kg_per_l}</span>}
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setSelectedProduct(null);
+                    resetForm();
+                  }}
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="submit-btn"
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : 'Update Product'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Variants Modal */}
+      {showVariantsModal && selectedProduct && (
+        <div className="modal-overlay" onClick={() => setShowVariantsModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Variants for {selectedProduct.name}</h2>
+              <button className="close-btn" onClick={() => setShowVariantsModal(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              {variantsLoading ? (
+                <div className="loading-state">
+                  <div className="loading-spinner"></div>
+                  <p>Loading variants...</p>
+                </div>
+              ) : productVariants.length > 0 ? (
+                <div className="variants-table-container">
+                  <table className="variants-table">
+                    <thead>
+                      <tr>
+                        <th>SKU</th>
+                        <th>Type</th>
+                        <th>Size</th>
+                        <th>Weight (kg)</th>
+                        <th>Capacity (kg)</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productVariants.map((variant) => (
+                        <tr key={variant.id}>
+                          <td>{variant.sku}</td>
+                          <td>
+                            <span className="variant-type-badge">
+                              {variant.sku_type}
+                            </span>
+                          </td>
+                          <td>{variant.size || '-'}</td>
+                          <td>{variant.tare_weight_kg || '-'}</td>
+                          <td>{variant.capacity_kg || '-'}</td>
+                          <td>
+                            <span className={`status-badge ${variant.status === 'ACTIVE' ? 'active' : 'inactive'}`}>
+                              {variant.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <Package size={48} />
+                  <h3>No variants found</h3>
+                  <p>This product doesn't have any variants yet.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
