@@ -11,13 +11,26 @@ class WarehouseRepositoryImpl(WarehouseRepository):
         self.session = session
 
     async def get_by_id(self, warehouse_id: str) -> Optional[Warehouse]:
-        result = await self.session.execute(select(WarehouseModel).where(WarehouseModel.id == UUID(warehouse_id)))
+        result = await self.session.execute(
+            select(WarehouseModel)
+            .where(
+                WarehouseModel.id == UUID(warehouse_id),
+                WarehouseModel.deleted_at.is_(None)
+            )
+        )
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
     async def get_all(self, tenant_id: str, limit: int = 100, offset: int = 0) -> List[Warehouse]:
         result = await self.session.execute(
-            select(WarehouseModel).where(WarehouseModel.tenant_id == UUID(tenant_id)).offset(offset).limit(limit)
+            select(WarehouseModel)
+            .where(
+                WarehouseModel.tenant_id == UUID(tenant_id),
+                WarehouseModel.deleted_at.is_(None)
+            )
+            .order_by(WarehouseModel.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
         return [self._to_entity(m) for m in result.scalars().all()]
 
@@ -29,7 +42,13 @@ class WarehouseRepositoryImpl(WarehouseRepository):
         return self._to_entity(model)
 
     async def update_warehouse(self, warehouse_id: str, warehouse: Warehouse) -> Optional[Warehouse]:
-        result = await self.session.execute(select(WarehouseModel).where(WarehouseModel.id == UUID(warehouse_id)))
+        result = await self.session.execute(
+            select(WarehouseModel)
+            .where(
+                WarehouseModel.id == UUID(warehouse_id),
+                WarehouseModel.deleted_at.is_(None)
+            )
+        )
         model = result.scalar_one_or_none()
         if not model:
             return None
@@ -48,7 +67,13 @@ class WarehouseRepositoryImpl(WarehouseRepository):
         return self._to_entity(model)
 
     async def delete_warehouse(self, warehouse_id: str) -> bool:
-        result = await self.session.execute(select(WarehouseModel).where(WarehouseModel.id == UUID(warehouse_id)))
+        result = await self.session.execute(
+            select(WarehouseModel)
+            .where(
+                WarehouseModel.id == UUID(warehouse_id),
+                WarehouseModel.deleted_at.is_(None)
+            )
+        )
         model = result.scalar_one_or_none()
         if not model:
             return False

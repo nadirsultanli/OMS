@@ -129,6 +129,20 @@
   padding: 12px 16px;
   border-bottom: 1px solid #e9ecef;
   vertical-align: middle;
+  text-align: left;
+}
+
+/* Status column alignment */
+.invoices-table td:nth-child(7) {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Actions column alignment */
+.invoices-table td:nth-child(8) {
+  text-align: center;
+  vertical-align: middle;
+  padding: 8px 12px;
 }
 
 .invoice-row {
@@ -152,7 +166,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -164,6 +178,9 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease-in-out;
   position: relative;
+  cursor: pointer;
+  border: none;
+  outline: none;
 }
 
 .status-badge:hover {
@@ -234,14 +251,17 @@
 
 .action-buttons {
   display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  min-height: 36px;
 }
 
 .btn {
-  padding: 6px 12px;
+  padding: 8px 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
@@ -251,12 +271,20 @@
   align-items: center;
   justify-content: center;
   min-width: 60px;
+  height: 36px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .btn-sm {
-  padding: 4px 8px;
+  padding: 6px 12px;
   font-size: 0.75rem;
   min-width: 50px;
+  height: 32px;
 }
 
 .btn-primary {

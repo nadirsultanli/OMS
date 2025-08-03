@@ -17,7 +17,7 @@ const Warehouses = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [warehousesPerPage] = useState(10);
+  const [warehousesPerPage] = useState(20);
   const [newWarehouse, setNewWarehouse] = useState({
     name: '',
     code: '',
@@ -45,18 +45,24 @@ const Warehouses = () => {
   const fetchWarehouses = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear any previous errors
+      
       const filters = {
         search: searchTerm,
         type: filterType,
         status: filterStatus
       };
+      
       const response = await warehouseService.getWarehouses(currentPage, warehousesPerPage, filters);
-      console.log('Warehouses fetched:', response); // Debug log
       
       if (response.success) {
-        setWarehouses(response.data.warehouses || []);
-        setTotalPages(Math.ceil((response.data.total || 0) / warehousesPerPage));
+        const warehouses = response.data.warehouses || [];
+        const total = response.data.total || 0;
+        
+        setWarehouses(warehouses);
+        setTotalPages(Math.ceil(total / warehousesPerPage));
       } else {
+        console.error('Failed to fetch warehouses:', response.error);
         setError(response.error || 'Failed to load warehouses');
         setWarehouses([]);
       }
@@ -67,6 +73,14 @@ const Warehouses = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setCurrentPage(1); // Reset to first page
+    setSearchTerm(''); // Clear search
+    setFilterType(''); // Clear filters
+    setFilterStatus(''); // Clear status filter
+    await fetchWarehouses();
   };
 
   const handleCreateWarehouse = async (e) => {
@@ -129,6 +143,8 @@ const Warehouses = () => {
       }
 
       const result = await warehouseService.createWarehouse(warehouseData);
+      
+      // Close modal and reset form
       setIsCreateModalOpen(false);
       setNewWarehouse({
         name: '',
@@ -146,8 +162,13 @@ const Warehouses = () => {
           longitude: null
         }
       });
+      
       setSuccessMessage(`Warehouse "${warehouseData.name}" created successfully!`);
-      await fetchWarehouses(); // Ensure warehouse list is refreshed
+      
+      // Force refresh the warehouse list with a small delay to ensure backend has processed the creation
+      setTimeout(async () => {
+        await handleRefresh(); // Use the manual refresh function
+      }, 1000); // Increased delay to ensure backend processing
       
       // Clear success message after 5 seconds
       setTimeout(() => {
@@ -283,7 +304,7 @@ const Warehouses = () => {
           <option value="BLK">Bulk Warehouse</option>
         </select>
 
-        <button className="refresh-btn" onClick={fetchWarehouses}>
+        <button className="refresh-btn" onClick={handleRefresh}>
           <RefreshCw size={18} />
         </button>
       </div>
@@ -381,7 +402,7 @@ const Warehouses = () => {
             Previous
           </button>
           <span className="pagination-info">
-            Page {currentPage} of {totalPages}
+            Page {currentPage} of {totalPages} (Showing {warehouses.length} of {warehouses.length + (totalPages - currentPage) * warehousesPerPage} warehouses)
           </span>
           <button
             className="pagination-btn"
@@ -392,7 +413,7 @@ const Warehouses = () => {
           </button>
         </div>
       )}
-
+      
       {isCreateModalOpen && (
         <div className="modal-overlay" onClick={() => setIsCreateModalOpen(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
