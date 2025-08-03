@@ -363,16 +363,33 @@ async def resend_user_invitation(
         if success:
             return {"message": "Invitation email sent successfully"}
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to send invitation email"
-            )
+            # Get user details to provide better error message
+            try:
+                user = await user_service.get_user_by_id(user_id)
+                if user.auth_user_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="User already exists in the system. Cannot resend invitation to existing users."
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Failed to send invitation email. Please try again later."
+                    )
+            except UserNotFoundError:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User with ID {user_id} not found"
+                )
         
     except UserNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"User with ID {user_id} not found"
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.error(f"Failed to resend invitation: {str(e)}", user_id=user_id)
         raise HTTPException(

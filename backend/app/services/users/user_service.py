@@ -409,18 +409,54 @@ class UserService:
                     default_logger.warning(f"Failed to create auth user for resend: {str(e)}", 
                                          email=user.email)
             
-            # Send invitation
+            # Check if user already exists in Supabase Auth
+            if user.auth_user_id:
+                try:
+                    # Try to get the auth user to check their status
+                    auth_user = supabase.auth.admin.get_user_by_id(str(user.auth_user_id))
+                    
+                    if auth_user and auth_user.user:
+                        # If user exists and is confirmed, we can't send invitation
+                        if auth_user.user.email_confirmed_at:
+                            default_logger.warning(f"User already confirmed, cannot resend invitation", 
+                                                 email=user.email, user_id=user_id)
+                            return False
+                        
+                        # If user exists but not confirmed, try to resend confirmation
+                        try:
+                            supabase.auth.admin.resend_signup({
+                                "email": user.email,
+                                "type": "signup"
+                            })
+                            default_logger.info(f"Confirmation email resent successfully", email=user.email)
+                            return True
+                        except Exception as e:
+                            default_logger.error(f"Failed to resend confirmation: {str(e)}", email=user.email)
+                            return False
+                    
+                except Exception as e:
+                    default_logger.warning(f"Could not check auth user status: {str(e)}", email=user.email)
+                    # Continue with invitation attempt
+            
+            # Send invitation for new users or if auth user check failed
             try:
                 supabase.auth.admin.invite_user_by_email(
                     email=user.email,
                     options={"redirect_to": redirect_url}
                 )
-                default_logger.info(f"Invitation resent successfully", email=user.email)
+                default_logger.info(f"Invitation sent successfully", email=user.email)
                 return True
                 
             except Exception as e:
-                default_logger.error(f"Failed to resend invitation: {str(e)}", email=user.email)
-                return False
+                error_msg = str(e)
+                # Check if it's a "user already exists" error
+                if "already registered" in error_msg.lower() or "already exists" in error_msg.lower():
+                    default_logger.warning(f"User already exists in auth, cannot send invitation", 
+                                         email=user.email, error=error_msg)
+                    return False
+                else:
+                    default_logger.error(f"Failed to send invitation: {error_msg}", email=user.email)
+                    return False
                 
         except Exception as e:
             default_logger.error(f"Failed to resend invitation: {str(e)}", user_id=user_id)
