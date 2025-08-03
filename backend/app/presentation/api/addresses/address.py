@@ -12,7 +12,10 @@ from app.domain.entities.users import User
 
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
 
-class SetDefaultAddressRequest(BaseModel):
+class SetPrimaryBillingAddressRequest(BaseModel):
+    customer_id: str
+
+class SetPrimaryDeliveryAddressRequest(BaseModel):
     customer_id: str
 
 @router.post("/", response_model=AddressResponse, status_code=status.HTTP_201_CREATED)
@@ -26,15 +29,25 @@ async def create_address(
     address_data['tenant_id'] = current_user.tenant_id
     address_data['created_by'] = current_user.id
     
-    # BUSINESS RULE: Validate single default address constraint
-    if address_data.get('is_default', False):
-        # Check if customer already has a default address
+    # BUSINESS RULE: Validate single primary address constraint
+    if address_data.get('is_primary_billing', False):
+        # Check if customer already has a primary billing address
         existing_addresses = await address_service.get_addresses_by_customer(str(address_data['customer_id']))
-        existing_defaults = [addr for addr in existing_addresses if addr.is_default]
-        if existing_defaults:
+        existing_primary_billing = [addr for addr in existing_addresses if addr.is_primary_billing]
+        if existing_primary_billing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Customer already has a default address. Setting this address as default will automatically unset the existing default address."
+                detail=f"Customer already has a primary billing address. Setting this address as primary billing will automatically unset the existing primary billing address."
+            )
+    
+    if address_data.get('is_primary_delivery', False):
+        # Check if customer already has a primary delivery address
+        existing_addresses = await address_service.get_addresses_by_customer(str(address_data['customer_id']))
+        existing_primary_delivery = [addr for addr in existing_addresses if addr.is_primary_delivery]
+        if existing_primary_delivery:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Customer already has a primary delivery address. Setting this address as primary delivery will automatically unset the existing primary delivery address."
             )
     
     try:
@@ -77,19 +90,32 @@ async def update_address(
     request: UpdateAddressRequest, 
     address_service: AddressService = Depends(get_address_service)
 ):
-    # BUSINESS RULE: Validate single default address constraint for updates
+    # BUSINESS RULE: Validate single primary address constraint for updates
     update_data = request.model_dump(exclude_unset=True)
-    if update_data.get('is_default', False):
-        # Get the current address to check if it's already default
+    if update_data.get('is_primary_billing', False):
+        # Get the current address to check if it's already primary billing
         current_address = await address_service.get_address_by_id(address_id)
-        if not current_address.is_default:
-            # Check if customer already has a default address (excluding current one)
+        if not current_address.is_primary_billing:
+            # Check if customer already has a primary billing address (excluding current one)
             existing_addresses = await address_service.get_addresses_by_customer(str(current_address.customer_id))
-            existing_defaults = [addr for addr in existing_addresses if addr.is_default and str(addr.id) != address_id]
-            if existing_defaults:
+            existing_primary_billing = [addr for addr in existing_addresses if addr.is_primary_billing and str(addr.id) != address_id]
+            if existing_primary_billing:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Customer already has a default address. Setting this address as default will automatically unset the existing default address."
+                    detail=f"Customer already has a primary billing address. Setting this address as primary billing will automatically unset the existing primary billing address."
+                )
+    
+    if update_data.get('is_primary_delivery', False):
+        # Get the current address to check if it's already primary delivery
+        current_address = await address_service.get_address_by_id(address_id)
+        if not current_address.is_primary_delivery:
+            # Check if customer already has a primary delivery address (excluding current one)
+            existing_addresses = await address_service.get_addresses_by_customer(str(current_address.customer_id))
+            existing_primary_delivery = [addr for addr in existing_addresses if addr.is_primary_delivery and str(addr.id) != address_id]
+            if existing_primary_delivery:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Customer already has a primary delivery address. Setting this address as primary delivery will automatically unset the existing primary delivery address."
                 )
     
     address = await address_service.update_address(address_id, **update_data)
@@ -109,13 +135,24 @@ async def delete_address(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return None
 
-@router.post("/{address_id}/set_default", status_code=status.HTTP_200_OK)
-async def set_default_address(
+@router.post("/{address_id}/set_primary_billing", status_code=status.HTTP_200_OK)
+async def set_primary_billing_address(
     address_id: str, 
-    request: SetDefaultAddressRequest,
+    request: SetPrimaryBillingAddressRequest,
     address_service: AddressService = Depends(get_address_service)
 ):
-    success = await address_service.set_default_address(request.customer_id, address_id)
+    success = await address_service.set_primary_billing_address(request.customer_id, address_id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Address with ID {address_id} not found or could not be set as default")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Address with ID {address_id} not found or could not be set as primary billing")
+    return {"success": True}
+
+@router.post("/{address_id}/set_primary_delivery", status_code=status.HTTP_200_OK)
+async def set_primary_delivery_address(
+    address_id: str, 
+    request: SetPrimaryDeliveryAddressRequest,
+    address_service: AddressService = Depends(get_address_service)
+):
+    success = await address_service.set_primary_delivery_address(request.customer_id, address_id)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Address with ID {address_id} not found or could not be set as primary delivery")
     return {"success": True} 

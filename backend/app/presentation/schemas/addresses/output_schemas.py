@@ -14,7 +14,8 @@ class AddressResponse(BaseModel):
     deleted_at: Optional[str]
     deleted_by: Optional[UUID]
     coordinates: Optional[str]
-    is_default: bool
+    is_primary_billing: bool
+    is_primary_delivery: bool
     street: str
     city: str
     state: Optional[str]

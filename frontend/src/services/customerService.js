@@ -63,10 +63,16 @@ class CustomerService {
   async getCustomerById(customerId) {
     try {
       const response = await api.get(`/customers/${customerId}`);
-      return response.data;
+      return {
+        success: true,
+        data: response.data
+      };
     } catch (error) {
       console.error('Error fetching customer:', error);
-      throw error;
+      return {
+        success: false,
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to fetch customer details.'
+      };
     }
   }
 
@@ -239,14 +245,26 @@ class CustomerService {
     }
   }
 
-  async setDefaultAddress(addressId, customerId) {
+  async setPrimaryBillingAddress(addressId, customerId) {
     try {
-      const response = await api.post(`/addresses/${addressId}/set_default`, {
+      const response = await api.post(`/addresses/${addressId}/set_primary_billing`, {
         customer_id: customerId
       });
       return response.data;
     } catch (error) {
-      console.error('Error setting default address:', error);
+      console.error('Error setting primary billing address:', error);
+      throw error;
+    }
+  }
+
+  async setPrimaryDeliveryAddress(addressId, customerId) {
+    try {
+      const response = await api.post(`/addresses/${addressId}/set_primary_delivery`, {
+        customer_id: customerId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error setting primary delivery address:', error);
       throw error;
     }
   }

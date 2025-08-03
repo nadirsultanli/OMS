@@ -21,7 +21,8 @@ class Address:
     deleted_at: Optional[datetime]
     deleted_by: Optional[UUID]
     coordinates: Optional[str]  # Geography type, store as WKT or GeoJSON string for now
-    is_default: bool
+    is_primary_billing: bool
+    is_primary_delivery: bool
     street: str
     city: str
     state: Optional[str]
@@ -30,7 +31,7 @@ class Address:
     access_instructions: Optional[str]
 
     @staticmethod
-    def create(tenant_id: UUID, customer_id: UUID, address_type: AddressType, street: str, city: str, country: str = "Kenya", is_default: bool = False, created_by: Optional[UUID] = None, **kwargs) -> "Address":
+    def create(tenant_id: UUID, customer_id: UUID, address_type: AddressType, street: str, city: str, country: str = "Kenya", is_primary_billing: bool = False, is_primary_delivery: bool = False, created_by: Optional[UUID] = None, **kwargs) -> "Address":
         now = datetime.now()
         return Address(
             id=uuid4(),
@@ -44,7 +45,8 @@ class Address:
             deleted_at=None,
             deleted_by=None,
             coordinates=kwargs.get("coordinates"),
-            is_default=is_default,
+            is_primary_billing=is_primary_billing,
+            is_primary_delivery=is_primary_delivery,
             street=street,
             city=city,
             state=kwargs.get("state"),
@@ -66,7 +68,8 @@ class Address:
             "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
             "deleted_by": str(self.deleted_by) if self.deleted_by else None,
             "coordinates": self.coordinates,
-            "is_default": self.is_default,
+            "is_primary_billing": self.is_primary_billing,
+            "is_primary_delivery": self.is_primary_delivery,
             "street": self.street,
             "city": self.city,
             "state": self.state,
@@ -89,7 +92,8 @@ class Address:
             deleted_at=datetime.fromisoformat(data["deleted_at"]) if data.get("deleted_at") else None,
             deleted_by=UUID(data["deleted_by"]) if data.get("deleted_by") else None,
             coordinates=data.get("coordinates"),
-            is_default=data["is_default"],
+            is_primary_billing=data.get("is_primary_billing", False),
+            is_primary_delivery=data.get("is_primary_delivery", False),
             street=data["street"],
             city=data["city"],
             state=data.get("state"),

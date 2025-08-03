@@ -22,7 +22,8 @@ class Address(Base):
     deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
     deleted_by = Column(SAUUID(as_uuid=True), nullable=True)
     coordinates = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)  # Store as WKT or GeoJSON string
-    is_default = Column(Boolean, nullable=False, server_default=text("false"))
+    is_primary_billing = Column(Boolean, nullable=False, server_default=text("false"))
+    is_primary_delivery = Column(Boolean, nullable=False, server_default=text("false"))
     street = Column(String, nullable=False)
     city = Column(String, nullable=False)
     state = Column(String, nullable=True)

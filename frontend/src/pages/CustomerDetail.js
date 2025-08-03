@@ -42,9 +42,16 @@ const CustomerDetail = () => {
     zip_code: '',
     country: 'Kenya',
     access_instructions: '',
-    is_default: false,
+    is_primary_billing: false,
+    is_primary_delivery: false,
     coordinates: null
   });
+
+  // Address type options
+  const addressTypeOptions = [
+    { value: 'delivery', label: 'Delivery Address', description: 'For product deliveries' },
+    { value: 'billing', label: 'Billing Address', description: 'For invoices and payments' }
+  ];
 
   useEffect(() => {
     fetchCustomerDetails();
@@ -162,7 +169,8 @@ const CustomerDetail = () => {
       zip_code: address.zip_code || '',
       country: address.country,
       access_instructions: address.access_instructions || '',
-      is_default: address.is_default,
+      is_primary_billing: address.is_primary_billing,
+      is_primary_delivery: address.is_primary_delivery,
       coordinates: address.coordinates ? 
         address.coordinates.replace('POINT(', '').replace(')', '').split(' ').map(Number) : 
         null
@@ -243,7 +251,6 @@ const CustomerDetail = () => {
         customer_id: customerId,
         tenant_id: tenantId,
         created_by: currentUser.id,
-        is_default: false, // Always set to false since we removed the checkbox
         // Send coordinates as array - backend will convert to POINT format
         coordinates: addressForm.coordinates || null
       };
@@ -270,7 +277,8 @@ const CustomerDetail = () => {
         zip_code: '',
         country: 'Kenya',
         access_instructions: '',
-        is_default: false,
+        is_primary_billing: false,
+        is_primary_delivery: false,
         coordinates: null
       });
       setShowAddressForm(false);
@@ -291,13 +299,23 @@ const CustomerDetail = () => {
     }
   };
 
-  const handleSetDefaultAddress = async (addressId) => {
+  const handleSetPrimaryBillingAddress = async (addressId) => {
     try {
-      await customerService.setDefaultAddress(addressId, customerId);
-      setMessage('Default address updated successfully!');
+      await customerService.setPrimaryBillingAddress(addressId, customerId);
+      setMessage('Primary billing address updated successfully!');
       await fetchCustomerAddresses();
     } catch (error) {
-      setErrors({ general: 'Failed to set default address.' });
+      setErrors({ general: 'Failed to set primary billing address.' });
+    }
+  };
+
+  const handleSetPrimaryDeliveryAddress = async (addressId) => {
+    try {
+      await customerService.setPrimaryDeliveryAddress(addressId, customerId);
+      setMessage('Primary delivery address updated successfully!');
+      await fetchCustomerAddresses();
+    } catch (error) {
+      setErrors({ general: 'Failed to set primary delivery address.' });
     }
   };
 
@@ -339,7 +357,6 @@ const CustomerDetail = () => {
     try {
       const addressData = {
         ...addressForm,
-        is_default: editingAddress.is_default, // Keep the existing default status when updating
         // Send coordinates as array - backend will convert to POINT format
         coordinates: addressForm.coordinates || null
       };
@@ -359,7 +376,8 @@ const CustomerDetail = () => {
         zip_code: '',
         country: 'Kenya',
         access_instructions: '',
-        is_default: false,
+        is_primary_billing: false,
+        is_primary_delivery: false,
         coordinates: null
       });
       setEditingAddress(null);
@@ -450,6 +468,14 @@ const CustomerDetail = () => {
             </span>
           </div>
         </div>
+        
+        <button 
+          onClick={() => navigate(`/customers/${customerId}/edit`)} 
+          className="edit-customer-btn"
+        >
+          <Edit size={16} />
+          Edit Customer
+        </button>
       </div>
 
       {message && (
@@ -576,7 +602,8 @@ const CustomerDetail = () => {
                   zip_code: '',
                   country: 'Kenya',
                   access_instructions: '',
-                  is_default: false,
+                  is_primary_billing: false,
+                  is_primary_delivery: false,
                   coordinates: null
                 });
                 setShowAddressForm(true);
@@ -598,27 +625,43 @@ const CustomerDetail = () => {
               <div className="addresses-grid">
                 {addresses
                   .sort((a, b) => {
-                    // Sort so default address comes first
-                    if (a.is_default && !b.is_default) return -1;
-                    if (!a.is_default && b.is_default) return 1;
+                    // Sort so primary addresses come first
+                    const aIsPrimary = a.is_primary_billing || a.is_primary_delivery;
+                    const bIsPrimary = b.is_primary_billing || b.is_primary_delivery;
+                    if (aIsPrimary && !bIsPrimary) return -1;
+                    if (!aIsPrimary && bIsPrimary) return 1;
                     return 0;
                   })
                   .map((address) => (
-                  <div key={address.id} className={`address-card ${address.is_default ? 'default' : ''}`}>
+                  <div key={address.id} className={`address-card ${(address.is_primary_billing || address.is_primary_delivery) ? 'primary' : ''}`}>
                     <div className="address-header">
                       <div className="address-type">
                         <MapPin size={16} />
-                        {address.address_type}
-                        {address.is_default && (
-                          <Star size={14} className="default-star" />
+                        <span className={`address-type-badge ${address.address_type}`}>
+                          {address.address_type}
+                        </span>
+                        {address.is_primary_billing && (
+                          <Star size={14} className="primary-star billing" title="Primary Billing Address" />
+                        )}
+                        {address.is_primary_delivery && (
+                          <Star size={14} className="primary-star delivery" title="Primary Delivery Address" />
                         )}
                       </div>
                       <div className="address-actions">
-                        {!address.is_default && (
+                        {!address.is_primary_billing && address.address_type === 'billing' && (
                           <button 
-                            onClick={() => handleSetDefaultAddress(address.id)}
-                            className="set-default-btn"
-                            title="Set as default"
+                            onClick={() => handleSetPrimaryBillingAddress(address.id)}
+                            className="set-primary-btn billing"
+                            title="Set as primary billing address"
+                          >
+                            <StarOff size={14} />
+                          </button>
+                        )}
+                        {!address.is_primary_delivery && address.address_type === 'delivery' && (
+                          <button 
+                            onClick={() => handleSetPrimaryDeliveryAddress(address.id)}
+                            className="set-primary-btn delivery"
+                            title="Set as primary delivery address"
                           >
                             <StarOff size={14} />
                           </button>
@@ -633,11 +676,11 @@ const CustomerDetail = () => {
                         <button 
                           onClick={() => handleDeleteAddress(address.id)}
                           className="delete-btn"
-                          title={address.is_default ? "Primary address cannot be deleted" : "Delete address"}
-                          disabled={address.is_default}
+                          title={(address.is_primary_billing || address.is_primary_delivery) ? "Primary address cannot be deleted" : "Delete address"}
+                          disabled={address.is_primary_billing || address.is_primary_delivery}
                           style={{ 
-                            cursor: address.is_default ? 'not-allowed' : 'pointer',
-                            opacity: address.is_default ? 0.5 : 1 
+                            cursor: (address.is_primary_billing || address.is_primary_delivery) ? 'not-allowed' : 'pointer',
+                            opacity: (address.is_primary_billing || address.is_primary_delivery) ? 0.5 : 1 
                           }}
                         >
                           <Trash2 size={14} />
@@ -700,7 +743,8 @@ const CustomerDetail = () => {
                     zip_code: '',
                     country: 'Kenya',
                     access_instructions: '',
-                    is_default: false,
+                    is_primary_billing: false,
+                    is_primary_delivery: false,
                     coordinates: null
                   });
                 }}
@@ -720,9 +764,15 @@ const CustomerDetail = () => {
                     onChange={handleAddressInputChange}
                     className={errors.address_type ? 'error' : ''}
                   >
-                    <option value="delivery">Delivery</option>
-                    <option value="billing">Billing</option>
+                    {addressTypeOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
+                  <div className="address-type-description">
+                    {addressTypeOptions.find(opt => opt.value === addressForm.address_type)?.description}
+                  </div>
                   {errors.address_type && <span className="error-text">{typeof errors.address_type === 'string' ? errors.address_type : JSON.stringify(errors.address_type)}</span>}
                 </div>
 

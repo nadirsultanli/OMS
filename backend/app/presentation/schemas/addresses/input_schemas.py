@@ -13,7 +13,8 @@ class CreateAddressRequest(BaseModel):
     country: Optional[str] = "Kenya"
     access_instructions: Optional[str] = None
     coordinates: Optional[Union[str, List[float]]] = None
-    is_default: bool = False
+    is_primary_billing: bool = False
+    is_primary_delivery: bool = False
     # tenant_id and created_by will be set from user context
 
     @field_validator('coordinates')
@@ -36,7 +37,8 @@ class UpdateAddressRequest(BaseModel):
     country: Optional[str] = None
     access_instructions: Optional[str] = None
     coordinates: Optional[Union[str, List[float]]] = None
-    is_default: Optional[bool] = None
+    is_primary_billing: Optional[bool] = None
+    is_primary_delivery: Optional[bool] = None
     updated_by: Optional[UUID] = None
 
     @field_validator('coordinates')

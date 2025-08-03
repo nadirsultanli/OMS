@@ -43,19 +43,33 @@ class AddressRepository(AddressRepositoryInterface):
                     print(f"Warning: Invalid coordinates format '{coord_str}': {e}")
                     coordinates = None
         
-        # ENFORCE SINGLE DEFAULT ADDRESS PER CUSTOMER
-        # If this address is being set as default, unset ALL other default addresses for this customer
-        if address.is_default:
+        # ENFORCE SINGLE PRIMARY ADDRESS PER CUSTOMER PER TYPE
+        # If this address is being set as primary billing, unset other primary billing addresses
+        if address.is_primary_billing:
             await self._session.execute(
                 sa_update(AddressORM)
                 .where(
                     AddressORM.tenant_id == address.tenant_id,
                     AddressORM.customer_id == address.customer_id,
-                    AddressORM.is_default == True,
+                    AddressORM.is_primary_billing == True,
                     AddressORM.deleted_at == None
                 )
-                .values(is_default=False)
+                .values(is_primary_billing=False)
             )
+        
+        # If this address is being set as primary delivery, unset other primary delivery addresses
+        if address.is_primary_delivery:
+            await self._session.execute(
+                sa_update(AddressORM)
+                .where(
+                    AddressORM.tenant_id == address.tenant_id,
+                    AddressORM.customer_id == address.customer_id,
+                    AddressORM.is_primary_delivery == True,
+                    AddressORM.deleted_at == None
+                )
+                .values(is_primary_delivery=False)
+            )
+        
         obj = AddressORM(
             id=address.id,
             tenant_id=address.tenant_id,
@@ -68,7 +82,8 @@ class AddressRepository(AddressRepositoryInterface):
             deleted_at=address.deleted_at,
             deleted_by=address.deleted_by,
             coordinates=coordinates,
-            is_default=address.is_default,
+            is_primary_billing=address.is_primary_billing,
+            is_primary_delivery=address.is_primary_delivery,
             street=address.street,
             city=address.city,
             state=address.state,
@@ -87,23 +102,37 @@ class AddressRepository(AddressRepositoryInterface):
         if not obj:
             return None
             
-        # ENFORCE SINGLE DEFAULT ADDRESS PER CUSTOMER
-        # If this address is being set as default, unset ALL other default addresses for this customer
-        if address.is_default and not obj.is_default:
+        # ENFORCE SINGLE PRIMARY ADDRESS PER CUSTOMER PER TYPE
+        # If this address is being set as primary billing, unset other primary billing addresses
+        if address.is_primary_billing and not obj.is_primary_billing:
             await self._session.execute(
                 sa_update(AddressORM)
                 .where(
                     AddressORM.tenant_id == address.tenant_id,
                     AddressORM.customer_id == address.customer_id,
                     AddressORM.id != UUID(address_id),  # Don't update the current address
-                    AddressORM.is_default == True,
+                    AddressORM.is_primary_billing == True,
                     AddressORM.deleted_at == None
                 )
-                .values(is_default=False)
+                .values(is_primary_billing=False)
+            )
+        
+        # If this address is being set as primary delivery, unset other primary delivery addresses
+        if address.is_primary_delivery and not obj.is_primary_delivery:
+            await self._session.execute(
+                sa_update(AddressORM)
+                .where(
+                    AddressORM.tenant_id == address.tenant_id,
+                    AddressORM.customer_id == address.customer_id,
+                    AddressORM.id != UUID(address_id),  # Don't update the current address
+                    AddressORM.is_primary_delivery == True,
+                    AddressORM.deleted_at == None
+                )
+                .values(is_primary_delivery=False)
             )
         
         for field in [
-            "tenant_id", "customer_id", "address_type", "coordinates", "is_default", "street", "city", "state", "zip_code", "country", "access_instructions", "updated_at", "updated_by", "deleted_at", "deleted_by"
+            "tenant_id", "customer_id", "address_type", "coordinates", "is_primary_billing", "is_primary_delivery", "street", "city", "state", "zip_code", "country", "access_instructions", "updated_at", "updated_by", "deleted_at", "deleted_by"
         ]:
             if field == "coordinates" and getattr(address, field) is not None:
                 # Validate coordinates before creating WKTElement
@@ -133,20 +162,39 @@ class AddressRepository(AddressRepositoryInterface):
         await self._session.commit()
         return True
 
-    async def set_default_address(self, customer_id: str, address_id: str, updated_by: Optional[UUID] = None) -> bool:
-        # Unset all other addresses for this customer
+    async def set_primary_billing_address(self, customer_id: str, address_id: str, updated_by: Optional[UUID] = None) -> bool:
+        # Unset all other primary billing addresses for this customer
         await self._session.execute(
             sa_update(AddressORM)
             .where(AddressORM.customer_id == UUID(customer_id), AddressORM.deleted_at == None)
-            .values(is_default=False)
+            .values(is_primary_billing=False)
         )
-        # Set the specified address as default
+        # Set the specified address as primary billing
         result = await self._session.execute(select(AddressORM).where(AddressORM.id == UUID(address_id), AddressORM.customer_id == UUID(customer_id), AddressORM.deleted_at == None))
         obj = result.scalar_one_or_none()
         if not obj:
             await self._session.commit()
             return False
-        obj.is_default = True
+        obj.is_primary_billing = True
+        obj.updated_at = datetime.now()
+        obj.updated_by = updated_by
+        await self._session.commit()
+        return True
+
+    async def set_primary_delivery_address(self, customer_id: str, address_id: str, updated_by: Optional[UUID] = None) -> bool:
+        # Unset all other primary delivery addresses for this customer
+        await self._session.execute(
+            sa_update(AddressORM)
+            .where(AddressORM.customer_id == UUID(customer_id), AddressORM.deleted_at == None)
+            .values(is_primary_delivery=False)
+        )
+        # Set the specified address as primary delivery
+        result = await self._session.execute(select(AddressORM).where(AddressORM.id == UUID(address_id), AddressORM.customer_id == UUID(customer_id), AddressORM.deleted_at == None))
+        obj = result.scalar_one_or_none()
+        if not obj:
+            await self._session.commit()
+            return False
+        obj.is_primary_delivery = True
         obj.updated_at = datetime.now()
         obj.updated_by = updated_by
         await self._session.commit()
@@ -175,7 +223,8 @@ class AddressRepository(AddressRepositoryInterface):
             deleted_at=obj.deleted_at,
             deleted_by=obj.deleted_by,
             coordinates=coordinates,
-            is_default=obj.is_default,
+            is_primary_billing=obj.is_primary_billing,
+            is_primary_delivery=obj.is_primary_delivery,
             street=obj.street,
             city=obj.city,
             state=obj.state,

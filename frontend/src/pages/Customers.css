@@ -1178,3 +1178,46 @@
     border: 1px solid #000;
   }
 }
+
+/* Action buttons in table */
+.actions-cell {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.edit-btn {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.edit-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.view-btn {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.view-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+}

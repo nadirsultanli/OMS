@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import customerService from '../services/customerService';
 import fileUploadService from '../services/fileUploadService';
-import { Search, Plus, Mail, Phone, Building2, CreditCard, Wallet, Upload, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, Mail, Phone, Building2, CreditCard, Wallet, Upload, FileText, ChevronLeft, ChevronRight, Edit, Eye } from 'lucide-react';
 import countryCodes from '../data/countryCodes';
 import './Customers.css';
 
@@ -404,6 +404,16 @@ const Customers = () => {
     navigate(`/customers/${customerId}`);
   };
 
+  const handleEditCustomer = (e, customerId) => {
+    e.stopPropagation(); // Prevent row click
+    navigate(`/customers/${customerId}/edit`);
+  };
+
+  const handleViewCustomer = (e, customerId) => {
+    e.stopPropagation(); // Prevent row click
+    navigate(`/customers/${customerId}`);
+  };
+
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -584,6 +594,7 @@ const Customers = () => {
                   <th>Customer Type</th>
                   <th>Status</th>
                   <th>Created</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -609,6 +620,24 @@ const Customers = () => {
                         </span>
                       </td>
                       <td className="date-cell">{formatDate(customer.created_at)}</td>
+                      <td className="actions-cell">
+                        <button
+                          type="button"
+                          onClick={(e) => handleEditCustomer(e, customer.id)}
+                          className="action-btn edit-btn"
+                          title="Edit Customer"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleViewCustomer(e, customer.id)}
+                          className="action-btn view-btn"
+                          title="View Customer"
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}

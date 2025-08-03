@@ -29,5 +29,9 @@ class AddressRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def set_default_address(self, customer_id: str, address_id: str, updated_by: Optional[UUID] = None) -> bool:
+    async def set_primary_billing_address(self, customer_id: str, address_id: str, updated_by: Optional[UUID] = None) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def set_primary_delivery_address(self, customer_id: str, address_id: str, updated_by: Optional[UUID] = None) -> bool:
         raise NotImplementedError 

@@ -57,6 +57,28 @@
   align-items: center;
 }
 
+.edit-customer-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #2563eb;
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.edit-customer-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+}
+
 /* Messages */
 .message {
   padding: 16px;
@@ -252,9 +274,9 @@
   transition: all 0.3s ease;
 }
 
-.address-card.default {
-  background: #fff7e6;
+.address-card.primary {
   border-color: #ffc107;
+  background: linear-gradient(135deg, #fffbf0 0%, #fff8e1 100%);
 }
 
 .address-card:hover {
@@ -278,8 +300,16 @@
   text-transform: capitalize;
 }
 
-.default-star {
+.primary-star {
   color: #ffc107;
+}
+
+.primary-star.billing {
+  color: #dc3545;
+}
+
+.primary-star.delivery {
+  color: #28a745;
 }
 
 .address-actions {
@@ -287,7 +317,7 @@
   gap: 4px;
 }
 
-.set-default-btn,
+.set-primary-btn,
 .edit-btn,
 .delete-btn {
   padding: 6px;
@@ -298,10 +328,16 @@
   transition: all 0.2s ease;
 }
 
-.set-default-btn:hover {
-  background: #fff3cd;
-  border-color: #ffc107;
-  color: #856404;
+.set-primary-btn.billing:hover {
+  background: #f8d7da;
+  border-color: #dc3545;
+  color: #721c24;
+}
+
+.set-primary-btn.delivery:hover {
+  background: #d4edda;
+  border-color: #28a745;
+  color: #155724;
 }
 
 .edit-btn:hover {
@@ -731,4 +767,40 @@
 
 .download-btn:active {
   transform: translateY(0);
+}
+
+/* Address type description */
+.address-type-description {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Address type badges */
+.address-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.address-type-badge.delivery {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.address-type-badge.billing {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+
+.address-type-badge.both {
+  background: rgba(168, 85, 247, 0.1);
+  color: #7c3aed;
 }
