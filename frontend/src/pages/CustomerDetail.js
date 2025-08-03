@@ -83,8 +83,13 @@ const CustomerDetail = () => {
   const fetchCustomerDetails = async () => {
     try {
       const result = await customerService.getCustomerById(customerId);
-      setCustomer(result);
+      if (result.success) {
+        setCustomer(result.data);
+      } else {
+        setErrors({ general: result.error || 'Failed to load customer details.' });
+      }
     } catch (error) {
+      console.error('Error fetching customer details:', error);
       setErrors({ general: 'Failed to load customer details.' });
     }
   };
@@ -400,13 +405,19 @@ const CustomerDetail = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid Date';
+    }
   };
 
   const getStatusBadgeClass = (status) => {

@@ -406,11 +406,13 @@ const Customers = () => {
 
   const handleEditCustomer = (e, customerId) => {
     e.stopPropagation(); // Prevent row click
+    console.log('Edit button clicked for customer:', customerId);
     navigate(`/customers/${customerId}/edit`);
   };
 
   const handleViewCustomer = (e, customerId) => {
     e.stopPropagation(); // Prevent row click
+    console.log('View button clicked for customer:', customerId);
     navigate(`/customers/${customerId}`);
   };
 
@@ -626,16 +628,34 @@ const Customers = () => {
                           onClick={(e) => handleEditCustomer(e, customer.id)}
                           className="action-btn edit-btn"
                           title="Edit Customer"
+                          style={{
+                            backgroundColor: '#eff6ff',
+                            color: '#3b82f6',
+                            borderColor: '#3b82f6',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            padding: '0 8px',
+                            minWidth: '50px'
+                          }}
                         >
-                          <Edit size={16} />
+                          Edit
                         </button>
                         <button
                           type="button"
                           onClick={(e) => handleViewCustomer(e, customer.id)}
                           className="action-btn view-btn"
                           title="View Customer"
+                          style={{
+                            backgroundColor: '#ecfdf5',
+                            color: '#10b981',
+                            borderColor: '#10b981',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            padding: '0 8px',
+                            minWidth: '50px'
+                          }}
                         >
-                          <Eye size={16} />
+                          View
                         </button>
                       </td>
                     </tr>
