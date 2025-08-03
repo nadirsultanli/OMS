@@ -84,17 +84,17 @@ async def get_variants(
     active_only: bool = Query(True, description="Only active variants"),
     variant_service: VariantService = Depends(get_variant_service)
 ):
-    """Get variants with filtering options"""
+    """Get variants with filtering options and proper pagination"""
     tenant_uuid = UUID(tenant_id)
     
     if product_id:
-        variants = await variant_service.get_variants_by_product(UUID(product_id))
+        variants = await variant_service.get_variants_by_product(UUID(product_id), limit, offset)
     elif status:
-        variants = await variant_service.get_variants_by_status(tenant_uuid, status)
+        variants = await variant_service.get_variants_by_status(tenant_uuid, status, limit, offset)
     elif scenario:
-        variants = await variant_service.get_variants_by_scenario(tenant_uuid, scenario)
+        variants = await variant_service.get_variants_by_scenario(tenant_uuid, scenario, limit, offset)
     elif active_only:
-        variants = await variant_service.get_active_variants(tenant_uuid)
+        variants = await variant_service.get_active_variants(tenant_uuid, limit, offset)
     else:
         variants = await variant_service.get_all_variants(tenant_uuid, limit, offset)
     

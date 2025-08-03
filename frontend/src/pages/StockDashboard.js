@@ -46,7 +46,7 @@ const StockDashboard = () => {
 
       // Load comprehensive stock data across all warehouses
       const stockLevelsResponse = await stockService.getStockLevels({ 
-        limit: 1000, 
+        limit: 100,  // Reduced from 1000 to 100
         includeZeroStock: false 
       });
       

@@ -88,16 +88,16 @@ const Dashboard = () => {
         paymentSummaryResponse
       ] = await Promise.allSettled([
         // Load customers count - use smaller limit since we only need total
-        customerService.getCustomers({ limit: 10, offset: 0 }),
+        customerService.getCustomers({ limit: 5, offset: 0 }),  // Reduced from 10 to 5
         
         // Load orders summary - use optimized dashboard endpoint
         orderService.getOrdersSummary(tenantId),
         
         // Load stock levels - use smaller limit
-        stockService.getStockLevels({ limit: 50 }),
+        stockService.getStockLevels({ limit: 20 }),  // Reduced from 50 to 20
         
         // Load trips summary - use smaller limit
-        tripService.getTrips({ limit: 50 }),
+        tripService.getTrips({ limit: 20 }),  // Reduced from 50 to 20
         
         // Load vehicles summary - use optimized dashboard endpoint
         api.get(`/vehicles/summary/dashboard?tenant_id=${tenantId}`),

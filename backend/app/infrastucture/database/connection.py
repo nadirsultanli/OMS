@@ -169,34 +169,34 @@ class DirectDatabaseConnection:
 
     def configure(self, url: str):
         self._url = url
-        # Optimize database connection for production performance with timeout handling
+        # Optimize database connection for production performance with better timeout handling
         self._engine = create_async_engine(
             url, 
             echo=False, 
             future=True,
-            # Connection pool settings for better performance
-            pool_size=5,            # Reduce pool size for pooler connections
-            max_overflow=10,        # Allow up to 15 total connections
+            # Increased connection pool settings for better performance
+            pool_size=10,           # Increased from 5 to 10
+            max_overflow=20,        # Increased from 10 to 20 (allow up to 30 total connections)
             pool_pre_ping=True,     # Validate connections before use
-            pool_recycle=1800,      # Recycle connections every 30 minutes (pooler timeout handling)
-            pool_timeout=10,        # Wait up to 10 seconds for a connection
-            # Query performance settings with timeouts
+            pool_recycle=900,       # Reduced from 1800 to 900 (15 minutes)
+            pool_timeout=30,        # Increased from 10 to 30 seconds
+            # Query performance settings with more reasonable timeouts
             connect_args={
                 "statement_cache_size": 0,  # Disable statement cache for pooled connections
                 "prepared_statement_cache_size": 0,
-                "command_timeout": 30,      # 30 second query timeout
+                "command_timeout": 60,      # Increased from 30 to 60 seconds
                 "server_settings": {
                     "application_name": "oms_backend_pooler",
-                    "tcp_keepalives_idle": "30",      # Reduced for pooler
-                    "tcp_keepalives_interval": "10",   
+                    "tcp_keepalives_idle": "60",      # Increased for better connection stability
+                    "tcp_keepalives_interval": "30",   
                     "tcp_keepalives_count": "3",
-                    "statement_timeout": "30000",     # 30 second statement timeout
-                    "idle_in_transaction_session_timeout": "60000"  # 1 minute idle timeout
+                    "statement_timeout": "60000",     # Increased from 30000 to 60000 (60 seconds)
+                    "idle_in_transaction_session_timeout": "120000"  # Increased from 60000 to 120000 (2 minutes)
                 }
             }
         )
         self._sessionmaker = async_sessionmaker(self._engine, expire_on_commit=False, class_=AsyncSession)
-        default_logger.info("Direct SQLAlchemy connection configured", url=url[:20] + "...")
+        default_logger.info("Direct SQLAlchemy connection configured with optimized settings", url=url[:20] + "...")
 
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """Get async database session with proper lifecycle management and retry logic"""
@@ -208,9 +208,9 @@ class DirectDatabaseConnection:
         
         for attempt in range(max_retries):
             try:
-                # Add timeout to session creation
+                # Add timeout to session creation - increased timeout
                 session_task = self._sessionmaker()
-                session = await asyncio.wait_for(session_task.__aenter__(), timeout=10.0)
+                session = await asyncio.wait_for(session_task.__aenter__(), timeout=30.0)  # Increased from 10.0 to 30.0
                 
                 try:
                     yield session
