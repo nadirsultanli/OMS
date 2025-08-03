@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Scale, Package, AlertTriangle, CheckCircle } from 'lucide-react';
+import { X, Scale, Package, AlertTriangle, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
 import deliveryService from '../services/deliveryService';
 import './LoadCapacityModal.css';
 
@@ -86,7 +86,8 @@ const LoadCapacityModal = ({
             line_details: []
           }],
           weightFormatted: `${tripWeight.toFixed(2)} kg`,
-          volumeFormatted: `${totalVolume.toFixed(3)} m³`
+          volumeFormatted: `${totalVolume.toFixed(3)} m³`,
+          hasValidData: true
         });
         return;
       }
@@ -120,13 +121,17 @@ const LoadCapacityModal = ({
   const getCapacityStatus = () => {
     if (!capacityData || !vehicle) return null;
     
-    const exceedsCapacity = capacityData.totalWeight > vehicle.capacity_kg;
+    // Check if we have valid weight data
+    const hasValidWeight = capacityData.totalWeight > 0;
+    const exceedsCapacity = hasValidWeight && capacityData.totalWeight > vehicle.capacity_kg;
+    
     return {
       exceedsCapacity,
-      isValid: !exceedsCapacity,
+      isValid: hasValidWeight && !exceedsCapacity,
+      hasData: hasValidWeight,
       warning: exceedsCapacity ? 
         `Total load weight (${capacityData.weightFormatted}) exceeds vehicle capacity (${vehicle.capacity_kg} kg)` :
-        null
+        !hasValidWeight ? 'No weight data available for capacity analysis' : null
     };
   };
 
@@ -177,14 +182,19 @@ const LoadCapacityModal = ({
 
           {/* Capacity Status */}
           {capacityStatus && (
-            <div className={`capacity-status ${capacityStatus.isValid ? 'valid' : 'invalid'}`}>
+            <div className={`capacity-status ${capacityStatus.isValid ? 'valid' : capacityStatus.hasData ? 'invalid' : 'warning'}`}>
               {capacityStatus.isValid ? (
                 <CheckCircle size={20} className="status-icon" />
-              ) : (
+              ) : capacityStatus.hasData ? (
                 <AlertTriangle size={20} className="status-icon" />
+              ) : (
+                <AlertCircle size={20} className="status-icon" />
               )}
               <div className="status-content">
-                <h4>{capacityStatus.isValid ? 'Capacity OK' : 'Capacity Exceeded'}</h4>
+                <h4>
+                  {capacityStatus.isValid ? 'Capacity OK' : 
+                   capacityStatus.hasData ? 'Capacity Exceeded' : 'No Data Available'}
+                </h4>
                 {capacityStatus.warning && (
                   <p className="warning-text">{capacityStatus.warning}</p>
                 )}
@@ -230,6 +240,7 @@ const LoadCapacityModal = ({
                   <span className="label">Total Weight:</span>
                   <span className={`value weight ${capacityStatus?.exceedsCapacity ? 'exceeded' : ''}`}>
                     {capacityData.weightFormatted}
+                    {capacityData.hasValidData && <span className="data-indicator"> ✓</span>}
                   </span>
                 </div>
                 <div className="summary-item">
@@ -247,6 +258,14 @@ const LoadCapacityModal = ({
                     {capacityData.orderCapacities.length}
                   </span>
                 </div>
+                {vehicle && (
+                  <div className="summary-item">
+                    <span className="label">Vehicle Capacity:</span>
+                    <span className="value capacity">
+                      {vehicle.capacity_kg} kg
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Detailed Breakdown */}
@@ -320,6 +339,7 @@ const LoadCapacityModal = ({
           </button>
           {capacityData && (
             <button onClick={handleRefresh} className="refresh-btn">
+              <RefreshCw size={16} />
               Refresh
             </button>
           )}

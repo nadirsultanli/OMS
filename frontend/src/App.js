@@ -9,6 +9,7 @@ import AuthCallback from './pages/AuthCallback';
 import Users from './pages/Users';
 import Customers from './pages/Customers';
 import CustomerDetail from './pages/CustomerDetail';
+import CustomerEdit from './pages/CustomerEdit';
 import Warehouses from './pages/Warehouses';
 import WarehouseDetail from './pages/WarehouseDetail';
 import Products from './pages/Products';
@@ -110,6 +111,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <CustomerDetail />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/customers/:customerId/edit"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <CustomerEdit />
                 </Layout>
               </ProtectedRoute>
             } 

@@ -374,25 +374,31 @@
 .driver-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-weight: 500;
   height: 100%;
   max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .vehicle-icon,
 .driver-icon {
   color: #6b7280;
   flex-shrink: 0;
+  width: 14px;
+  height: 14px;
 }
 
 .vehicle-name,
 .driver-name {
   color: #374151;
-  /* Removed text truncation to show full names */
-  white-space: normal;
-  word-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.4;
+  max-width: 100%;
+  font-size: 11px;
 }
 
 .orders-count {
@@ -424,18 +430,57 @@
 
 .actions {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
   flex-wrap: nowrap;
-  min-height: 32px;
+  height: 40px;
   width: 100%;
+  padding: 4px;
+  flex-direction: row;
+  position: relative;
+  min-height: 40px;
+  max-height: 40px;
 }
 
 /* Table base styles handled by shared Table.css */
 
 /* Cell content styles are already defined above */
+
+/* Table row consistency */
+.trips-table tbody tr {
+  height: 60px;
+  min-height: 60px;
+  max-height: 60px;
+}
+
+.trips-table tbody td {
+  vertical-align: middle;
+  height: 60px;
+  min-height: 60px;
+  max-height: 60px;
+}
+
+/* Actions cell specific styling */
+.trips-table td:last-child {
+  vertical-align: middle;
+  text-align: center;
+  padding: 8px 12px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 60px;
+  width: 100%;
+}
 
 /* ============================================
    ACTIONS COLUMN - CLEAN LAYOUT

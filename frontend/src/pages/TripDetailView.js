@@ -260,19 +260,33 @@ const TripDetailView = ({ tripId: propTripId, onClose }) => {
         const customerIds = result.available_orders?.map(order => order.customer_id) || [];
         const uniqueCustomerIds = [...new Set(customerIds)];
         
-        for (const customerId of uniqueCustomerIds) {
-          if (!customers[customerId]) {
+        // Batch fetch customers to avoid infinite loading
+        const customerPromises = uniqueCustomerIds
+          .filter(customerId => !customers[customerId])
+          .map(async (customerId) => {
             try {
               const customer = await customerService.getCustomerById(customerId);
               if (customer.success) {
-                setCustomers(prev => ({ ...prev, [customerId]: customer.data }));
+                return { id: customerId, data: customer.data };
               }
             } catch (error) {
               console.warn(`Failed to fetch customer ${customerId}:`, error);
             }
+            return null;
+          });
+        
+        const customerResults = await Promise.all(customerPromises);
+        const newCustomers = {};
+        customerResults.forEach(result => {
+          if (result) {
+            newCustomers[result.id] = result.data;
           }
+        });
+        
+        if (Object.keys(newCustomers).length > 0) {
+          setCustomers(prev => ({ ...prev, ...newCustomers }));
         }
-              }
+      }
     } catch (error) {
       console.error('Failed to fetch available orders:', error);
     }
