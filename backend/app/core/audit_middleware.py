@@ -96,8 +96,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         # Skip excluded paths
         for excluded_path in self.excluded_paths:
-            if path.startswith(excluded_path):
-                default_logger.info(f"⏭️ Skipping audit - path {path} starts with excluded path {excluded_path}")
+            if path == excluded_path or path.startswith(excluded_path):
+                default_logger.info(f"⏭️ Skipping audit - path {path} matches excluded path {excluded_path}")
                 return True
 
         # Skip audit endpoints to prevent recursive logging
@@ -105,10 +105,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
             default_logger.info(f"⏭️ Skipping audit - path {path} is audit endpoint")
             return True
 
-        # Skip Google OAuth endpoints to prevent unnecessary logging
-        if path.startswith("/api/v1/auth/google"):
-            default_logger.info(f"⏭️ Skipping audit - path {path} is Google OAuth endpoint")
-            return True
+        # Skip auth endpoints to prevent unnecessary logging
+        if path.startswith("/api/v1/auth/"):
+            # Only audit login/logout for security monitoring, skip everything else
+            auth_endpoints_to_audit = ["/api/v1/auth/login", "/api/v1/auth/logout"]
+            if path not in auth_endpoints_to_audit:
+                default_logger.info(f"⏭️ Skipping audit - path {path} is auth endpoint")
+                return True
 
         # Skip dashboard summary endpoints for performance (high-frequency calls)
         if "/summary/dashboard" in path:
@@ -410,8 +413,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     if object_id is None and len(parts) >= 4:
                         # Some endpoints might use non-UUID IDs
                         potential_id = parts[3]
-                        # Exclude action endpoints and common non-ID paths
-                        excluded_paths = ['', 'new', 'create', 'list', 'estimate-volume-for-gas-type', 'calculate-mixed-load-capacity', 'tenants', 'exceeding-limits', 'renewal-needed', 'plans', 'usage', 'summary', 'available-orders', 'overdue', 'dashboard', 'pdf', 'send', 'payment', 'from-order', 'upgrade', 'current']
+                        # Exclude action endpoints and common non-ID paths, including auth-specific paths
+                        excluded_paths = ['', 'new', 'create', 'list', 'estimate-volume-for-gas-type', 'calculate-mixed-load-capacity', 'tenants', 'exceeding-limits', 'renewal-needed', 'plans', 'usage', 'summary', 'available-orders', 'overdue', 'dashboard', 'pdf', 'send', 'payment', 'from-order', 'upgrade', 'current', 'me', 'profile', 'login', 'logout', 'signup', 'refresh', 'forgot-password', 'reset-password']
                         if potential_id and potential_id not in excluded_paths:
                             # This could be a valid ID (non-UUID)
                             object_id = potential_id

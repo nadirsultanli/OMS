@@ -4,6 +4,7 @@ from app.infrastucture.database.connection import get_supabase_client_sync
 from app.domain.entities.users import User, UserStatus
 from app.services.users.user_service import UserService
 from app.services.dependencies.users import get_user_service
+from app.infrastucture.logs.logger import default_logger
 
 
 async def get_current_user(
@@ -50,18 +51,32 @@ async def get_current_user(
             return user
         
         # Handle regular JWT tokens
-        # Get Supabase client and verify the JWT token
-        supabase = get_supabase_client_sync()
-        auth_response = supabase.auth.get_user(token)
+        # Use local JWT verification only (no network calls)
+        auth_user_info = None
         
-        if not auth_response.user:
+        # Use local JWT verification only
+        from app.core.jwt_utils import verify_supabase_jwt_local
+        
+        local_user_info = verify_supabase_jwt_local(token)
+        if local_user_info:
+            # Create a mock user object similar to Supabase's structure
+            class MockUser:
+                def __init__(self, user_data):
+                    self.id = user_data['id']
+                    self.email = user_data['email']
+                    self.email_verified = user_data.get('email_verified', True)
+            
+            auth_user_info = MockUser(local_user_info)
+            default_logger.info(f"JWT verified locally for user: {auth_user_info.email}")
+        else:
+            default_logger.error("Local JWT verification failed")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token"
             )
         
         # Get user from our database using the auth_user_id
-        auth_user_id = auth_response.user.id
+        auth_user_id = auth_user_info.id
         print(f"🔍 Debug: Looking up user with auth_user_id: {auth_user_id}")
         user = await user_service.get_user_by_auth_id(auth_user_id)
         print(f"🔍 Debug: User lookup result: {user is not None}")

@@ -100,11 +100,25 @@ async def conditional_auth(
             return user
         
         # Handle regular JWT tokens
-        # Get Supabase client and verify the JWT token
-        supabase = get_supabase_client_sync()
-        auth_response = supabase.auth.get_user(credentials.credentials)
+        # Use local JWT verification as primary method due to network issues
+        auth_user_info = None
         
-        if not auth_response.user:
+        # Use local JWT verification only (no network calls)
+        from app.core.jwt_utils import verify_supabase_jwt_local
+        
+        local_user_info = verify_supabase_jwt_local(credentials.credentials)
+        if local_user_info:
+            # Create a mock user object similar to Supabase's structure
+            class MockUser:
+                def __init__(self, user_data):
+                    self.id = user_data['id']
+                    self.email = user_data['email']
+                    self.email_verified = user_data.get('email_verified', True)
+            
+            auth_user_info = MockUser(local_user_info)
+            default_logger.info(f"JWT verified locally for user: {auth_user_info.email}")
+        else:
+            default_logger.error("Local JWT verification failed")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
@@ -112,21 +126,31 @@ async def conditional_auth(
             )
         
         # Try to get user by auth_user_id first, fallback to email
-        auth_user_id = auth_response.user.id
-        user_email = auth_response.user.email
+        auth_user_id = auth_user_info.id
+        user_email = auth_user_info.email
         default_logger.info(f"Auth middleware looking up user by auth_id: {auth_user_id}, email: {user_email}")
         
-        user = await user_service.get_user_by_auth_id(auth_user_id)
-        
-        if not user:
-            default_logger.info(f"User not found by auth_id, trying email: {user_email}")
-            # Fallback to email lookup
-            user = await user_service.get_user_by_email(user_email)
+        try:
+            user = await user_service.get_user_by_auth_id(auth_user_id)
+            default_logger.info(f"Auth lookup by auth_id result: {'Found' if user else 'Not found'}")
             
-            if user:
-                # Update the auth_user_id for future lookups
-                default_logger.info(f"Updating auth_user_id for user: {user.email}")
-                user = await user_service.update_user_auth_id(str(user.id), auth_user_id)
+            if not user:
+                default_logger.info(f"User not found by auth_id, trying email: {user_email}")
+                # Fallback to email lookup
+                user = await user_service.get_user_by_email(user_email)
+                default_logger.info(f"Auth lookup by email result: {'Found' if user else 'Not found'}")
+                
+                if user:
+                    # Update the auth_user_id for future lookups
+                    default_logger.info(f"Updating auth_user_id for user: {user.email}")
+                    user = await user_service.update_user_auth_id(str(user.id), auth_user_id)
+        except Exception as db_error:
+            default_logger.error(f"Database error during user lookup: {str(db_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database error during authentication",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         
         if not user:
             default_logger.warning(f"User not found in database for auth_id: {auth_user_id}, email: {user_email}")

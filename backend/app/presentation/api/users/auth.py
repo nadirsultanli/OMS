@@ -208,21 +208,39 @@ async def login(
         )
         
         try:
-            # Fetch tenant information safely
+            # Fetch tenant information safely with timeout - REDUCED TIMEOUT
             try:
-                tenant = await tenant_service.get_tenant_by_id(str(user.tenant_id))
+                import asyncio
+                # Reduce timeout to 2 seconds to prevent login delays
+                tenant = await asyncio.wait_for(
+                    tenant_service.get_tenant_by_id(str(user.tenant_id)),
+                    timeout=2.0  # Reduced from 5.0 to 2.0 seconds
+                )
                 tenant_info = TenantInfo(
                     id=str(tenant.id),
                     name=tenant.name,
                     base_currency=tenant.base_currency
                 )
                 logger.debug("Tenant information fetched successfully", tenant_id=str(user.tenant_id))
+            except asyncio.TimeoutError:
+                # Handle timeout specifically
+                logger.warning(
+                    "Tenant fetch timed out, using fallback", 
+                    tenant_id=str(user.tenant_id),
+                    timeout_seconds=2.0
+                )
+                tenant_info = TenantInfo(
+                    id=str(user.tenant_id),
+                    name="Unknown",
+                    base_currency="KES"  # Default currency
+                )
             except Exception as tenant_error:
                 # Fallback to basic tenant info if fetch fails
                 logger.warning(
                     "Failed to fetch tenant information, using fallback", 
                     tenant_id=str(user.tenant_id),
-                    error=str(tenant_error)
+                    error=str(tenant_error),
+                    error_type=type(tenant_error).__name__
                 )
                 tenant_info = TenantInfo(
                     id=str(user.tenant_id),

@@ -5,6 +5,8 @@ from app.infrastucture.database.connection import get_supabase_client_sync
 from app.infrastucture.logs.logger import default_logger
 from uuid import UUID
 from datetime import datetime
+import asyncio
+import time
 
 
 class SupabaseUserRepository(UserRepositoryInterface):
@@ -16,6 +18,50 @@ class SupabaseUserRepository(UserRepositoryInterface):
     def _get_client(self):
         """Get Supabase client"""
         return get_supabase_client_sync()
+    
+    async def _execute_with_retry(self, operation_name: str, operation_func, max_retries: int = 3):
+        """Execute a Supabase operation with retry logic for connectivity issues"""
+        retry_delay = 1.0
+        last_exception = None
+        
+        for attempt in range(max_retries):
+            try:
+                # Execute the operation
+                result = operation_func()
+                
+                # Log successful retry if this wasn't the first attempt
+                if attempt > 0:
+                    default_logger.info(f"Supabase {operation_name} succeeded on attempt {attempt + 1}")
+                
+                return result
+                
+            except Exception as e:
+                last_exception = e
+                error_str = str(e)
+                
+                # Check if this is a retryable error
+                is_retryable = (
+                    'PGRST002' in error_str or  # Schema cache error
+                    'Could not query the database' in error_str or
+                    'Connection' in error_str or
+                    'timeout' in error_str.lower() or
+                    'network' in error_str.lower()
+                )
+                
+                if not is_retryable or attempt == max_retries - 1:
+                    # Don't retry for non-retryable errors or if we've exhausted retries
+                    default_logger.error(f"Supabase {operation_name} failed: {error_str}")
+                    raise e
+                
+                # Log the retry attempt
+                default_logger.warning(f"Supabase {operation_name} attempt {attempt + 1} failed: {error_str}, retrying in {retry_delay}s")
+                
+                # Wait before retrying
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 1.5  # Exponential backoff
+        
+        # This should never be reached, but just in case
+        raise last_exception
     
     def _to_entity(self, data: dict) -> User:
         """Convert Supabase response to User entity"""
@@ -63,8 +109,11 @@ class SupabaseUserRepository(UserRepositoryInterface):
 
     async def get_by_id(self, user_id: str) -> Optional[User]:
         try:
-            client = self._get_client()
-            result = client.table(self.table_name).select("*").eq("id", user_id).execute()
+            def operation():
+                client = self._get_client()
+                return client.table(self.table_name).select("*").eq("id", user_id).execute()
+            
+            result = await self._execute_with_retry("get_by_id", operation)
             
             if result.data and len(result.data) > 0:
                 return self._to_entity(result.data[0])

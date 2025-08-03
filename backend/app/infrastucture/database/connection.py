@@ -169,25 +169,29 @@ class DirectDatabaseConnection:
 
     def configure(self, url: str):
         self._url = url
-        # Optimize database connection for production performance
+        # Optimize database connection for production performance with timeout handling
         self._engine = create_async_engine(
             url, 
             echo=False, 
             future=True,
             # Connection pool settings for better performance
-            pool_size=10,           # Maintain 10 connections
-            max_overflow=20,        # Allow up to 30 total connections
+            pool_size=5,            # Reduce pool size for pooler connections
+            max_overflow=10,        # Allow up to 15 total connections
             pool_pre_ping=True,     # Validate connections before use
-            pool_recycle=3600,      # Recycle connections every hour
-            # Query performance settings
+            pool_recycle=1800,      # Recycle connections every 30 minutes (pooler timeout handling)
+            pool_timeout=10,        # Wait up to 10 seconds for a connection
+            # Query performance settings with timeouts
             connect_args={
                 "statement_cache_size": 0,  # Disable statement cache for pooled connections
                 "prepared_statement_cache_size": 0,
+                "command_timeout": 30,      # 30 second query timeout
                 "server_settings": {
-                    "application_name": "oms_backend_production",
-                    "tcp_keepalives_idle": "60",
-                    "tcp_keepalives_interval": "30", 
-                    "tcp_keepalives_count": "3"
+                    "application_name": "oms_backend_pooler",
+                    "tcp_keepalives_idle": "30",      # Reduced for pooler
+                    "tcp_keepalives_interval": "10",   
+                    "tcp_keepalives_count": "3",
+                    "statement_timeout": "30000",     # 30 second statement timeout
+                    "idle_in_transaction_session_timeout": "60000"  # 1 minute idle timeout
                 }
             }
         )
@@ -195,23 +199,62 @@ class DirectDatabaseConnection:
         default_logger.info("Direct SQLAlchemy connection configured", url=url[:20] + "...")
 
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Get async database session with proper lifecycle management"""
+        """Get async database session with proper lifecycle management and retry logic"""
         if not self._sessionmaker:
             raise ValueError("Direct database not configured. Call configure() first.")
-        async with self._sessionmaker() as session:
-            yield session
+        
+        max_retries = 3
+        retry_delay = 1.0
+        
+        for attempt in range(max_retries):
+            try:
+                # Add timeout to session creation
+                session_task = self._sessionmaker()
+                session = await asyncio.wait_for(session_task.__aenter__(), timeout=10.0)
+                
+                try:
+                    yield session
+                    await session_task.__aexit__(None, None, None)
+                    break
+                except Exception as e:
+                    await session_task.__aexit__(type(e), e, e.__traceback__)
+                    raise
+                    
+            except (asyncio.TimeoutError, SQLAlchemyError, OSError) as e:
+                if attempt == max_retries - 1:
+                    default_logger.error(f"Database session creation failed after {max_retries} attempts: {str(e)}")
+                    raise
+                else:
+                    default_logger.warning(f"Database session creation attempt {attempt + 1} failed: {str(e)}, retrying in {retry_delay}s")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
 
     async def test_connection(self) -> bool:
         if not self._engine:
             raise ValueError("Direct database not configured. Call configure() first.")
-        try:
-            async with self._engine.connect() as conn:
-                await conn.execute(sqlalchemy.text("SELECT 1"))
-            default_logger.info("Direct SQLAlchemy connection test successful")
-            return True
-        except SQLAlchemyError as e:
-            default_logger.warning(f"Direct SQLAlchemy connection test failed: {str(e)}")
-            return False
+        
+        max_retries = 3
+        retry_delay = 2.0
+        
+        for attempt in range(max_retries):
+            try:
+                # Add timeout to connection test
+                async with await asyncio.wait_for(self._engine.connect(), timeout=15.0) as conn:
+                    await asyncio.wait_for(
+                        conn.execute(sqlalchemy.text("SELECT 1")), 
+                        timeout=10.0
+                    )
+                default_logger.info("Direct SQLAlchemy connection test successful")
+                return True
+                
+            except (asyncio.TimeoutError, SQLAlchemyError, OSError) as e:
+                if attempt == max_retries - 1:
+                    default_logger.warning(f"Direct SQLAlchemy connection test failed after {max_retries} attempts: {str(e)}")
+                    return False
+                else:
+                    default_logger.warning(f"Connection test attempt {attempt + 1} failed: {str(e)}, retrying in {retry_delay}s")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 1.5  # Moderate exponential backoff
 
 # Global direct database connection instance
 direct_db_connection = DirectDatabaseConnection()
