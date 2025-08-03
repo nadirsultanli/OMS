@@ -66,10 +66,12 @@ const PriceListDetail = () => {
       if (linesResult.success) {
         const allLines = linesResult.data || [];
         console.log('Fetched price lines:', allLines.length);
+        console.log('Sample price line:', allLines[0]);
         
         // Filter and prioritize KIT variants over separate GAS+DEP variants
         const filteredLines = filterPriceLinesForKITPriority(allLines);
         console.log('Filtered price lines:', filteredLines.length);
+        console.log('Sample filtered line:', filteredLines[0]);
         setPriceLines(filteredLines);
       } else {
         console.error('Error fetching price lines:', linesResult.error);
@@ -104,7 +106,7 @@ const PriceListDetail = () => {
         console.error('Error fetching variants:', variantResult.error);
       }
     } catch (error) {
-      console.error('Failed to fetch products and variants:', error);
+      console.error('Error in fetchProductsAndVariants:', error);
     }
   };
 
@@ -383,6 +385,7 @@ const PriceListDetail = () => {
 
   const getVariantName = (variantId) => {
     const variant = variants.find(v => v.id === variantId);
+    
     if (variant) {
       // Build a descriptive name with SKU prominently displayed
       let name = variant.sku;
@@ -460,38 +463,42 @@ const PriceListDetail = () => {
         return;
       }
       
-      // Extract size from SKU (e.g., GAS18, DEP18, KIT18-OUTRIGHT -> 18)
-      const sizeMatch = variant.sku.match(/(?:GAS|DEP|KIT)(\d+)/);
-      if (!sizeMatch) {
-        console.warn(`No size match found for SKU: ${variant.sku}`);
-        return;
+      // Extract size from SKU patterns:
+      // CYL12-FULL, CYL12-EMPTY -> 12
+      // DEP12 -> 12
+      // GAS-REG-STD -> REG
+      let size = null;
+      let sizeMatch = variant.sku.match(/CYL(\d+)/);
+      if (sizeMatch) {
+        size = sizeMatch[1];
+      } else {
+        sizeMatch = variant.sku.match(/DEP(\d+)/);
+        if (sizeMatch) {
+          size = sizeMatch[1];
+        } else {
+          // For GAS variants without size, use a generic group
+          size = 'GAS';
+        }
       }
       
-      const size = sizeMatch[1];
+      if (!size) {
+        console.warn(`No size match found for SKU: ${variant.sku}`);
+        // Add to a generic group
+        size = 'OTHER';
+      }
+      
       if (!productGroups[size]) {
         productGroups[size] = [];
       }
       productGroups[size].push({ ...line, variant });
     });
     
-    // For each product group, show KIT + GAS, but hide DEP when KIT exists
+    // For each product group, show all variants (no filtering for now)
     const filteredLines = [];
     
     Object.values(productGroups).forEach(group => {
-      const kitLine = group.find(line => line.variant.sku.startsWith('KIT'));
-      const gasLine = group.find(line => line.variant.sku.startsWith('GAS'));
-      const depLine = group.find(line => line.variant.sku.startsWith('DEP'));
-      
-      if (kitLine) {
-        // If KIT exists, show KIT and GAS, but hide DEP
-        filteredLines.push(kitLine);
-        if (gasLine) filteredLines.push(gasLine);
-        // Don't add depLine - hide it when KIT exists
-      } else {
-        // If no KIT, show GAS and DEP separately
-        if (gasLine) filteredLines.push(gasLine);
-        if (depLine) filteredLines.push(depLine);
-      }
+      // For now, show all variants in the group
+      filteredLines.push(...group);
     });
     
     // Add lines without variants (bulk gas, etc.)
@@ -848,7 +855,7 @@ const PriceListDetail = () => {
                   <tr key={line.id}>
                     <td className="product-cell">
                       <div className="sku-display">
-                        {line.variant_id ? getVariantName(line.variant_id) : line.gas_type}
+                        {line.variant_id ? getVariantName(line.variant_id) : (line.gas_type === 'DELETED_VARIANT' ? 'DELETED_VARIANT' : line.gas_type)}
                       </div>
                       {line.tax_code && (
                         <div className="tax-info">
@@ -905,4 +912,4 @@ const PriceListDetail = () => {
   );
 };
 
-export default PriceListDetail; 
+export default PriceListDetail;

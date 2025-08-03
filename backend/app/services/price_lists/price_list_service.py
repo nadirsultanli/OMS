@@ -27,10 +27,12 @@ class PriceListService:
         """Create a new price list"""
         from datetime import datetime
         
-        # BUSINESS RULE: If this price list is active, deactivate all others
+        # BUSINESS RULE: If this price list is active, deactivate all others first
         if active:
-            await self._deactivate_other_price_lists(tenant_id, created_by)
+            # First deactivate all other active price lists for this tenant
+            await self.deactivate_other_price_lists(tenant_id, None, created_by)
         
+        # Then create the price list
         price_list = PriceListEntity(
             tenant_id=tenant_id,
             name=name,
@@ -89,11 +91,12 @@ class PriceListService:
         # Get current price list
         current_price_list = await self.get_price_list_by_id(price_list_id)
         
-        # BUSINESS RULE: If activating this price list, deactivate all others
+        # BUSINESS RULE: If activating this price list, deactivate all others first
         if active and not current_price_list.active:
-            await self._deactivate_other_price_lists(current_price_list.tenant_id, updated_by)
+            # First deactivate all other active price lists for this tenant
+            await self.deactivate_other_price_lists(current_price_list.tenant_id, current_price_list.id, updated_by)
         
-        # Create updated price list
+        # Then update the price list
         updated_price_list = PriceListEntity(
             id=current_price_list.id,
             tenant_id=current_price_list.tenant_id,
@@ -232,27 +235,10 @@ class PriceListService:
     async def _deactivate_other_price_lists(self, tenant_id: UUID, updated_by: UUID) -> None:
         """Deactivate all other active price lists for the tenant"""
         """BUSINESS RULE: Only one active price list per tenant at any time"""
-        # Get all active price lists for the tenant
-        active_lists = await self.price_list_repository.get_all_price_lists(tenant_id, limit=1000, offset=0)
-        active_lists = [pl for pl in active_lists if pl.active]
-        
-        # Deactivate all active price lists
-        for price_list in active_lists:
-            await self.price_list_repository.update_price_list(
-                PriceListEntity(
-                    id=price_list.id,
-                    tenant_id=price_list.tenant_id,
-                    name=price_list.name,
-                    effective_from=price_list.effective_from,
-                    effective_to=price_list.effective_to,
-                    active=False,  # Deactivate
-                    currency=price_list.currency,
-                    created_at=price_list.created_at,
-                    created_by=price_list.created_by,
-                    updated_at=datetime.utcnow(),
-                    updated_by=updated_by,
-                    deleted_at=price_list.deleted_at,
-                    deleted_by=price_list.deleted_by,
-                    lines=price_list.lines
-                )
-            ) 
+        # This method is deprecated - use deactivate_other_price_lists with specific price list ID
+        pass
+    
+    async def deactivate_other_price_lists(self, tenant_id: UUID, exclude_price_list_id: Optional[UUID], updated_by: UUID) -> None:
+        """Deactivate all other active price lists for a tenant except the specified one"""
+        """BUSINESS RULE: Only one active price list per tenant at any time"""
+        await self.price_list_repository.deactivate_other_price_lists(tenant_id, exclude_price_list_id, updated_by) 

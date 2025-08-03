@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -239,6 +239,47 @@ class PriceListRepositoryImpl(PriceListRepository):
             deleted_by=model.deleted_by,
             lines=price_list.lines  # Use the lines from the input price list
         )
+    
+    async def deactivate_other_price_lists(self, tenant_id: UUID, exclude_price_list_id: UUID, updated_by: UUID) -> None:
+        """Deactivate all other active price lists for a tenant except the specified one"""
+        if exclude_price_list_id is None:
+            # Deactivate all active price lists for this tenant
+            stmt = (
+                update(PriceListModel)
+                .where(
+                    and_(
+                        PriceListModel.tenant_id == tenant_id,
+                        PriceListModel.active == True,
+                        PriceListModel.deleted_at.is_(None)
+                    )
+                )
+                .values(
+                    active=False,
+                    updated_at=datetime.utcnow(),
+                    updated_by=updated_by
+                )
+            )
+        else:
+            # Deactivate all active price lists except the specified one
+            stmt = (
+                update(PriceListModel)
+                .where(
+                    and_(
+                        PriceListModel.tenant_id == tenant_id,
+                        PriceListModel.active == True,
+                        PriceListModel.id != exclude_price_list_id,
+                        PriceListModel.deleted_at.is_(None)
+                    )
+                )
+                .values(
+                    active=False,
+                    updated_at=datetime.utcnow(),
+                    updated_by=updated_by
+                )
+            )
+        
+        await self.session.execute(stmt)
+        await self.session.commit()
     
     async def delete_price_list(self, price_list_id: UUID, deleted_by: UUID) -> bool:
         """Soft delete a price list"""

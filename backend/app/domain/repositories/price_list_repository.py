@@ -35,6 +35,11 @@ class PriceListRepository(ABC):
         pass
     
     @abstractmethod
+    async def deactivate_other_price_lists(self, tenant_id: UUID, exclude_price_list_id: Optional[UUID], updated_by: UUID) -> None:
+        """Deactivate all other active price lists for a tenant except the specified one"""
+        pass
+    
+    @abstractmethod
     async def delete_price_list(self, price_list_id: UUID, deleted_by: UUID) -> bool:
         """Soft delete a price list"""
         pass
