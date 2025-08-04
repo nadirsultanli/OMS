@@ -175,24 +175,24 @@ class DirectDatabaseConnection:
             url, 
             echo=False, 
             future=True,
-            # Conservative connection pool settings
-            pool_size=5,            # Reduced to 5 connections
-            max_overflow=10,        # Reduced to 10 (allow up to 15 total connections)
+            # Aggressive connection pool settings to prevent idle transactions
+            pool_size=3,            # Reduced to 3 connections
+            max_overflow=5,         # Reduced to 5 (allow up to 8 total connections)
             pool_pre_ping=True,     # Validate connections before use
-            pool_recycle=300,       # Recycle connections every 5 minutes
-            pool_timeout=10,        # Reduced timeout to 10 seconds
-            # Query performance settings with strict timeouts
+            pool_recycle=60,        # Recycle connections every 1 minute
+            pool_timeout=5,         # Reduced timeout to 5 seconds
+            # Query performance settings with very strict timeouts
             connect_args={
                 "statement_cache_size": 0,  # Disable statement cache for pooled connections
                 "prepared_statement_cache_size": 0,
-                "command_timeout": 30,      # Reduced to 30 seconds
+                "command_timeout": 15,      # Reduced to 15 seconds
                 "server_settings": {
                     "application_name": "oms_backend",
-                    "tcp_keepalives_idle": "30",      # Reduced for faster cleanup
-                    "tcp_keepalives_interval": "10",   
-                    "tcp_keepalives_count": "3",
-                    "statement_timeout": "30000",     # Reduced to 30 seconds
-                    "idle_in_transaction_session_timeout": "60000"  # Reduced to 1 minute
+                    "tcp_keepalives_idle": "15",      # Very aggressive keepalive
+                    "tcp_keepalives_interval": "5",   
+                    "tcp_keepalives_count": "2",
+                    "statement_timeout": "15000",     # Reduced to 15 seconds
+                    "idle_in_transaction_session_timeout": "30000"  # Reduced to 30 seconds
                 }
             }
         )
@@ -268,28 +268,34 @@ async def init_direct_database() -> None:
 
 async def cleanup_idle_connections():
     """
-    Clean up idle database connections to prevent connection pool exhaustion.
-    This should be called periodically (e.g., every 2-5 minutes) from your application.
+    Clean up idle database connections using aggressive cleanup (30-second threshold).
+    This should be called periodically (e.g., every 30 seconds) from your application.
     """
     try:
         async for session in direct_db_connection.get_session():
-            # Call the cleanup function
-            result = await session.execute(text("SELECT cleanup_idle_connections();"))
+            # Call the aggressive cleanup function
+            result = await session.execute(text("SELECT cleanup_idle_connections_aggressive();"))
             terminated_count = result.scalar()
             
             # Log the cleanup
-            default_logger.info(f"Connection cleanup completed: {terminated_count} connections terminated")
+            if terminated_count > 0:
+                default_logger.info(f"✅ Aggressive connection cleanup completed: {terminated_count} connections terminated")
+            else:
+                default_logger.info("✅ No connections needed cleanup")
             
             # Also get current connection status
-            status_result = await session.execute(text("SELECT get_connection_status();"))
-            status = status_result.scalar()
-            
-            default_logger.info(f"Current connection status: {status}")
+            try:
+                status_result = await session.execute(text("SELECT get_connection_status();"))
+                status = status_result.scalar()
+                default_logger.info(f"Current connection status: {status}")
+            except:
+                # Status function might not exist, that's okay
+                pass
             
             break  # Exit after first iteration
             
     except Exception as e:
-        default_logger.error(f"Failed to cleanup idle connections: {str(e)}")
+        default_logger.error(f"❌ Failed to cleanup idle connections: {str(e)}")
 
 
 def get_database() -> Client:

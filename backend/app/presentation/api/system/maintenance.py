@@ -16,7 +16,7 @@ async def cleanup_connections(
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    Manually trigger connection cleanup.
+    Manually trigger aggressive connection cleanup (30-second threshold).
     Only accessible by admin users.
     """
     try:
@@ -24,15 +24,22 @@ async def cleanup_connections(
         if current_user.role != "ADMIN":
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        # Run the cleanup
-        await cleanup_idle_connections()
+        # Run the aggressive cleanup
+        from app.infrastucture.database.connection import direct_db_connection
+        from sqlalchemy import text
+        
+        async for session in direct_db_connection.get_session():
+            result = await session.execute(text("SELECT cleanup_idle_connections_aggressive();"))
+            terminated_count = result.scalar()
+            await session.commit()
         
         # Get current status
         status = await get_connections_status_internal()
         
         return {
             "success": True,
-            "message": "Connection cleanup completed",
+            "message": f"Aggressive connection cleanup completed. Terminated {terminated_count} connections.",
+            "terminated_count": terminated_count,
             "status": status
         }
         
@@ -65,6 +72,37 @@ async def get_connections_status(
     except Exception as e:
         default_logger.error(f"Failed to get connection status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
+
+
+@router.post("/monitor-connections")
+async def monitor_connections(
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Monitor and automatically cleanup connections if needed (30-second threshold).
+    Only accessible by admin users.
+    """
+    try:
+        # Check if user is admin
+        if current_user.role != "ADMIN":
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Run the monitoring function
+        from app.infrastucture.database.connection import direct_db_connection
+        from sqlalchemy import text
+        
+        async for session in direct_db_connection.get_session():
+            await session.execute(text("SELECT monitor_and_cleanup_connections();"))
+            await session.commit()
+        
+        return {
+            "success": True,
+            "message": "Connection monitoring completed"
+        }
+        
+    except Exception as e:
+        default_logger.error(f"Connection monitoring failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Monitoring failed: {str(e)}")
 
 
 async def get_connections_status_internal() -> Dict[str, Any]:

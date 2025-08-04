@@ -281,7 +281,7 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  overflow: visible;
   margin-bottom: 24px;
   width: 100%;
   max-width: 100%;
@@ -290,6 +290,7 @@
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
+  overflow-y: visible;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -299,14 +300,14 @@
 }
 
 /* Column width coordination with shared Table.css */
-.trips-table th.trip-number-col { width: 16%; }
+.trips-table th.trip-number-col { width: 15%; }
 .trips-table th.date-col { width: 12%; }
-.trips-table th.vehicle-col { width: 14%; }
-.trips-table th.driver-col { width: 14%; }
+.trips-table th.vehicle-col { width: 16%; }
+.trips-table th.driver-col { width: 16%; }
 .trips-table th.status-col { width: 12%; }
 .trips-table th.orders-col { width: 8%; text-align: center; }
 .trips-table th.load-col { width: 10%; text-align: right; }
-.trips-table th.actions-col { width: 14%; text-align: center; }
+.trips-table th.actions-col { width: 11%; text-align: center; }
 
 /* Cell alignment coordination with shared Table.css */
 .trips-table td.orders-cell { text-align: center; }
@@ -350,6 +351,8 @@
   font-weight: 600;
   transition: color 0.2s ease;
   white-space: nowrap;
+  overflow: visible;
+  font-size: 14px;
 }
 
 .date-info {
@@ -379,7 +382,7 @@
   height: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .vehicle-icon,
@@ -394,11 +397,11 @@
 .driver-name {
   color: #374151;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
   line-height: 1.4;
   max-width: 100%;
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .orders-count {
@@ -460,6 +463,8 @@
   height: 60px;
   min-height: 60px;
   max-height: 60px;
+  padding: 8px 12px;
+  overflow: visible;
 }
 
 /* Actions cell specific styling */
@@ -1170,14 +1175,14 @@
   }
   
   /* Responsive column widths - maintain proportions */
-  .trips-table th.trip-number-col { width: 16%; min-width: 140px; }
+  .trips-table th.trip-number-col { width: 15%; min-width: 140px; }
   .trips-table th.date-col { width: 12%; min-width: 100px; }
-  .trips-table th.vehicle-col { width: 14%; min-width: 120px; }
-  .trips-table th.driver-col { width: 14%; min-width: 120px; }
+  .trips-table th.vehicle-col { width: 16%; min-width: 140px; }
+  .trips-table th.driver-col { width: 16%; min-width: 140px; }
   .trips-table th.status-col { width: 12%; min-width: 100px; }
   .trips-table th.orders-col { width: 8%; min-width: 60px; }
   .trips-table th.load-col { width: 10%; min-width: 80px; }
-  .trips-table th.actions-col { width: 14%; min-width: 120px; }
+  .trips-table th.actions-col { width: 11%; min-width: 100px; }
 }
 
 @media (max-width: 768px) {

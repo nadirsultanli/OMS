@@ -12,7 +12,7 @@ from fastapi.openapi.utils import get_openapi
 from decouple import config
 from app.core.logging_config import setup_logging, get_request_logger
 from app.infrastucture.logs.logger import default_logger
-from app.infrastucture.database.connection import init_database, init_direct_database, direct_db_connection
+from app.infrastucture.database.connection import init_database, init_direct_database, direct_db_connection, cleanup_idle_connections
 from app.presentation.api.users import auth_router, user_router, verification_router
 from app.presentation.api.customers.customer import router as customer_router
 from app.presentation.api.tenants.tenant import router as tenant_router
@@ -75,6 +75,22 @@ async def lifespan(app: FastAPI):
                 async with direct_db_connection._engine.connect() as conn:
                     await conn.execute(sqlalchemy.text("SELECT 1"))
                 default_logger.info("Direct SQLAlchemy connection successful (local development)")
+                
+                # Start automatic connection cleanup task
+                async def periodic_cleanup():
+                    """Background task to periodically cleanup connections"""
+                    while True:
+                        try:
+                            await asyncio.sleep(30)  # Run every 30 seconds
+                            await cleanup_idle_connections()
+                        except Exception as e:
+                            default_logger.error(f"Periodic cleanup failed: {str(e)}")
+                            await asyncio.sleep(60)  # Wait longer on error
+                
+                # Start the cleanup task
+                asyncio.create_task(periodic_cleanup())
+                default_logger.info("✅ Automatic connection cleanup started (every 30 seconds)")
+                
         except Exception as e:
             default_logger.error(f"Failed to initialize direct SQLAlchemy connection: {str(e)}")
     else:
