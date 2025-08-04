@@ -6,7 +6,7 @@ from app.services.auth.google_oauth_service import GoogleOAuthService
 from app.infrastucture.logs.logger import get_logger
 from app.services.dependencies.railway_users import get_railway_user_service
 from app.domain.entities.users import UserStatus
-from app.infrastucture.database.connection import get_supabase_client_sync
+from app.infrastucture.database.connection import get_supabase_admin_client_sync
 
 logger = get_logger("google_auth_api")
 google_auth_router = APIRouter(prefix="/google", tags=["Google OAuth"])
@@ -69,7 +69,7 @@ async def google_callback(
             )
         
         # Get Supabase client for auth operations
-        supabase = get_supabase_client_sync()
+        supabase = get_supabase_admin_client_sync()
         
         try:
             # Check if user exists in Supabase Auth
@@ -267,7 +267,7 @@ async def validate_google_token(request: GoogleTokenRequest):
             )
         
         # Generate new JWT tokens
-        supabase = get_supabase_client_sync()
+        supabase = get_supabase_admin_client_sync()
         user_service = get_railway_user_service()
         user = await user_service.get_user_by_email(email)
         
