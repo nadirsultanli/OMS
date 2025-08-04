@@ -464,4 +464,45 @@ class SQLAlchemyTripRepository(TripRepository):
             created_by=stop_model.created_by,
             updated_at=stop_model.updated_at,
             updated_by=stop_model.updated_by
-        ) 
+        )
+
+    async def get_trips_summary(self, tenant_id: UUID) -> dict:
+        """Get optimized trips summary for dashboard (count only, no data loading)"""
+        from sqlalchemy import func, case
+        
+        # Single query to get all counts at once using CASE WHEN
+        stmt = select(
+            func.count(TripModel.id).label('total'),
+            func.sum(case(
+                (TripModel.trip_status.in_(['draft', 'planned']), 1),
+                else_=0
+            )).label('pending'),
+            func.sum(case(
+                (TripModel.trip_status.in_(['loaded', 'in_progress']), 1),
+                else_=0
+            )).label('active'),
+            func.sum(case(
+                (TripModel.trip_status.in_(['completed']), 1),
+                else_=0
+            )).label('completed'),
+            func.sum(case(
+                (TripModel.trip_status.in_(['cancelled']), 1),
+                else_=0
+            )).label('cancelled')
+        ).where(
+            and_(
+                TripModel.tenant_id == tenant_id,
+                TripModel.deleted_at.is_(None)
+            )
+        )
+        
+        result = await self.session.execute(stmt)
+        row = result.first()
+        
+        return {
+            'total': int(row.total or 0),
+            'pending': int(row.pending or 0),
+            'active': int(row.active or 0),
+            'completed': int(row.completed or 0),
+            'cancelled': int(row.cancelled or 0)
+        } 

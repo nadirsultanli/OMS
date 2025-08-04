@@ -91,4 +91,9 @@ class TripRepository(ABC):
     @abstractmethod
     async def get_trip_stops_by_order(self, order_id: UUID) -> List[TripStop]:
         """Get trip stops that contain the specified order"""
+        pass
+    
+    @abstractmethod
+    async def get_trips_summary(self, tenant_id: UUID) -> dict:
+        """Get optimized trips summary for dashboard"""
         pass 

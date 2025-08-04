@@ -68,7 +68,7 @@ class UserService {
           role: user.role || 'user',
           status: user.status || 'active'
         })),
-        count: response.data.total || response.data.count || 0,
+        total: response.data.total || response.data.count || 0,
         limit: params.limit || 100,
         offset: params.offset || 0
       };

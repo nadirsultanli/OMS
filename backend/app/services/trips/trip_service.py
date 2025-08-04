@@ -417,6 +417,11 @@ class TripService:
             return False
         
         return True
+
+    async def get_trips_summary(self, tenant_id: UUID) -> dict:
+        """Get trips summary for dashboard (optimized for performance)"""
+        # Use optimized repository method (single COUNT query with CASE WHEN)
+        return await self.trip_repository.get_trips_summary(tenant_id)
     
     # Trip Planning Methods
     

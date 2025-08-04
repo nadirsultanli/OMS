@@ -42,6 +42,29 @@ from decimal import Decimal
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 
+@router.get("/summary/dashboard", status_code=200)
+async def get_trips_dashboard_summary(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """
+    Get optimized trips summary for dashboard (cached and lightweight)
+    """
+    try:
+        from uuid import UUID
+        summary = await trip_service.get_trips_summary(UUID(tenant_id))
+        return {
+            "success": True,
+            "data": summary,
+            "cache": {
+                "ttl": 30,  # Cache for 30 seconds
+                "timestamp": int(__import__('time').time())
+            }
+        }
+    except Exception as e:
+        default_logger.error(f"Error getting trips dashboard summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get trips summary")
+
 @router.post("/", response_model=TripResponse, status_code=201)
 async def create_trip(
     request: CreateTripRequest,

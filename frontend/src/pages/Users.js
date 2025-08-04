@@ -5,7 +5,7 @@ import './Users.css';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
+  // Removed filteredUsers state since we're using server-side filtering
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [message, setMessage] = useState('');
@@ -37,10 +37,6 @@ const Users = () => {
     fetchUsers();
   }, [pagination.limit, pagination.offset]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [users, filters]);
-
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -49,8 +45,9 @@ const Users = () => {
         offset: pagination.offset
       };
 
-      // Only add role filter to API request (since backend search may not work)
+      // Add filters to API request
       if (filters.role) params.role = filters.role;
+      if (filters.search) params.search = filters.search;
 
       const result = await userService.getUsers(params);
 
@@ -58,7 +55,8 @@ const Users = () => {
         setUsers(result.data.results || []);
         setPagination(prev => ({
           ...prev,
-          total: result.data.total || 0
+          total: result.data.total || 0,
+          totalPages: Math.ceil((result.data.total || 0) / prev.limit)
         }));
       } else {
         setErrors({ general: result.error });
@@ -71,18 +69,10 @@ const Users = () => {
   };
 
   const applyFilters = () => {
-    let filtered = [...users];
-
-    // Apply search filter (client-side)
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(user =>
-        user.full_name?.toLowerCase().includes(searchTerm) ||
-        user.email?.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    setFilteredUsers(filtered);
+    // Reset pagination when applying filters
+    resetPaginationOnFilter();
+    // Trigger fetch with current filters
+    fetchUsers();
   };
 
 
@@ -378,8 +368,20 @@ const Users = () => {
               placeholder="Search by name or email..."
               value={filters.search}
               onChange={handleFilterChange}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  applyFilters();
+                }
+              }}
               className="search-input"
             />
+            <button
+              onClick={applyFilters}
+              className="search-button"
+              disabled={loading}
+            >
+              Search
+            </button>
           </div>
 
           <div className="filter-group">
@@ -407,7 +409,7 @@ const Users = () => {
             <div className="loading-spinner"></div>
             <p>Loading users...</p>
           </div>
-        ) : filteredUsers.length === 0 ? (
+        ) : users.length === 0 ? (
           <div className="empty-state">
             <h3>No users found</h3>
             <p>{filters.search || filters.role ? 'No users found matching your filters.' : 'Start by creating your first user'}</p>
@@ -426,7 +428,7 @@ const Users = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => (
+                {users.map((user) => (
                   <tr key={user.id}>
                     <td className="name-cell">{user.full_name || '-'}</td>
                     <td className="email-cell">{user.email}</td>
@@ -462,7 +464,7 @@ const Users = () => {
       </div>
 
       {/* Pagination */}
-      {!loading && filteredUsers.length > 0 && (
+      {!loading && users.length > 0 && (
         <div className="pagination-container">
           <div className="pagination-header">
             <div className="pagination-info">

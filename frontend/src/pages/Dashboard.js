@@ -96,8 +96,8 @@ const Dashboard = () => {
         // Load stock levels - use smaller limit
         stockService.getStockLevels({ limit: 20 }),  // Reduced from 50 to 20
         
-        // Load trips summary - use smaller limit
-        tripService.getTrips({ limit: 20 }),  // Reduced from 50 to 20
+        // Load trips summary - use optimized dashboard endpoint
+        tripService.getTripsSummary(tenantId),
         
         // Load vehicles summary - use optimized dashboard endpoint
         api.get(`/vehicles/summary/dashboard?tenant_id=${tenantId}`),
@@ -159,16 +159,21 @@ const Dashboard = () => {
         }));
       }
 
-      // Process trips data
-      if (tripsResponse.status === 'fulfilled' && tripsResponse.value.data.success) {
-        const trips = tripsResponse.value.data.data.results || [];
-        const active = trips.filter(t => t.status === 'IN_PROGRESS').length;
-        const pending = trips.filter(t => t.status === 'PLANNED').length;
+      // Process trips data (optimized endpoint)
+      console.log('Trips API Response:', tripsResponse);
+      if (tripsResponse.status === 'fulfilled' && tripsResponse.value.success) {
+        const summary = tripsResponse.value.data.data;
+        console.log('Trips Summary Data:', summary);
         setDashboardData(prev => ({
           ...prev,
-          trips: { active, pending, loading: false }
+          trips: { 
+            active: summary.active || 0, 
+            pending: summary.pending || 0, 
+            loading: false 
+          }
         }));
       } else {
+        console.error('Trips API Error:', tripsResponse);
         setDashboardData(prev => ({
           ...prev,
           trips: { active: 0, pending: 0, loading: false }
@@ -210,10 +215,13 @@ const Dashboard = () => {
         finalData.customers = { total: customersResponse.value.data.total || 0, loading: false };
       }
       if (ordersResponse.status === 'fulfilled' && ordersResponse.value.success) {
-        const orders = ordersResponse.value.data.orders || [];
-        const pending = orders.filter(o => o.status === 'pending').length;
-        const completed = orders.filter(o => o.status === 'completed').length;
-        finalData.orders = { total: orders.length, pending, completed, loading: false };
+        const summary = ordersResponse.value.data.data;
+        finalData.orders = { 
+          total: summary.total || 0, 
+          pending: summary.pending || 0, 
+          completed: summary.completed || 0, 
+          loading: false 
+        };
       }
       if (stockResponse.status === 'fulfilled') {
         const stockLevels = stockResponse.value.stock_levels || [];
@@ -221,10 +229,12 @@ const Dashboard = () => {
         finalData.stock = { lowStock, totalProducts: stockLevels.length, loading: false };
       }
       if (tripsResponse.status === 'fulfilled' && tripsResponse.value.success) {
-        const trips = tripsResponse.value.data.results || [];
-        const active = trips.filter(t => t.status === 'IN_PROGRESS').length;
-        const pending = trips.filter(t => t.status === 'PLANNED').length;
-        finalData.trips = { active, pending, loading: false };
+        const summary = tripsResponse.value.data.data;
+        finalData.trips = { 
+          active: summary.active || 0, 
+          pending: summary.pending || 0, 
+          loading: false 
+        };
       }
       if (vehiclesResponse.status === 'fulfilled' && vehiclesResponse.value.success) {
         const vehicles = vehiclesResponse.value.data.results || [];

@@ -145,6 +145,18 @@
   flex: 1;
   min-width: 300px;
   max-width: 400px;
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.search-group:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .search-icon {
@@ -154,30 +166,30 @@
   transform: translateY(-50%);
   color: #6b7280;
   z-index: 2;
+  pointer-events: none;
 }
 
 .search-input {
-  width: 100%;
+  flex: 1;
   height: 44px;
   padding: 12px 12px 12px 48px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border: none;
   font-size: 16px;
-  transition: all 0.3s ease;
-  background: white;
+  background: transparent;
   color: #374151;
   box-sizing: border-box;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: #9ca3af;
+  font-size: 15px;
 }
 
 .search-input:focus {
   outline: none;
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.search-input::placeholder {
-  color: #9ca3af;
-  font-size: 15px;
 }
 
 .filter-group {
@@ -217,6 +229,38 @@
   outline: none;
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.search-button {
+  height: 44px;
+  padding: 0 20px;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+}
+
+.search-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  transform: translateY(-1px);
+}
+
+.search-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.search-button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* ============================================
@@ -904,6 +948,18 @@
   .search-group {
     min-width: 100%;
     max-width: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .search-input {
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+  }
+  
+  .search-button {
+    width: 100%;
+    border-radius: 8px;
   }
 
   .filter-group {
@@ -983,6 +1039,17 @@
   }
 
   .page-subtitle {
+    font-size: 13px;
+  }
+  
+  .search-group {
+    min-width: 100%;
+    max-width: none;
+  }
+  
+  .search-button {
+    min-width: 60px;
+    padding: 0 12px;
     font-size: 13px;
   }
 

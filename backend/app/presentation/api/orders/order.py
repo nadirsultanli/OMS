@@ -422,11 +422,15 @@ async def get_orders(
     )
     
     try:
+        # Get orders and total count separately for proper pagination
         orders = await order_service.get_all_orders(
             tenant_id=current_user.tenant_id,
             limit=limit,
             offset=offset
         )
+        
+        # Get actual total count from database
+        total_count = await order_service.get_orders_count(current_user.tenant_id)
         
         # Convert to summary responses
         order_summaries = []
@@ -436,7 +440,7 @@ async def get_orders(
         
         return OrderSummaryListResponse(
             orders=order_summaries,
-            total=len(order_summaries),
+            total=total_count,
             limit=limit,
             offset=offset
         )

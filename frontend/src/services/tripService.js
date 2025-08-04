@@ -268,6 +268,16 @@ const tripService = {
     }
   },
 
+  // Get trips summary for dashboard
+  getTripsSummary: async (tenantId) => {
+    try {
+      const response = await api.get(`/trips/summary/dashboard?tenant_id=${tenantId}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: extractErrorMessage(error.response?.data) };
+    }
+  },
+
   // =====================================================================
   // TRIP-ORDER INTEGRATION METHODS
   // =====================================================================
