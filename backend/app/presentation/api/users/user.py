@@ -366,10 +366,10 @@ async def resend_user_invitation(
             # Get user details to provide better error message
             try:
                 user = await user_service.get_user_by_id(user_id)
-                if user.auth_user_id:
+                if user.status == UserStatus.ACTIVE:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="User already exists in the system. Cannot resend invitation to existing users."
+                        detail="User is already active. Cannot resend invitation to active users."
                     )
                 else:
                     raise HTTPException(
