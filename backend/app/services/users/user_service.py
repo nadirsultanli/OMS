@@ -417,6 +417,7 @@ class UserService:
             
             # Send invitation for new users or if auth user check failed
             try:
+                default_logger.info(f"Attempting to send invitation to {user.email} with redirect: {redirect_url}")
                 supabase.auth.admin.invite_user_by_email(
                     email=user.email,
                     options={"redirect_to": redirect_url}
@@ -426,52 +427,56 @@ class UserService:
                 
             except Exception as e:
                 error_msg = str(e)
+                default_logger.error(f"Failed to send invitation: {error_msg}", email=user.email, user_id=user_id)
                 # Check if it's a "user already exists" error
                 if "already registered" in error_msg.lower() or "already exists" in error_msg.lower():
-                    # Try to use resend_signup instead of invite_user_by_email
+                    # Try to reset email_confirmed_at and resend invitation
                     try:
-                        default_logger.info(f"User already exists in auth, trying resend_signup", 
+                        default_logger.info(f"User already exists in auth, attempting to reset and resend", 
                                          email=user.email)
                         
-                        # Use resend_signup which is designed for this scenario
-                        supabase.auth.admin.resend_signup({
-                            "email": user.email,
-                            "type": "signup"
-                        })
+                        # Update the user to unconfirm their email
+                        supabase.auth.admin.update_user_by_id(
+                            str(user.auth_user_id),
+                            {"email_confirmed_at": None}
+                        )
                         
-                        default_logger.info(f"Signup email resent successfully", email=user.email)
+                        # Now try to send invitation again
+                        supabase.auth.admin.invite_user_by_email(
+                            email=user.email,
+                            options={"redirect_to": redirect_url}
+                        )
+                        
+                        default_logger.info(f"Invitation resent successfully after reset", email=user.email)
                         return True
                         
-                    except Exception as resend_error:
-                        default_logger.error(f"Failed to resend signup: {str(resend_error)}", 
-                                           email=user.email)
+                    except Exception as reset_error:
+                        default_logger.error(f"Failed to reset and resend invitation: {str(reset_error)}", 
+                                           email=user.email, user_id=user_id)
                         
-                        # If resend_signup fails, try to reset email_confirmed_at as last resort
+                        # If reset fails, try to delete and recreate the auth user
                         try:
-                            default_logger.info(f"Attempting to reset email_confirmed_at as last resort", 
-                                             email=user.email)
+                            default_logger.info(f"Attempting to delete and recreate auth user as last resort", 
+                                             email=user.email, user_id=user_id)
                             
-                            # Update the user to unconfirm their email
-                            supabase.auth.admin.update_user_by_id(
-                                str(user.auth_user_id),
-                                {"email_confirmed_at": None}
-                            )
+                            # Delete the auth user
+                            supabase.auth.admin.delete_user(str(user.auth_user_id))
                             
-                            # Now try to send invitation again
+                            # Create a new auth user
                             supabase.auth.admin.invite_user_by_email(
                                 email=user.email,
                                 options={"redirect_to": redirect_url}
                             )
                             
-                            default_logger.info(f"Invitation resent successfully after reset", email=user.email)
+                            default_logger.info(f"Auth user recreated and invitation sent successfully", email=user.email)
                             return True
                             
-                        except Exception as reset_error:
-                            default_logger.error(f"Failed to reset and resend invitation: {str(reset_error)}", 
-                                               email=user.email)
+                        except Exception as recreate_error:
+                            default_logger.error(f"Failed to recreate auth user: {str(recreate_error)}", 
+                                               email=user.email, user_id=user_id)
                             return False
                 else:
-                    default_logger.error(f"Failed to send invitation: {error_msg}", email=user.email)
+                    default_logger.error(f"Failed to send invitation (unknown error): {error_msg}", email=user.email, user_id=user_id)
                     return False
                 
         except Exception as e:
