@@ -56,8 +56,8 @@ const AcceptInvitation = () => {
       type: finalType
     });
     
-    // Set the token if it exists and type is invite (or no type but token exists)
-    if (finalToken && (finalType === 'invite' || !finalType)) {
+    // Set the token if it exists (be more flexible with token validation)
+    if (finalToken) {
       setToken(finalToken);
       console.log('AcceptInvitation - Token set successfully');
       
@@ -80,8 +80,7 @@ const AcceptInvitation = () => {
         console.log('AcceptInvitation - Could not decode JWT token for email extraction:', e);
       }
     } else {
-      console.warn('AcceptInvitation - No valid invitation token found');
-      console.warn('AcceptInvitation - Expected: token with type=invite or just token parameter');
+      console.warn('AcceptInvitation - No token found in URL');
       setErrors({ 
         general: 'Invalid invitation link. Please check your email for the correct invitation link or try accessing the link again.' 
       });
