@@ -409,33 +409,11 @@ class UserService:
                     default_logger.warning(f"Failed to create auth user for resend: {str(e)}", 
                                          email=user.email)
             
-            # Check if user is already active in our database
+            # Only restriction: if user is ACTIVE, don't allow resend
             if user.status == UserStatus.ACTIVE:
                 default_logger.warning(f"User is already active, cannot resend invitation", 
                                      email=user.email, user_id=user_id)
                 return False
-            
-            # Check if user already exists in Supabase Auth
-            if user.auth_user_id:
-                try:
-                    # Try to get the auth user to check their status
-                    auth_user = supabase.auth.admin.get_user_by_id(str(user.auth_user_id))
-                    
-                    if auth_user and auth_user.user:
-                        # If user exists and is confirmed in Supabase but not active in our DB, 
-                        # we can still send invitation (user might have clicked link but not completed setup)
-                        if auth_user.user.email_confirmed_at and user.status == UserStatus.PENDING:
-                            default_logger.info(f"User confirmed in Supabase but still pending in our DB, sending invitation", 
-                                             email=user.email, user_id=user_id)
-                            # Continue to send invitation
-                        elif auth_user.user.email_confirmed_at and user.status == UserStatus.ACTIVE:
-                            default_logger.warning(f"User already confirmed and active, cannot resend invitation", 
-                                                 email=user.email, user_id=user_id)
-                            return False
-                    
-                except Exception as e:
-                    default_logger.warning(f"Could not check auth user status: {str(e)}", email=user.email)
-                    # Continue with invitation attempt
             
             # Send invitation for new users or if auth user check failed
             try:
@@ -450,9 +428,30 @@ class UserService:
                 error_msg = str(e)
                 # Check if it's a "user already exists" error
                 if "already registered" in error_msg.lower() or "already exists" in error_msg.lower():
-                    default_logger.warning(f"User already exists in auth, cannot send invitation", 
-                                         email=user.email, error=error_msg)
-                    return False
+                    # Try to reset the user's email confirmation status and resend
+                    try:
+                        default_logger.info(f"User already exists in auth, attempting to reset and resend", 
+                                         email=user.email)
+                        
+                        # Update the user to unconfirm their email
+                        supabase.auth.admin.update_user_by_id(
+                            str(user.auth_user_id),
+                            {"email_confirmed_at": None}
+                        )
+                        
+                        # Now try to send invitation again
+                        supabase.auth.admin.invite_user_by_email(
+                            email=user.email,
+                            options={"redirect_to": redirect_url}
+                        )
+                        
+                        default_logger.info(f"Invitation resent successfully after reset", email=user.email)
+                        return True
+                        
+                    except Exception as reset_error:
+                        default_logger.error(f"Failed to reset and resend invitation: {str(reset_error)}", 
+                                           email=user.email)
+                        return False
                 else:
                     default_logger.error(f"Failed to send invitation: {error_msg}", email=user.email)
                     return False
