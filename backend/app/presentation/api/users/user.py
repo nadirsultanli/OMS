@@ -418,6 +418,26 @@ async def fix_missing_auth_users(
         )
 
 
+@user_router.post("/fix-orphaned-auth", status_code=status.HTTP_200_OK)
+async def fix_orphaned_auth_users(
+    user_service: UserService = Depends(get_smart_user_service)
+):
+    """Fix users that exist in Supabase Auth but not in our local database"""
+    try:
+        results = await user_service.fix_orphaned_auth_users()
+        return {
+            "message": f"Fixed {results['fixed_users']} out of {results['orphaned_users']} orphaned users",
+            "results": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to fix orphaned auth users: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fix orphaned auth users"
+        )
+
+
 @user_router.get("/test-supabase-connection", status_code=status.HTTP_200_OK)
 async def test_supabase_connection(
     user_service: UserService = Depends(get_smart_user_service)

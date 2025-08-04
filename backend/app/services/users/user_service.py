@@ -461,22 +461,89 @@ class UserService:
                             default_logger.info(f"Attempting to delete and recreate auth user as last resort", 
                                              email=user.email, user_id=user_id)
                             
+                            # Store the current user info before deletion
+                            current_user_email = user.email
+                            current_user_name = user.full_name
+                            current_user_role = user.role
+                            current_user_tenant_id = user.tenant_id
+                            
                             # Delete the auth user
                             supabase.auth.admin.delete_user(str(user.auth_user_id))
                             
                             # Create a new auth user
-                            supabase.auth.admin.invite_user_by_email(
+                            auth_response = supabase.auth.admin.invite_user_by_email(
                                 email=user.email,
                                 options={"redirect_to": redirect_url}
                             )
                             
-                            default_logger.info(f"Auth user recreated and invitation sent successfully", email=user.email)
+                            # Update our local database with the new auth_user_id
+                            if auth_response and auth_response.user:
+                                # Update the user's auth_user_id to the new one
+                                await self.update_user_auth_id(user_id, auth_response.user.id)
+                                default_logger.info(f"Auth user recreated and local database updated successfully", 
+                                                 email=user.email, new_auth_id=auth_response.user.id)
+                            else:
+                                # If we can't get the new auth_user_id, create a new user record
+                                default_logger.warning(f"Could not get new auth_user_id, creating new user record", 
+                                                     email=user.email)
+                                
+                                # Create a new user record with the same details but new auth_user_id
+                                new_user = await self.create_user(
+                                    email=current_user_email,
+                                    name=current_user_name,
+                                    role=current_user_role,
+                                    tenant_id=str(current_user_tenant_id),
+                                    created_by=None  # System created
+                                )
+                                
+                                # Link the new auth user
+                                if auth_response and auth_response.user:
+                                    await self.update_user_auth_id(new_user.id, auth_response.user.id)
+                                
+                                default_logger.info(f"New user record created and linked to auth user", 
+                                                 email=user.email, new_user_id=new_user.id)
+                            
                             return True
                             
                         except Exception as recreate_error:
                             default_logger.error(f"Failed to recreate auth user: {str(recreate_error)}", 
                                                email=user.email, user_id=user_id)
-                            return False
+                            
+                            # As a final fallback, try to create a new user record
+                            try:
+                                default_logger.info(f"Attempting to create new user record as final fallback", 
+                                                 email=user.email)
+                                
+                                # Check if user already exists in our database
+                                existing_user = await self.get_user_by_email(user.email)
+                                if existing_user:
+                                    default_logger.info(f"User already exists in database, updating auth_user_id", 
+                                                     email=user.email)
+                                    # Try to get the latest auth user for this email
+                                    auth_users = supabase.auth.admin.list_users()
+                                    for auth_user in auth_users.users:
+                                        if auth_user.email == user.email:
+                                            await self.update_user_auth_id(existing_user.id, auth_user.id)
+                                            default_logger.info(f"Updated auth_user_id for existing user", 
+                                                             email=user.email, auth_id=auth_user.id)
+                                            return True
+                                else:
+                                    # Create new user record
+                                    new_user = await self.create_user(
+                                        email=user.email,
+                                        name=user.full_name,
+                                        role=user.role,
+                                        tenant_id=str(user.tenant_id),
+                                        created_by=None
+                                    )
+                                    default_logger.info(f"Created new user record as fallback", 
+                                                     email=user.email, new_user_id=new_user.id)
+                                    return True
+                                    
+                            except Exception as fallback_error:
+                                default_logger.error(f"Final fallback also failed: {str(fallback_error)}", 
+                                                   email=user.email)
+                                return False
                 else:
                     default_logger.error(f"Failed to send invitation (unknown error): {error_msg}", email=user.email, user_id=user_id)
                     return False
@@ -590,6 +657,81 @@ class UserService:
             default_logger.error(f"Failed to fix missing auth users: {str(e)}")
             raise UserUpdateError(f"Failed to fix missing auth users: {str(e)}")
     
+    async def fix_orphaned_auth_users(self) -> dict:
+        """Fix users that exist in Supabase Auth but not in our local database"""
+        try:
+            supabase = get_supabase_admin_client_sync()
+            
+            # Get all auth users
+            auth_users = supabase.auth.admin.list_users()
+            
+            results = {
+                "total_auth_users": len(auth_users.users),
+                "orphaned_users": 0,
+                "fixed_users": 0,
+                "failed_users": []
+            }
+            
+            for auth_user in auth_users.users:
+                try:
+                    # Check if user exists in our database
+                    existing_user = await self.get_user_by_email(auth_user.email)
+                    
+                    if not existing_user:
+                        results["orphaned_users"] += 1
+                        default_logger.warning(f"Found orphaned auth user: {auth_user.email}")
+                        
+                        # Create user in our database
+                        try:
+                            # Extract user metadata if available
+                            user_metadata = auth_user.user_metadata or {}
+                            name = user_metadata.get('name', auth_user.email.split('@')[0])
+                            role = user_metadata.get('role', 'tenant_admin')
+                            
+                            # Use default tenant (you might want to make this configurable)
+                            default_tenant_id = "332072c1-5405-4f09-a56f-a631defa911b"  # Circl Team
+                            
+                            new_user = await self.create_user(
+                                email=auth_user.email,
+                                name=name,
+                                role=UserRoleType(role),
+                                tenant_id=default_tenant_id,
+                                created_by=None
+                            )
+                            
+                            # Link the auth user
+                            await self.update_user_auth_id(new_user.id, auth_user.id)
+                            
+                            results["fixed_users"] += 1
+                            default_logger.info(f"Fixed orphaned user: {auth_user.email} -> {new_user.id}")
+                            
+                        except Exception as create_error:
+                            default_logger.error(f"Failed to create user for orphaned auth user: {auth_user.email}", 
+                                               error=str(create_error))
+                            results["failed_users"].append({
+                                "email": auth_user.email,
+                                "error": str(create_error)
+                            })
+                    
+                except Exception as e:
+                    default_logger.error(f"Error processing auth user {auth_user.email}: {str(e)}")
+                    results["failed_users"].append({
+                        "email": auth_user.email,
+                        "error": str(e)
+                    })
+            
+            return results
+            
+        except Exception as e:
+            default_logger.error(f"Failed to fix orphaned auth users: {str(e)}")
+            return {
+                "error": str(e),
+                "total_auth_users": 0,
+                "orphaned_users": 0,
+                "fixed_users": 0,
+                "failed_users": []
+            }
+
     async def test_supabase_connection(self) -> dict:
         """Test Supabase connection and auth capabilities"""
         try:
