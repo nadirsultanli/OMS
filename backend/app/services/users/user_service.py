@@ -428,30 +428,48 @@ class UserService:
                 error_msg = str(e)
                 # Check if it's a "user already exists" error
                 if "already registered" in error_msg.lower() or "already exists" in error_msg.lower():
-                    # Try to reset the user's email confirmation status and resend
+                    # Try to use resend_signup instead of invite_user_by_email
                     try:
-                        default_logger.info(f"User already exists in auth, attempting to reset and resend", 
+                        default_logger.info(f"User already exists in auth, trying resend_signup", 
                                          email=user.email)
                         
-                        # Update the user to unconfirm their email
-                        supabase.auth.admin.update_user_by_id(
-                            str(user.auth_user_id),
-                            {"email_confirmed_at": None}
-                        )
+                        # Use resend_signup which is designed for this scenario
+                        supabase.auth.admin.resend_signup({
+                            "email": user.email,
+                            "type": "signup"
+                        })
                         
-                        # Now try to send invitation again
-                        supabase.auth.admin.invite_user_by_email(
-                            email=user.email,
-                            options={"redirect_to": redirect_url}
-                        )
-                        
-                        default_logger.info(f"Invitation resent successfully after reset", email=user.email)
+                        default_logger.info(f"Signup email resent successfully", email=user.email)
                         return True
                         
-                    except Exception as reset_error:
-                        default_logger.error(f"Failed to reset and resend invitation: {str(reset_error)}", 
+                    except Exception as resend_error:
+                        default_logger.error(f"Failed to resend signup: {str(resend_error)}", 
                                            email=user.email)
-                        return False
+                        
+                        # If resend_signup fails, try to reset email_confirmed_at as last resort
+                        try:
+                            default_logger.info(f"Attempting to reset email_confirmed_at as last resort", 
+                                             email=user.email)
+                            
+                            # Update the user to unconfirm their email
+                            supabase.auth.admin.update_user_by_id(
+                                str(user.auth_user_id),
+                                {"email_confirmed_at": None}
+                            )
+                            
+                            # Now try to send invitation again
+                            supabase.auth.admin.invite_user_by_email(
+                                email=user.email,
+                                options={"redirect_to": redirect_url}
+                            )
+                            
+                            default_logger.info(f"Invitation resent successfully after reset", email=user.email)
+                            return True
+                            
+                        except Exception as reset_error:
+                            default_logger.error(f"Failed to reset and resend invitation: {str(reset_error)}", 
+                                               email=user.email)
+                            return False
                 else:
                     default_logger.error(f"Failed to send invitation: {error_msg}", email=user.email)
                     return False
