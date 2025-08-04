@@ -6,6 +6,7 @@ from app.infrastucture.logs.logger import default_logger
 import sqlalchemy
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 
 
 class DatabaseConnection:
@@ -169,29 +170,29 @@ class DirectDatabaseConnection:
 
     def configure(self, url: str):
         self._url = url
-        # Optimize database connection for production performance with better timeout handling
+        # Conservative connection pool settings to prevent connection leaks
         self._engine = create_async_engine(
             url, 
             echo=False, 
             future=True,
-            # Increased connection pool settings for better performance
-            pool_size=10,           # Increased from 5 to 10
-            max_overflow=20,        # Increased from 10 to 20 (allow up to 30 total connections)
+            # Conservative connection pool settings
+            pool_size=5,            # Reduced to 5 connections
+            max_overflow=10,        # Reduced to 10 (allow up to 15 total connections)
             pool_pre_ping=True,     # Validate connections before use
-            pool_recycle=900,       # Reduced from 1800 to 900 (15 minutes)
-            pool_timeout=30,        # Increased from 10 to 30 seconds
-            # Query performance settings with more reasonable timeouts
+            pool_recycle=300,       # Recycle connections every 5 minutes
+            pool_timeout=10,        # Reduced timeout to 10 seconds
+            # Query performance settings with strict timeouts
             connect_args={
                 "statement_cache_size": 0,  # Disable statement cache for pooled connections
                 "prepared_statement_cache_size": 0,
-                "command_timeout": 60,      # Increased from 30 to 60 seconds
+                "command_timeout": 30,      # Reduced to 30 seconds
                 "server_settings": {
-                    "application_name": "oms_backend_pooler",
-                    "tcp_keepalives_idle": "60",      # Increased for better connection stability
-                    "tcp_keepalives_interval": "30",   
+                    "application_name": "oms_backend",
+                    "tcp_keepalives_idle": "30",      # Reduced for faster cleanup
+                    "tcp_keepalives_interval": "10",   
                     "tcp_keepalives_count": "3",
-                    "statement_timeout": "60000",     # Increased from 30000 to 60000 (60 seconds)
-                    "idle_in_transaction_session_timeout": "120000"  # Increased from 60000 to 120000 (2 minutes)
+                    "statement_timeout": "30000",     # Reduced to 30 seconds
+                    "idle_in_transaction_session_timeout": "60000"  # Reduced to 1 minute
                 }
             }
         )
@@ -199,35 +200,19 @@ class DirectDatabaseConnection:
         default_logger.info("Direct SQLAlchemy connection configured with optimized settings", url=url[:20] + "...")
 
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Get async database session with proper lifecycle management and retry logic"""
+        """Get async database session with proper lifecycle management"""
         if not self._sessionmaker:
             raise ValueError("Direct database not configured. Call configure() first.")
         
-        max_retries = 3
-        retry_delay = 1.0
-        
-        for attempt in range(max_retries):
+        # Use the sessionmaker as an async context manager
+        async with self._sessionmaker() as session:
             try:
-                # Add timeout to session creation - increased timeout
-                session_task = self._sessionmaker()
-                session = await asyncio.wait_for(session_task.__aenter__(), timeout=30.0)  # Increased from 10.0 to 30.0
-                
-                try:
-                    yield session
-                    await session_task.__aexit__(None, None, None)
-                    break
-                except Exception as e:
-                    await session_task.__aexit__(type(e), e, e.__traceback__)
-                    raise
-                    
-            except (asyncio.TimeoutError, SQLAlchemyError, OSError) as e:
-                if attempt == max_retries - 1:
-                    default_logger.error(f"Database session creation failed after {max_retries} attempts: {str(e)}")
-                    raise
-                else:
-                    default_logger.warning(f"Database session creation attempt {attempt + 1} failed: {str(e)}, retrying in {retry_delay}s")
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
+                yield session
+            except Exception:
+                # Rollback on any exception
+                await session.rollback()
+                raise
+            # No commit for read-only operations - let the context manager handle cleanup
 
     async def test_connection(self) -> bool:
         if not self._engine:
@@ -256,6 +241,18 @@ class DirectDatabaseConnection:
                     await asyncio.sleep(retry_delay)
                     retry_delay *= 1.5  # Moderate exponential backoff
 
+    async def close(self):
+        """Properly close the database engine and all connections"""
+        if self._engine:
+            try:
+                default_logger.info("Disposing SQLAlchemy engine...")
+                await self._engine.dispose()
+                self._engine = None
+                self._sessionmaker = None
+                default_logger.info("SQLAlchemy engine disposed successfully")
+            except Exception as e:
+                default_logger.error(f"Error disposing SQLAlchemy engine: {str(e)}")
+
 # Global direct database connection instance
 direct_db_connection = DirectDatabaseConnection()
 
@@ -268,6 +265,31 @@ async def init_direct_database() -> None:
         return
     direct_db_connection.configure(url)
     await direct_db_connection.test_connection()
+
+async def cleanup_idle_connections():
+    """
+    Clean up idle database connections to prevent connection pool exhaustion.
+    This should be called periodically (e.g., every 2-5 minutes) from your application.
+    """
+    try:
+        async for session in direct_db_connection.get_session():
+            # Call the cleanup function
+            result = await session.execute(text("SELECT cleanup_idle_connections();"))
+            terminated_count = result.scalar()
+            
+            # Log the cleanup
+            default_logger.info(f"Connection cleanup completed: {terminated_count} connections terminated")
+            
+            # Also get current connection status
+            status_result = await session.execute(text("SELECT get_connection_status();"))
+            status = status_result.scalar()
+            
+            default_logger.info(f"Current connection status: {status}")
+            
+            break  # Exit after first iteration
+            
+    except Exception as e:
+        default_logger.error(f"Failed to cleanup idle connections: {str(e)}")
 
 
 def get_database() -> Client:

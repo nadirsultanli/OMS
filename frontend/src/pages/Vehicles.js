@@ -167,8 +167,8 @@ const Vehicles = () => {
         loadVehicleInventoryBatch(vehiclesData);
         setPagination(prev => ({
           ...prev,
-          total: result.data.count || 0,
-          totalPages: Math.ceil((result.data.count || 0) / prev.limit)
+          total: result.data.total || 0,
+          totalPages: Math.ceil((result.data.total || 0) / prev.limit)
         }));
       } else {
         setMessage({ type: 'error', text: result.error });
@@ -1040,71 +1040,39 @@ const EditVehicleModal = ({ vehicle, warehouses, onClose, onSubmit, errors }) =>
 
 const VehicleInventoryModal = ({ vehicle, onClose }) => {
   const [inventoryData, setInventoryData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchInventoryWithNames = async () => {
+    const processInventoryData = () => {
       try {
         setLoading(true);
+        // Use the inventory data that's already provided by the backend
+        // The backend now returns product_name and variant_name directly
         const inventory = (vehicle.truck_inventory && vehicle.truck_inventory.length > 0) 
           ? vehicle.truck_inventory 
           : vehicle.inventory || [];
 
-        // Fetch product and variant names for better display
-        const enrichedInventory = await Promise.all(
-          inventory.map(async (item) => {
-            try {
-              // Fetch product name
-              let productName = 'Unknown Product';
-              if (item.product_id) {
-                const productResponse = await fetch(`/api/products/${item.product_id}`);
-                if (productResponse.ok) {
-                  const productData = await productResponse.json();
-                  productName = productData.name || 'Unknown Product';
-                }
-              }
+        // Process the inventory data - backend already provides product_name and variant_name
+        const processedInventory = inventory.map((item) => {
+          return {
+            ...item,
+            product_name: item.product_name || 'Unknown Product',
+            variant_name: item.variant_name || 'Unknown Variant',
+            unit_cost: item.unit_cost || 0,
+            total_cost: item.total_cost || 0
+          };
+        });
 
-              // Fetch variant name
-              let variantName = 'Unknown Variant';
-              if (item.variant_id) {
-                const variantResponse = await fetch(`/api/variants/${item.variant_id}`);
-                if (variantResponse.ok) {
-                  const variantData = await variantResponse.json();
-                  variantName = variantData.sku || 'Unknown Variant';
-                }
-              }
-
-              return {
-                ...item,
-                product_name: productName,
-                variant_name: variantName,
-                // Calculate costs if not present
-                unit_cost: item.unit_cost || 0,
-                total_cost: item.total_cost || (item.unit_cost * (item.quantity || item.loaded_qty || 0)) || 0
-              };
-            } catch (error) {
-              console.error('Error fetching product/variant details:', error);
-              return {
-                ...item,
-                product_name: 'Unknown Product',
-                variant_name: 'Unknown Variant',
-                unit_cost: item.unit_cost || 0,
-                total_cost: item.total_cost || 0
-              };
-            }
-          })
-        );
-
-        setInventoryData(enrichedInventory);
+        setInventoryData(processedInventory);
       } catch (error) {
-        console.error('Error fetching inventory data:', error);
+        console.error('Error processing inventory data:', error);
         setInventoryData([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchInventoryWithNames();
+    processInventoryData();
   }, [vehicle]);
 
   return (

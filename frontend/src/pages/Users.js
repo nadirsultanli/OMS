@@ -58,7 +58,7 @@ const Users = () => {
         setUsers(result.data.results || []);
         setPagination(prev => ({
           ...prev,
-          total: result.data.count || 0
+          total: result.data.total || 0
         }));
       } else {
         setErrors({ general: result.error });

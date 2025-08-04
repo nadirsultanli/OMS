@@ -24,8 +24,8 @@ class VariantRepository(ABC):
         pass
     
     @abstractmethod
-    async def get_variants_by_product(self, product_id: UUID) -> List[Variant]:
-        """Get all variants for a specific product"""
+    async def get_variants_by_product(self, product_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all variants for a specific product with pagination"""
         pass
     
     @abstractmethod
@@ -44,38 +44,38 @@ class VariantRepository(ABC):
         pass
     
     @abstractmethod
-    async def get_variants_by_status(self, tenant_id: UUID, status: ProductStatus) -> List[Variant]:
-        """Get variants by status within a tenant"""
+    async def get_variants_by_status(self, tenant_id: UUID, status: ProductStatus, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get variants by status within a tenant with pagination"""
         pass
     
     @abstractmethod
-    async def get_variants_by_scenario(self, tenant_id: UUID, scenario: ProductScenario) -> List[Variant]:
-        """Get variants by scenario within a tenant"""
+    async def get_variants_by_scenario(self, tenant_id: UUID, scenario: ProductScenario, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get variants by scenario within a tenant with pagination"""
         pass
     
     @abstractmethod
-    async def get_active_variants(self, tenant_id: UUID) -> List[Variant]:
-        """Get all active variants for a tenant"""
+    async def get_active_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all active variants for a tenant with pagination"""
         pass
     
     @abstractmethod
-    async def get_physical_variants(self, tenant_id: UUID) -> List[Variant]:
-        """Get all physical variants (CYL*) for a tenant"""
+    async def get_physical_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all physical variants (CYL*) for a tenant with pagination"""
         pass
     
     @abstractmethod
-    async def get_gas_services(self, tenant_id: UUID) -> List[Variant]:
-        """Get all gas service variants (GAS*) for a tenant"""
+    async def get_gas_services(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all gas service variants (GAS*) for a tenant with pagination"""
         pass
     
     @abstractmethod
-    async def get_deposit_variants(self, tenant_id: UUID) -> List[Variant]:
-        """Get all deposit variants (DEP*) for a tenant"""
+    async def get_deposit_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all deposit variants (DEP*) for a tenant with pagination"""
         pass
     
     @abstractmethod
-    async def get_bundle_variants(self, tenant_id: UUID) -> List[Variant]:
-        """Get all bundle variants (KIT*) for a tenant"""
+    async def get_bundle_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all bundle variants (KIT*) for a tenant with pagination"""
         pass
     
     @abstractmethod

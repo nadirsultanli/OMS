@@ -190,8 +190,8 @@ class SQLAlchemyOrderRepository(OrderRepository):
         
         return self._to_order_entity(model) if model else None
 
-    async def get_orders_by_customer(self, customer_id: str, tenant_id: UUID) -> List[Order]:
-        """Get all orders for a specific customer (optimized - no order lines)"""
+    async def get_orders_by_customer(self, customer_id: str, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
+        """Get all orders for a specific customer with pagination (optimized - no order lines)"""
         stmt = (
             select(OrderModel)
             .where(
@@ -202,14 +202,16 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 )
             )
             .order_by(OrderModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         
         return [self._to_order_entity(model) for model in models]
 
-    async def get_orders_by_status(self, status: OrderStatus, tenant_id: UUID) -> List[Order]:
-        """Get all orders with a specific status (optimized - no order lines)"""
+    async def get_orders_by_status(self, status: OrderStatus, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
+        """Get all orders with a specific status with pagination (optimized - no order lines)"""
         stmt = (
             select(OrderModel)
             .where(
@@ -220,6 +222,8 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 )
             )
             .order_by(OrderModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
         result = await self.session.execute(stmt)
         models = result.scalars().all()

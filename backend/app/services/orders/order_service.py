@@ -89,13 +89,13 @@ class OrderService:
         
         return order
 
-    async def get_orders_by_customer(self, customer_id: str, tenant_id: UUID) -> List[Order]:
-        """Get all orders for a customer"""
-        return await self.order_repository.get_orders_by_customer(customer_id, tenant_id)
+    async def get_orders_by_customer(self, customer_id: str, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
+        """Get all orders for a customer with pagination"""
+        return await self.order_repository.get_orders_by_customer(customer_id, tenant_id, limit, offset)
 
-    async def get_orders_by_status(self, status: OrderStatus, tenant_id: UUID) -> List[Order]:
-        """Get all orders with a specific status"""
-        return await self.order_repository.get_orders_by_status(status, tenant_id)
+    async def get_orders_by_status(self, status: OrderStatus, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
+        """Get all orders with a specific status with pagination"""
+        return await self.order_repository.get_orders_by_status(status, tenant_id, limit, offset)
 
     async def get_orders_by_statuses(self, statuses: List[OrderStatus], tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
         """Get all orders with any of the specified statuses"""

@@ -224,10 +224,13 @@ class VehicleWarehouseService:
             total_weight_kg = 0.0
             total_volume_m3 = 0.0
             
-            # Import the database session to query truck_inventory directly
+            # Import the database session and models to query truck_inventory with product/variant details
             from app.infrastucture.database.connection import direct_db_connection
             from app.infrastucture.database.models.truck_inventory import TruckInventoryModel
-            from sqlalchemy import select, and_
+            from app.infrastucture.database.models.products import Product
+            from app.infrastucture.database.models.variants import Variant
+            from sqlalchemy import select, and_, join
+            from sqlalchemy.orm import selectinload
             
             # Get tenant ID from user context or fallback to a default
             if user and user.tenant_id:
@@ -238,8 +241,19 @@ class VehicleWarehouseService:
             
             # Get database session using the direct connection
             async for session in direct_db_connection.get_session():
-                # Get truck inventory for this vehicle and trip
-                truck_inventory_query = select(TruckInventoryModel).where(
+                # Get truck inventory with product and variant details using JOIN
+                truck_inventory_query = select(
+                    TruckInventoryModel,
+                    Product.name.label('product_name'),
+                    Variant.sku.label('variant_name'),
+                    Variant.unit_weight_kg,
+                    Variant.unit_volume_m3,
+                    Variant.default_price.label('unit_cost')
+                ).join(
+                    Variant, TruckInventoryModel.variant_id == Variant.id
+                ).join(
+                    Product, Variant.product_id == Product.id
+                ).where(
                     and_(
                         TruckInventoryModel.vehicle_id == vehicle_id,
                         TruckInventoryModel.trip_id == trip_id if trip_id else True
@@ -247,64 +261,50 @@ class VehicleWarehouseService:
                 )
                 
                 result = await session.execute(truck_inventory_query)
-                truck_inventory_records = result.scalars().all()
+                truck_inventory_records = result.all()
                 
                 default_logger.info(f"Found {len(truck_inventory_records)} truck inventory records for vehicle {vehicle_id}")
                 
-                # Get variant details for weight and volume calculations
-                variant_details = {}
-                if self.variant_service and truck_inventory_records:
-                    for record in truck_inventory_records:
-                        try:
-                            variant = await self.variant_service.get_variant_by_id(record.variant_id)
-                            if variant:
-                                variant_details[str(record.variant_id)] = {
-                                    'unit_weight_kg': float(getattr(variant, 'unit_weight_kg', 27.0)),
-                                    'unit_volume_m3': float(getattr(variant, 'unit_volume_m3', 0.036)),
-                                    'product_id': str(getattr(variant, 'product_id', record.variant_id))
-                                }
-                        except Exception as e:
-                            default_logger.warning(f"Failed to fetch variant details for {record.variant_id}: {e}")
-                
-                # Fallback weights for variants without database details
+                # Fallback weights and costs for variants without database details
                 default_weight_kg = 27.0  # Default cylinder weight
                 default_volume_m3 = 0.036  # Default cylinder volume
+                default_cost = 0.0  # Default cost
                 
                 # Convert truck inventory records to inventory format
                 for record in truck_inventory_records:
-                    variant_id_str = str(record.variant_id)
-                    variant_info = variant_details.get(variant_id_str, {
-                        'unit_weight_kg': default_weight_kg,
-                        'unit_volume_m3': default_volume_m3,
-                        'product_id': str(record.product_id)
-                    })
+                    # Extract data from the joined result
+                    truck_inv = record[0]  # TruckInventoryModel
+                    product_name = record[1] or "Unknown Product"  # Product.name
+                    variant_name = record[2] or "Unknown Variant"  # Variant.sku
+                    unit_weight_kg = float(record[3]) if record[3] is not None else default_weight_kg
+                    unit_volume_m3 = float(record[4]) if record[4] is not None else default_volume_m3
+                    unit_cost = float(record[5]) if record[5] is not None else default_cost
                     
-                    unit_weight_kg = variant_info['unit_weight_kg']
-                    unit_volume_m3 = variant_info['unit_volume_m3']
-                    product_id = variant_info['product_id']
-                    
-                    remaining_qty = float(record.loaded_qty - record.delivered_qty)
+                    remaining_qty = float(truck_inv.loaded_qty - truck_inv.delivered_qty)
                     item_weight = unit_weight_kg * remaining_qty
                     item_volume = unit_volume_m3 * remaining_qty
+                    total_cost = unit_cost * remaining_qty
                     
                     total_weight_kg += item_weight
                     total_volume_m3 += item_volume
                     
                     truck_inventory_items.append({
-                        "product_id": product_id,
-                        "variant_id": str(record.variant_id),
-                        "loaded_qty": float(record.loaded_qty),
-                        "delivered_qty": float(record.delivered_qty),
+                        "product_id": str(truck_inv.product_id),
+                        "variant_id": str(truck_inv.variant_id),
+                        "product_name": product_name,
+                        "variant_name": variant_name,
+                        "loaded_qty": float(truck_inv.loaded_qty),
+                        "delivered_qty": float(truck_inv.delivered_qty),
                         "remaining_qty": remaining_qty,
-                        "empties_expected_qty": float(record.empties_expected_qty),
-                        "empties_collected_qty": float(record.empties_collected_qty),
+                        "empties_expected_qty": float(truck_inv.empties_expected_qty),
+                        "empties_collected_qty": float(truck_inv.empties_collected_qty),
                         "unit_weight_kg": unit_weight_kg,
                         "unit_volume_m3": unit_volume_m3,
+                        "unit_cost": unit_cost,
+                        "total_cost": total_cost,
                         "total_weight_kg": item_weight,
                         "total_volume_m3": item_volume
                     })
-                
-                break  # Exit the async for loop after first iteration
             
             # Convert to inventory format for API
             # Note: Vehicles are not warehouses, so we don't create stock level entries
@@ -314,12 +314,14 @@ class VehicleWarehouseService:
                     "warehouse_id": None,  # Vehicle is not a warehouse
                     "variant_id": item["variant_id"],
                     "product_id": item["product_id"],
+                    "product_name": item["product_name"],
+                    "variant_name": item["variant_name"],
                     "stock_status": "TRUCK_STOCK",
                     "quantity": item["remaining_qty"],
                     "reserved_qty": 0.0,  # No reservations on vehicle
                     "available_qty": item["remaining_qty"],
-                    "unit_cost": 0.0,  # Cost not tracked in truck inventory
-                    "total_cost": 0.0,
+                    "unit_cost": item["unit_cost"],
+                    "total_cost": item["total_cost"],
                     "unit_weight_kg": item["unit_weight_kg"],
                     "unit_volume_m3": item["unit_volume_m3"],
                     "total_weight_kg": item["total_weight_kg"],

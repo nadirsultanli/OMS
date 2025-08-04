@@ -235,9 +235,9 @@ class VariantService:
         """Get variant by SKU"""
         return await self.variant_repository.get_variant_by_sku(tenant_id, sku)
     
-    async def get_variants_by_product(self, product_id: UUID) -> List[Variant]:
-        """Get all variants for a product"""
-        return await self.variant_repository.get_variants_by_product(product_id)
+    async def get_variants_by_product(self, product_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all variants for a product with pagination"""
+        return await self.variant_repository.get_variants_by_product(product_id, limit, offset)
     
     async def get_all_variants(
         self, 
@@ -251,38 +251,42 @@ class VariantService:
     async def get_variants_by_status(
         self, 
         tenant_id: UUID, 
-        status: ProductStatus
+        status: ProductStatus,
+        limit: int = 100,
+        offset: int = 0
     ) -> List[Variant]:
-        """Get variants by status"""
-        return await self.variant_repository.get_variants_by_status(tenant_id, status)
+        """Get variants by status with pagination"""
+        return await self.variant_repository.get_variants_by_status(tenant_id, status, limit, offset)
     
     async def get_variants_by_scenario(
         self, 
         tenant_id: UUID, 
-        scenario: ProductScenario
+        scenario: ProductScenario,
+        limit: int = 100,
+        offset: int = 0
     ) -> List[Variant]:
-        """Get variants by scenario"""
-        return await self.variant_repository.get_variants_by_scenario(tenant_id, scenario)
+        """Get variants by scenario with pagination"""
+        return await self.variant_repository.get_variants_by_scenario(tenant_id, scenario, limit, offset)
     
-    async def get_active_variants(self, tenant_id: UUID) -> List[Variant]:
-        """Get all active variants"""
-        return await self.variant_repository.get_active_variants(tenant_id)
+    async def get_active_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all active variants with pagination"""
+        return await self.variant_repository.get_active_variants(tenant_id, limit, offset)
     
-    async def get_physical_variants(self, tenant_id: UUID) -> List[Variant]:
-        """Get all physical variants (CYL*)"""
-        return await self.variant_repository.get_physical_variants(tenant_id)
+    async def get_physical_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all physical variants (CYL*) with pagination"""
+        return await self.variant_repository.get_physical_variants(tenant_id, limit, offset)
     
-    async def get_gas_services(self, tenant_id: UUID) -> List[Variant]:
-        """Get all gas service variants (GAS*)"""
-        return await self.variant_repository.get_gas_services(tenant_id)
+    async def get_gas_services(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all gas service variants (GAS*) with pagination"""
+        return await self.variant_repository.get_gas_services(tenant_id, limit, offset)
     
-    async def get_deposit_variants(self, tenant_id: UUID) -> List[Variant]:
-        """Get all deposit variants (DEP*)"""
-        return await self.variant_repository.get_deposit_variants(tenant_id)
+    async def get_deposit_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all deposit variants (DEP*) with pagination"""
+        return await self.variant_repository.get_deposit_variants(tenant_id, limit, offset)
     
-    async def get_bundle_variants(self, tenant_id: UUID) -> List[Variant]:
-        """Get all bundle variants (KIT*)"""
-        return await self.variant_repository.get_bundle_variants(tenant_id)
+    async def get_bundle_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all bundle variants (KIT*) with pagination"""
+        return await self.variant_repository.get_bundle_variants(tenant_id, limit, offset)
     
     async def update_variant(
         self,

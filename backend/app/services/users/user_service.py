@@ -96,9 +96,9 @@ class UserService:
             frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
             if role.value.lower() == "driver":
                 driver_frontend_url = os.getenv("DRIVER_FRONTEND_URL", "https://omsfrontend.netlify.app")
-                redirect_url = driver_frontend_url
+                redirect_url = f"{driver_frontend_url}/accept-invitation"
             else:
-                redirect_url = frontend_url
+                redirect_url = f"{frontend_url}/accept-invitation"
             
             # Step 1: Create Supabase Auth user first (MANDATORY)
             auth_user_id = None
@@ -381,9 +381,9 @@ class UserService:
             frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
             if user.role.value.lower() == "driver":
                 driver_frontend_url = os.getenv("DRIVER_FRONTEND_URL", "https://omsfrontend.netlify.app")
-                redirect_url = driver_frontend_url
+                redirect_url = f"{driver_frontend_url}/accept-invitation"
             else:
-                redirect_url = frontend_url
+                redirect_url = f"{frontend_url}/accept-invitation"
             
             supabase = get_supabase_admin_client_sync()
             
@@ -768,14 +768,13 @@ class UserService:
                 default_logger.warning(f"Could not check existing auth users: {str(e)}")
             
             # Configure redirect URL based on role
-            # Note: Supabase will redirect to the root URL with auth parameters
-            # Our AuthCallback component will then route to the appropriate page
+            # Redirect to the invitation acceptance page where users can set their password
             frontend_url = os.getenv("FRONTEND_URL", "https://omsfrontend.netlify.app")
             if role.value.lower() == "driver":
                 driver_frontend_url = os.getenv("DRIVER_FRONTEND_URL", "https://omsfrontend.netlify.app")
-                redirect_url = driver_frontend_url
+                redirect_url = f"{driver_frontend_url}/accept-invitation"
             else:
-                redirect_url = frontend_url
+                redirect_url = f"{frontend_url}/accept-invitation"
             
             # Step 1: Create user in Supabase Auth FIRST (mandatory)
             auth_user_id = None

@@ -454,19 +454,23 @@ async def get_orders(
 @router.get("/customer/{customer_id}", response_model=OrderSummaryListResponse)
 async def get_orders_by_customer(
     customer_id: str,
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     order_service: OrderService = Depends(get_order_service),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all orders for a specific customer"""
+    """Get all orders for a specific customer with pagination"""
     logger.info(
         "Getting orders by customer",
         user_id=str(current_user.id),
         tenant_id=str(current_user.tenant_id),
-        customer_id=customer_id
+        customer_id=customer_id,
+        limit=limit,
+        offset=offset
     )
     
     try:
-        orders = await order_service.get_orders_by_customer(customer_id, current_user.tenant_id)
+        orders = await order_service.get_orders_by_customer(customer_id, current_user.tenant_id, limit, offset)
         
         # Convert to summary responses
         order_summaries = []
@@ -477,8 +481,8 @@ async def get_orders_by_customer(
         return OrderSummaryListResponse(
             orders=order_summaries,
             total=len(order_summaries),
-            limit=len(order_summaries),
-            offset=0
+            limit=limit,
+            offset=offset
         )
     except Exception as e:
         logger.error(
@@ -495,15 +499,19 @@ async def get_orders_by_customer(
 @router.get("/status/{status}", response_model=OrderSummaryListResponse)
 async def get_orders_by_status(
     status: str,
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     order_service: OrderService = Depends(get_order_service),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all orders with a specific status"""
+    """Get all orders with a specific status with pagination"""
     logger.info(
         "Getting orders by status",
         user_id=str(current_user.id),
         tenant_id=str(current_user.tenant_id),
-        status=status
+        status=status,
+        limit=limit,
+        offset=offset
     )
     
     try:
@@ -513,7 +521,7 @@ async def get_orders_by_status(
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order status")
         
-        orders = await order_service.get_orders_by_status(order_status, current_user.tenant_id)
+        orders = await order_service.get_orders_by_status(order_status, current_user.tenant_id, limit, offset)
         
         # Convert to summary responses
         order_summaries = []
@@ -524,8 +532,8 @@ async def get_orders_by_status(
         return OrderSummaryListResponse(
             orders=order_summaries,
             total=len(order_summaries),
-            limit=len(order_summaries),
-            offset=0
+            limit=limit,
+            offset=offset
         )
     except HTTPException:
         raise

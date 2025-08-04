@@ -306,61 +306,69 @@ async def get_variant_relationships(
 @router.get("/by-type/physical", response_model=VariantListResponse)
 async def get_physical_variants(
     tenant_id: str = Query(..., description="Tenant ID"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     variant_service: VariantService = Depends(get_variant_service)
 ):
-    """Get all physical variants (CYL* - items that affect inventory)"""
-    variants = await variant_service.get_physical_variants(UUID(tenant_id))
+    """Get all physical variants (CYL* - items that affect inventory) with pagination"""
+    variants = await variant_service.get_physical_variants(UUID(tenant_id), limit, offset)
     variant_responses = [VariantResponse(**variant.to_dict()) for variant in variants]
     return VariantListResponse(
         variants=variant_responses,
         total=len(variant_responses),
-        limit=len(variant_responses),
-        offset=0
+        limit=limit,
+        offset=offset
     )
 
 @router.get("/by-type/gas-services", response_model=VariantListResponse)
 async def get_gas_services(
     tenant_id: str = Query(..., description="Tenant ID"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     variant_service: VariantService = Depends(get_variant_service)
 ):
-    """Get all gas service variants (GAS* - pure revenue items)"""
-    variants = await variant_service.get_gas_services(UUID(tenant_id))
+    """Get all gas service variants (GAS* - pure revenue items) with pagination"""
+    variants = await variant_service.get_gas_services(UUID(tenant_id), limit, offset)
     variant_responses = [VariantResponse(**variant.to_dict()) for variant in variants]
     return VariantListResponse(
         variants=variant_responses,
         total=len(variant_responses),
-        limit=len(variant_responses),
-        offset=0
+        limit=limit,
+        offset=offset
     )
 
 @router.get("/by-type/deposits", response_model=VariantListResponse)
 async def get_deposit_variants(
     tenant_id: str = Query(..., description="Tenant ID"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     variant_service: VariantService = Depends(get_variant_service)
 ):
-    """Get all deposit variants (DEP* - customer liability items)"""
-    variants = await variant_service.get_deposit_variants(UUID(tenant_id))
+    """Get all deposit variants (DEP* - customer liability items) with pagination"""
+    variants = await variant_service.get_deposit_variants(UUID(tenant_id), limit, offset)
     variant_responses = [VariantResponse(**variant.to_dict()) for variant in variants]
     return VariantListResponse(
         variants=variant_responses,
         total=len(variant_responses),
-        limit=len(variant_responses),
-        offset=0
+        limit=limit,
+        offset=offset
     )
 
 @router.get("/by-type/bundles", response_model=VariantListResponse)
 async def get_bundle_variants(
     tenant_id: str = Query(..., description="Tenant ID"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     variant_service: VariantService = Depends(get_variant_service)
 ):
-    """Get all bundle variants (KIT* - convenience packages)"""
-    variants = await variant_service.get_bundle_variants(UUID(tenant_id))
+    """Get all bundle variants (KIT* - convenience packages) with pagination"""
+    variants = await variant_service.get_bundle_variants(UUID(tenant_id), limit, offset)
     variant_responses = [VariantResponse(**variant.to_dict()) for variant in variants]
     return VariantListResponse(
         variants=variant_responses,
         total=len(variant_responses),
-        limit=len(variant_responses),
-        offset=0
+        limit=limit,
+        offset=offset
     )
 
 # New Atomic SKU Endpoints

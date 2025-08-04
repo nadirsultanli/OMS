@@ -1,4 +1,6 @@
 import os
+import signal
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, Request, Depends, HTTPException
@@ -33,6 +35,7 @@ from app.presentation.api.stripe.stripe import router as stripe_router
 from app.presentation.api.invoices.invoice import router as invoice_router
 from app.presentation.api.payments.payment import router as payment_router
 from app.presentation.api.tenant_subscriptions.tenant_subscription import router as subscription_router
+from app.presentation.api.system.maintenance import router as maintenance_router
 import sqlalchemy
 from app.core.auth_middleware import conditional_auth
 from app.core.audit_middleware import AuditMiddleware
@@ -79,8 +82,36 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Shutdown
+    # Shutdown - Clean up all database connections
     default_logger.info("Shutting down OMS Backend application...")
+    
+    # Clean up direct SQLAlchemy connections
+    try:
+        if not should_use_railway_mode() and direct_db_connection._engine:
+            await direct_db_connection.close()
+    except Exception as e:
+        default_logger.error(f"Error closing direct SQLAlchemy connections: {str(e)}")
+    
+    # Clean up Supabase connections
+    try:
+        from app.infrastucture.database.connection import db_connection
+        if db_connection._client:
+            default_logger.info("Cleaning up Supabase client connections...")
+            # Supabase client cleanup (if it has a close method)
+            if hasattr(db_connection._client, 'close'):
+                db_connection._client.close()
+            db_connection._client = None
+            
+        if db_connection._admin_client:
+            if hasattr(db_connection._admin_client, 'close'):
+                db_connection._admin_client.close()
+            db_connection._admin_client = None
+            
+        default_logger.info("Supabase client connections cleaned up successfully")
+    except Exception as e:
+        default_logger.error(f"Error cleaning up Supabase connections: {str(e)}")
+    
+    default_logger.info("Application shutdown completed")
 
 
 app = FastAPI(
@@ -156,6 +187,16 @@ app = FastAPI(
         }
     ]
 )
+
+# Signal handler for graceful shutdown
+def signal_handler(signum, frame):
+    """Handle termination signals to ensure graceful shutdown"""
+    default_logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+    # FastAPI's lifespan manager will handle the actual cleanup
+
+# Register signal handlers
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 # Setup logging
 setup_logging(app, log_level=LOG_LEVEL)
@@ -295,6 +336,7 @@ app.include_router(stripe_router, prefix="/api/v1")
 app.include_router(invoice_router, prefix="/api/v1")
 app.include_router(payment_router, prefix="/api/v1")
 app.include_router(subscription_router, prefix="/api/v1")
+app.include_router(maintenance_router, prefix="/api/v1")
 
 
 def custom_openapi():

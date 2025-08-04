@@ -133,8 +133,8 @@ const Trips = () => {
         setTrips(result.data.results || []);
         setPagination(prev => ({
           ...prev,
-          total: result.data.count || 0,
-          totalPages: Math.ceil((result.data.count || 0) / prev.limit)
+          total: result.data.total || 0,
+          totalPages: Math.ceil((result.data.total || 0) / prev.limit)
         }));
       } else {
         setMessage({ type: 'error', text: result.error });

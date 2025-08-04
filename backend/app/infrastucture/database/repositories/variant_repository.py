@@ -131,14 +131,14 @@ class VariantRepositoryImpl(VariantRepository):
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
     
-    async def get_variants_by_product(self, product_id: UUID) -> List[VariantEntity]:
-        """Get all variants for a specific product"""
+    async def get_variants_by_product(self, product_id: UUID, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get all variants for a specific product with pagination"""
         stmt = select(VariantModel).where(
             and_(
                 VariantModel.product_id == product_id,
                 VariantModel.deleted_at.is_(None)
             )
-        )
+        ).limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
@@ -151,7 +151,6 @@ class VariantRepositoryImpl(VariantRepository):
                 VariantModel.deleted_at.is_(None)
             )
         ).limit(limit).offset(offset)
-        
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
@@ -197,93 +196,93 @@ class VariantRepositoryImpl(VariantRepository):
         await self.session.commit()
         return True
     
-    async def get_variants_by_status(self, tenant_id: UUID, status: ProductStatus) -> List[VariantEntity]:
-        """Get variants by status within a tenant"""
+    async def get_variants_by_status(self, tenant_id: UUID, status: ProductStatus, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get variants by status within a tenant with pagination"""
         stmt = select(VariantModel).where(
             and_(
                 VariantModel.tenant_id == tenant_id,
                 VariantModel.status == status.value,
                 VariantModel.deleted_at.is_(None)
             )
-        )
+        ).limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
     
-    async def get_variants_by_scenario(self, tenant_id: UUID, scenario: ProductScenario) -> List[VariantEntity]:
-        """Get variants by scenario within a tenant"""
+    async def get_variants_by_scenario(self, tenant_id: UUID, scenario: ProductScenario, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get variants by scenario within a tenant with pagination"""
         stmt = select(VariantModel).where(
             and_(
                 VariantModel.tenant_id == tenant_id,
                 VariantModel.scenario == scenario.value,
                 VariantModel.deleted_at.is_(None)
             )
-        )
+        ).limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
     
-    async def get_active_variants(self, tenant_id: UUID) -> List[VariantEntity]:
-        """Get all active variants for a tenant"""
+    async def get_active_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get all active variants for a tenant with pagination"""
         stmt = select(VariantModel).where(
             and_(
                 VariantModel.tenant_id == tenant_id,
                 VariantModel.active == True,
                 VariantModel.deleted_at.is_(None)
             )
-        )
+        ).limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
     
-    async def get_physical_variants(self, tenant_id: UUID) -> List[VariantEntity]:
-        """Get all physical variants (CYL*) for a tenant"""
+    async def get_physical_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get all physical variants (CYL*) for a tenant with pagination"""
         stmt = select(VariantModel).where(
             and_(
                 VariantModel.tenant_id == tenant_id,
                 VariantModel.sku.like('CYL%'),
                 VariantModel.deleted_at.is_(None)
             )
-        )
+        ).limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
     
-    async def get_gas_services(self, tenant_id: UUID) -> List[VariantEntity]:
-        """Get all gas service variants (GAS*) for a tenant"""
+    async def get_gas_services(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get all gas service variants (GAS*) for a tenant with pagination"""
         stmt = select(VariantModel).where(
             and_(
                 VariantModel.tenant_id == tenant_id,
                 VariantModel.sku.like('GAS%'),
                 VariantModel.deleted_at.is_(None)
             )
-        )
+        ).limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
     
-    async def get_deposit_variants(self, tenant_id: UUID) -> List[VariantEntity]:
-        """Get all deposit variants (DEP*) for a tenant"""
+    async def get_deposit_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get all deposit variants (DEP*) for a tenant with pagination"""
         stmt = select(VariantModel).where(
             and_(
                 VariantModel.tenant_id == tenant_id,
                 VariantModel.sku.like('DEP%'),
                 VariantModel.deleted_at.is_(None)
             )
-        )
+        ).limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
     
-    async def get_bundle_variants(self, tenant_id: UUID) -> List[VariantEntity]:
-        """Get all bundle variants (KIT*) for a tenant"""
+    async def get_bundle_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get all bundle variants (KIT*) for a tenant with pagination"""
         stmt = select(VariantModel).where(
             and_(
                 VariantModel.tenant_id == tenant_id,
                 VariantModel.sku.like('KIT%'),
                 VariantModel.deleted_at.is_(None)
             )
-        )
+        ).limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]

@@ -35,7 +35,7 @@ const Variants = () => {
   // Pagination state
   const [pagination, setPagination] = useState({
     total: 0,
-    limit: 20,
+    limit: 100, // Increased from 20 to 100 to show all variants
     offset: 0,
     currentPage: 1,
     totalPages: 1
@@ -61,8 +61,11 @@ const Variants = () => {
   const [errors, setErrors] = useState({});
   
   useEffect(() => {
-    fetchProducts();
-    fetchVariants();
+    const initializeData = async () => {
+      await fetchProducts(); // Load products first
+      await fetchVariants(); // Then load variants
+    };
+    initializeData();
   }, []);
   
   // Auto-search when text changes
@@ -87,29 +90,29 @@ const Variants = () => {
     setLoading(true);
     try {
       const params = {
-        productId: appliedFilters.productId,
-        skuType: appliedFilters.skuType,
-        isStockItem: appliedFilters.isStockItem === '' ? undefined : appliedFilters.isStockItem === 'true',
+        product_id: appliedFilters.productId, // Map productId to product_id for backend
+        sku_type: appliedFilters.skuType, // Map skuType to sku_type for backend
+        is_stock_item: appliedFilters.isStockItem === '' ? undefined : appliedFilters.isStockItem === 'true',
         limit: pagination.limit,
         offset: (pagination.currentPage - 1) * pagination.limit
       };
       
       const result = await variantService.getVariants(null, params);
       if (result.success) {
-        // Filter by search term
-        let filteredVariants = result.data.variants || [];
-        let totalCount = result.data.count || filteredVariants.length;
+        let variants = result.data.variants || [];
+        let totalCount = result.data.total || 0; // Changed from count to total
         
+        // Apply client-side search filtering if search term is provided
         if (appliedFilters.search) {
           const search = appliedFilters.search.toLowerCase();
-          filteredVariants = filteredVariants.filter(v => 
+          variants = variants.filter(v => 
             v.sku.toLowerCase().includes(search) ||
             (v.state_attr && v.state_attr.toLowerCase().includes(search))
           );
-          totalCount = filteredVariants.length;
+          totalCount = variants.length;
         }
         
-        setVariants(filteredVariants);
+        setVariants(variants);
         setPagination(prev => ({
           ...prev,
           total: totalCount,
@@ -366,8 +369,9 @@ const Variants = () => {
   };
   
   const getProductName = (productId) => {
+    if (!productId) return '-';
     const product = products.find(p => p.id === productId);
-    return product ? product.name : '-';
+    return product ? product.name : `Product ${productId.slice(0, 8)}...`;
   };
   
   return (

@@ -26,13 +26,13 @@ class OrderRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_orders_by_customer(self, customer_id: str, tenant_id: UUID) -> List[Order]:
-        """Get all orders for a specific customer"""
+    async def get_orders_by_customer(self, customer_id: str, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
+        """Get all orders for a specific customer with pagination"""
         pass
 
     @abstractmethod
-    async def get_orders_by_status(self, status: OrderStatus, tenant_id: UUID) -> List[Order]:
-        """Get all orders with a specific status"""
+    async def get_orders_by_status(self, status: OrderStatus, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Order]:
+        """Get all orders with a specific status with pagination"""
         pass
 
     @abstractmethod
