@@ -32,23 +32,35 @@ async def get_current_user(
         if token.startswith("google_session_"):
             # Handle Google OAuth token
             user_id = token.replace("google_session_", "")
+            default_logger.info(f"Google OAuth token detected for user_id: {user_id}")
             
-            # Get user by ID directly
-            user = await user_service.get_user_by_id(user_id)
-            
-            if not user:
+            try:
+                # Get user by ID directly
+                user = await user_service.get_user_by_id(user_id)
+                
+                if not user:
+                    default_logger.warning(f"Google OAuth: User not found for ID: {user_id}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="User not found"
+                    )
+                
+                if user.status != UserStatus.ACTIVE:
+                    default_logger.warning(f"Google OAuth: User account not active for: {user.email}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="User account is not active"
+                    )
+                
+                default_logger.info(f"Google OAuth authentication successful for: {user.email}")
+                return user
+                
+            except Exception as google_auth_error:
+                default_logger.error(f"Google OAuth authentication failed: {str(google_auth_error)}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User not found"
+                    detail="Google OAuth authentication failed"
                 )
-            
-            if user.status != UserStatus.ACTIVE:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User account is not active"
-                )
-            
-            return user
         
         # Handle regular JWT tokens
         # Use local JWT verification only (no network calls)

@@ -68,119 +68,23 @@ async def google_callback(
                 status_code=302
             )
         
-        # Get Supabase client for auth operations
-        supabase = get_supabase_admin_client_sync()
+        # Generate tokens that work with the existing auth system
+        # Skip Supabase auth user creation - just use our existing user data
+        # The existing auth dependency already supports google_session_* tokens
+        access_token = f"google_session_{user_data['user_id']}"
+        refresh_token = f"refresh_google_{user_data['user_id']}"
         
-        try:
-            # Check if user exists in Supabase Auth
-            existing_auth_user = None
-            try:
-                auth_users = supabase.auth.admin.list_users()
-                for su_user in auth_users.users:
-                    if su_user.email == email:
-                        existing_auth_user = su_user
-                        break
-            except Exception as list_error:
-                logger.warning(f"Failed to list Supabase users: {str(list_error)}")
-            
-            # If user doesn't exist in Supabase Auth, create them
-            if not existing_auth_user:
-                logger.info(f"Creating new Supabase auth user for: {email}")
-                try:
-                    create_response = supabase.auth.admin.create_user({
-                        "email": email,
-                        "email_confirm": True,
-                        "user_metadata": {
-                            "user_id": str(user_data['user_id']),
-                            "tenant_id": str(user_data['tenant_id']),
-                            "role": user_data['role'],
-                            "fullname": user_data.get('name', ''),
-                            "provider": "google"
-                        }
-                    })
-                    existing_auth_user = create_response.user
-                    logger.info(f"Created Supabase auth user: {existing_auth_user.id}")
-                except Exception as create_error:
-                    logger.error(f"Failed to create Supabase auth user: {str(create_error)}")
-                    return RedirectResponse(
-                        url="https://omsfrontend.netlify.app/login?error=auth_user_creation_failed",
-                        status_code=302
-                    )
-            
-            # Generate real Supabase JWT tokens
-            try:
-                # For OAuth users, we need to create a session differently
-                # Since the user doesn't have a password, we'll use admin methods
-                # to create a session or use a different approach
-                
-                # Option 1: Try to create a session using admin methods
-                try:
-                    # Use admin sign_in to generate tokens with a temporary password
-                    sign_in_response = supabase.auth.admin.sign_in_with_password({
-                        "email": email,
-                        "password": f"google_oauth_{user_data['user_id']}"  # Use a secure password
-                    })
-                    
-                    if sign_in_response and hasattr(sign_in_response, 'session'):
-                        access_token = sign_in_response.session.access_token
-                        refresh_token = sign_in_response.session.refresh_token
-                        logger.info(f"Generated Supabase tokens for user: {email}")
-                    else:
-                        raise Exception("No session in sign_in response")
-                        
-                except Exception as sign_in_error:
-                    logger.warning(f"Sign in failed, trying alternative approach: {str(sign_in_error)}")
-                    
-                    # Option 2: Create a custom JWT token using admin methods
-                    try:
-                        # Generate a custom session for the user
-                        session_response = supabase.auth.admin.generate_link({
-                            "type": "magiclink",
-                            "email": email,
-                            "options": {
-                                "redirect_to": f"{google_service.frontend_url}/auth/callback"
-                            }
-                        })
-                        
-                        if session_response and hasattr(session_response, 'properties'):
-                            access_token = session_response.properties.get('access_token')
-                            refresh_token = session_response.properties.get('refresh_token')
-                            logger.info(f"Generated Supabase tokens via magic link for user: {email}")
-                        else:
-                            raise Exception("No properties in magic link response")
-                            
-                    except Exception as magic_link_error:
-                        logger.warning(f"Magic link failed, using fallback: {str(magic_link_error)}")
-                        
-                        # Option 3: Fallback - create custom tokens
-                        # This is not ideal but ensures the flow works
-                        access_token = f"google_session_{user_data['user_id']}"
-                        refresh_token = f"refresh_{user_data['user_id']}"
-                        logger.warning("Using fallback custom tokens for Google OAuth")
-                    
-            except Exception as token_error:
-                logger.warning(f"Failed to generate Supabase tokens: {str(token_error)}")
-                # Fallback: create custom tokens
-                access_token = f"google_session_{user_data['user_id']}"
-                refresh_token = f"refresh_{user_data['user_id']}"
-            
-            logger.info(f"Google OAuth authentication successful for existing user: {email}")
-            logger.info(f"User ID: {user_data['user_id']}, Role: {user_data['role']}, Tenant: {user_data['tenant_id']}")
-            
-            # Generate frontend redirect URL with real tokens
-            redirect_url = google_service.generate_frontend_redirect_url(
-                user_data, access_token, refresh_token
-            )
-            
-            logger.info(f"Google login successful for user: {email}")
-            return RedirectResponse(url=redirect_url, status_code=302)
-            
-        except Exception as session_error:
-            logger.error(f"Failed to create Google OAuth session: {str(session_error)}")
-            return RedirectResponse(
-                url="https://omsfrontend.netlify.app/login?error=session_creation_failed",
-                status_code=302
-            )
+        logger.info(f"Generated Google OAuth tokens for user: {email}")
+        logger.info(f"Access token: {access_token}")
+        logger.info(f"User ID: {user_data['user_id']}, Role: {user_data['role']}, Tenant: {user_data['tenant_id']}")
+        
+        # Generate frontend redirect URL with tokens
+        redirect_url = google_service.generate_frontend_redirect_url(
+            user_data, access_token, refresh_token
+        )
+        
+        logger.info(f"Google login successful - redirecting to: {redirect_url}")
+        return RedirectResponse(url=redirect_url, status_code=302)
             
     except Exception as e:
         logger.error(f"Google callback error: {str(e)}")
