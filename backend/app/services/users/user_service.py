@@ -429,7 +429,9 @@ class UserService:
                 error_msg = str(e)
                 default_logger.error(f"Failed to send invitation: {error_msg}", email=user.email, user_id=user_id)
                 # Check if it's a "user already exists" error
-                if "already registered" in error_msg.lower() or "already exists" in error_msg.lower():
+                if ("already registered" in error_msg.lower() or 
+                    "already exists" in error_msg.lower() or
+                    "has already been registered" in error_msg.lower()):
                     # Try to reset email_confirmed_at and resend invitation
                     try:
                         default_logger.info(f"User already exists in auth, attempting to reset and resend", 
