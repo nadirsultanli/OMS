@@ -81,8 +81,8 @@ const AcceptInvitation = () => {
       }
     } else {
       console.warn('AcceptInvitation - No token found in URL');
-      // Don't show error message, just redirect to login
-      navigate('/login');
+      // Don't redirect, just show the password setup form
+      // User can still try to set password or go back manually
     }
   }, [location]);
 
@@ -92,8 +92,8 @@ const AcceptInvitation = () => {
     
     // Check if token exists
     if (!token) {
-      // Don't show error message, just redirect to login
-      navigate('/login');
+      // Don't redirect, just let user try to set password
+      // They can use the "Back to Login" button if needed
       return;
     }
     
@@ -124,13 +124,13 @@ const AcceptInvitation = () => {
           }
         });
       } else {
-        // Don't show error message, just redirect to login
-        navigate('/login');
+        // Don't redirect on error, just let user try again
+        // They can use the "Back to Login" button if needed
       }
     } catch (error) {
       console.error('Accept invitation catch error:', error);
-      // Don't show error message, just redirect to login
-      navigate('/login');
+      // Don't redirect on error, just let user try again
+      // They can use the "Back to Login" button if needed
     } finally {
       setIsLoading(false);
     }
