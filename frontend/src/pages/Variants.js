@@ -673,27 +673,7 @@ const Variants = () => {
                 
                 {modalType === 'complete' && (
                   <>
-                    <div className="form-group">
-                      <label htmlFor="gas_price">Gas Price (Optional)</label>
-                      <input
-                        type="number"
-                        id="gas_price"
-                        value={formData.gas_price}
-                        onChange={(e) => handleFormChange('gas_price', e.target.value)}
-                        step="0.01"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label htmlFor="bundle_price">Bundle Price (Optional)</label>
-                      <input
-                        type="number"
-                        id="bundle_price"
-                        value={formData.bundle_price}
-                        onChange={(e) => handleFormChange('bundle_price', e.target.value)}
-                        step="0.01"
-                      />
-                    </div>
+                    {/* Gas Price and Bundle Price fields removed */}
                   </>
                 )}
                 
