@@ -115,7 +115,7 @@ const PasswordSetupForm = ({
               placeholder="Enter your email address"
               disabled={isLoading}
             />
-            {errors.email && <span className="error-text">{errors.email}</span>}
+            {/* Remove error message display */}
           </div>
         )}
         
@@ -131,7 +131,7 @@ const PasswordSetupForm = ({
             placeholder="Enter your password"
             disabled={isLoading}
           />
-          {allErrors.password && <span className="error-text">{allErrors.password}</span>}
+          {/* Remove error message display */}
           
           {/* Password requirements */}
           {formData.password && (
@@ -167,7 +167,7 @@ const PasswordSetupForm = ({
             placeholder="Confirm your password"
             disabled={isLoading}
           />
-          {allErrors.confirmPassword && <span className="error-text">{allErrors.confirmPassword}</span>}
+          {/* Remove error message display */}
         </div>
 
         <div className="form-actions">

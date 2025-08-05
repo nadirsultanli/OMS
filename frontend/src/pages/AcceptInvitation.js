@@ -81,9 +81,8 @@ const AcceptInvitation = () => {
       }
     } else {
       console.warn('AcceptInvitation - No token found in URL');
-      setErrors({ 
-        general: 'Invalid invitation link. Please check your email for the correct invitation link or try accessing the link again.' 
-      });
+      // Don't show error message, just redirect to login
+      navigate('/login');
     }
   }, [location]);
 
@@ -93,7 +92,8 @@ const AcceptInvitation = () => {
     
     // Check if token exists
     if (!token) {
-      setErrors({ general: 'No invitation token found. Please use the link from your invitation email.' });
+      // Don't show error message, just redirect to login
+      navigate('/login');
       return;
     }
     
@@ -105,38 +105,32 @@ const AcceptInvitation = () => {
       console.log('Accept invitation result:', result);
       
       if (result.success) {
-        setMessage('Account setup completed successfully! Redirecting to login...');
+        // Always redirect to login page after successful password setup
+        console.log('Password setup successful, redirecting to login');
         
         // Clear any existing authentication data to force fresh login
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        
-        // Also clear any other auth-related items
         localStorage.removeItem('supabase.auth.token');
         localStorage.removeItem('supabase.auth.expires_at');
         localStorage.removeItem('supabase.auth.refresh_token');
         
-        console.log('Cleared all authentication data from localStorage');
-        
-        // Set a flag to prevent dashboard redirect
-        sessionStorage.setItem('justCompletedInvitation', 'true');
-        
-        // Redirect to login page after 2 seconds
-        setTimeout(() => {
-          navigate('/login', { 
-            state: { 
-              message: 'Account setup completed! You can now login with your credentials.',
-              email: userEmail
-            }
-          });
-        }, 2000);
+        // Always redirect to login page immediately
+        navigate('/login', { 
+          state: { 
+            message: 'Account setup completed! You can now login with your credentials.',
+            email: userEmail
+          }
+        });
       } else {
-        setErrors({ general: result.error });
+        // Don't show error message, just redirect to login
+        navigate('/login');
       }
     } catch (error) {
       console.error('Accept invitation catch error:', error);
-      setErrors({ general: 'An unexpected error occurred. Please try again or contact support.' });
+      // Don't show error message, just redirect to login
+      navigate('/login');
     } finally {
       setIsLoading(false);
     }
@@ -160,11 +154,7 @@ const AcceptInvitation = () => {
           </div>
         )}
 
-        {errors.general && (
-          <div className="message error-message">
-            {errors.general}
-          </div>
-        )}
+        {/* Remove error message display */}
 
         <PasswordSetupForm
           onSubmit={handlePasswordSubmit}
