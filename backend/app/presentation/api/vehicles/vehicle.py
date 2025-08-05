@@ -17,7 +17,7 @@ from app.services.dependencies.vehicles import get_vehicle_service
 from app.domain.entities.vehicles import Vehicle
 from datetime import datetime
 from app.infrastucture.logs.logger import default_logger
-from app.services.dependencies.auth import get_tenant_aware_user
+from app.services.dependencies.auth import get_current_user
 from app.domain.entities.users import User
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
@@ -59,7 +59,7 @@ async def get_vehicle(vehicle_id: UUID, vehicle_service: VehicleService = Depend
 
 @router.get("/summary/dashboard")
 async def get_vehicles_dashboard_summary(
-    current_user: User = Depends(get_tenant_aware_user),
+    current_user: User = Depends(get_current_user),
     vehicle_service: VehicleService = Depends(get_vehicle_service)
 ):
     """
@@ -83,7 +83,7 @@ async def get_vehicles_dashboard_summary(
 
 @router.get("/", response_model=VehicleListResponse)
 async def list_vehicles(
-    current_user: User = Depends(get_tenant_aware_user),
+    current_user: User = Depends(get_current_user),
     active: Optional[bool] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
