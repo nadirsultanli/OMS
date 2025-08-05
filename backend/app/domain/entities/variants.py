@@ -557,9 +557,9 @@ class Variant:
             if self.tare_weight_kg or self.gross_weight_kg:
                 errors.append("Non-physical items should not have weight specifications")
         
-        # Rule 3: Deposits must have deposit amount
-        if self.is_deposit() and not self.deposit:
-            errors.append("Deposit variants must have deposit amount specified")
+        # # Rule 3: Deposits must have deposit amount (can be zero for initial creation)
+        # if self.is_deposit() and self.deposit is None:
+        #     errors.append("Deposit variants must have deposit amount specified (can be zero)")
         
         # Rule 4: Gas services should not have deposit amounts
         if self.is_gas_service() and self.deposit:
