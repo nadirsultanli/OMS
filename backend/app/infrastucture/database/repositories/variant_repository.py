@@ -248,6 +248,19 @@ class VariantRepositoryImpl(VariantRepository):
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
     
+    async def get_stock_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get all variants that affect inventory (stock variants) for a tenant with pagination"""
+        stmt = select(VariantModel).where(
+            and_(
+                VariantModel.tenant_id == tenant_id,
+                VariantModel.affects_inventory == True,
+                VariantModel.deleted_at.is_(None)
+            )
+        ).limit(limit).offset(offset)
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        return [self._to_entity(model) for model in models]
+    
     async def get_gas_services(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
         """Get all gas service variants (GAS*) for a tenant with pagination"""
         stmt = select(VariantModel).where(

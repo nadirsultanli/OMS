@@ -9,6 +9,7 @@ from app.domain.entities.variants import (
 from app.domain.repositories.variant_repository import VariantRepository
 from app.services.stock_levels.stock_level_service import StockLevelService
 from app.infrastucture.database.repositories.stock_level_repository import SQLAlchemyStockLevelRepository
+from app.services.dependencies.stock_levels import get_stock_level_service
 
 
 class VariantNotFoundError(Exception):
@@ -26,9 +27,6 @@ class VariantService:
     
     def __init__(self, variant_repository: VariantRepository):
         self.variant_repository = variant_repository
-        # Initialize stock level service for automatic stock level creation
-        stock_level_repo = SQLAlchemyStockLevelRepository()
-        self.stock_level_service = StockLevelService(stock_level_repo)
     
     async def _get_product_name(self, product_id: str) -> str:
         """Get product name for SKU generation"""
@@ -109,21 +107,7 @@ class VariantService:
             raise ValueError(f"Business rule validation failed: {', '.join(validation_errors)}")
         
         # Save to repository
-        saved_variant = await self.variant_repository.create_variant(variant)
-        
-        # Create initial stock levels for this variant across all warehouses
-        try:
-            await self.stock_level_service.create_initial_stock_levels_for_variant(
-                tenant_id=UUID(tenant_id),
-                variant_id=saved_variant.id,
-                created_by=UUID(created_by) if created_by else None
-            )
-        except Exception as e:
-            # Log the error but don't fail variant creation
-            # Stock levels can be created manually later if needed
-            print(f"Warning: Failed to create initial stock levels for variant {saved_variant.sku}: {str(e)}")
-        
-        return saved_variant
+        return await self.variant_repository.create_variant(variant)
     
     async def create_atomic_cylinder_variants(
         self,
@@ -325,6 +309,10 @@ class VariantService:
     async def get_physical_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
         """Get all physical variants (CYL*) with pagination"""
         return await self.variant_repository.get_physical_variants(tenant_id, limit, offset)
+    
+    async def get_stock_variants(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
+        """Get all variants that affect inventory (stock variants) with pagination"""
+        return await self.variant_repository.get_stock_variants(tenant_id, limit, offset)
     
     async def get_gas_services(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Variant]:
         """Get all gas service variants (GAS*) with pagination"""

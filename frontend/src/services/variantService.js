@@ -31,6 +31,30 @@ const variantService = {
     }
   },
 
+  // Get stock variants (variants that affect inventory)
+  getStockVariants: async (tenantId = null, params = {}) => {
+    try {
+      // Use provided tenantId or get from current user
+      const actualTenantId = tenantId || authService.getCurrentTenantId();
+      
+      if (!actualTenantId) {
+        return { success: false, error: 'No tenant ID found' };
+      }
+
+      const queryParams = new URLSearchParams({
+        tenant_id: actualTenantId,
+        limit: params.limit || 100,
+        offset: params.offset || 0
+      });
+
+      const response = await api.get(`/variants/by-type/stock?${queryParams}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error fetching stock variants:', error);
+      return { success: false, error: extractErrorMessage(error.response?.data) || 'Failed to fetch stock variants' };
+    }
+  },
+
   // Get variant by ID
   getVariantById: async (variantId) => {
     try {

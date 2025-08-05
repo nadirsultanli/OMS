@@ -77,10 +77,9 @@ const StockLevels = () => {
           console.log('Loading variants for tenant:', tenantId);
           console.log('Current user:', authService.getCurrentUser());
           
-          // First attempt: Load with high limit
-          const variantsResponse = await variantService.getVariants(tenantId, { 
-            limit: 1000,
-            active_only: true
+          // First attempt: Load stock variants with high limit
+          const variantsResponse = await variantService.getStockVariants(tenantId, { 
+            limit: 1000
           });
           
           console.log('Initial variants response:', variantsResponse);
@@ -102,10 +101,8 @@ const StockLevels = () => {
           
           // If we got less than 100 variants, try loading without limit
           if (variantsData.length < 100) {
-            console.log('Trying to load variants without limit...');
-            const unlimitedResponse = await variantService.getVariants(tenantId, { 
-              active_only: true
-            });
+            console.log('Trying to load stock variants without limit...');
+            const unlimitedResponse = await variantService.getStockVariants(tenantId, {});
             
             let unlimitedVariants = [];
             if (unlimitedResponse.success && unlimitedResponse.data) {

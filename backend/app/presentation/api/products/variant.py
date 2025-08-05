@@ -33,6 +33,8 @@ from app.presentation.schemas.variants.output_schemas import (
     BulkGasResponse
 )
 from app.services.dependencies.products import get_variant_service, get_lpg_business_service
+from app.services.dependencies.stock_levels import get_stock_level_service
+from app.services.stock_levels.stock_level_service import StockLevelService
 from app.core.auth_utils import current_user
 from app.domain.entities.users import User
 from app.domain.entities.variants import ProductStatus, ProductScenario
@@ -324,6 +326,23 @@ async def get_physical_variants(
         offset=offset
     )
 
+@router.get("/by-type/stock", response_model=VariantListResponse)
+async def get_stock_variants(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    variant_service: VariantService = Depends(get_variant_service)
+):
+    """Get all stock variants (variants that affect inventory) with pagination"""
+    variants = await variant_service.get_stock_variants(UUID(tenant_id), limit, offset)
+    variant_responses = [VariantResponse(**variant.to_dict()) for variant in variants]
+    return VariantListResponse(
+        variants=variant_responses,
+        total=len(variant_responses),
+        limit=limit,
+        offset=offset
+    )
+
 @router.get("/by-type/gas-services", response_model=VariantListResponse)
 async def get_gas_services(
     tenant_id: str = Query(..., description="Tenant ID"),
@@ -482,7 +501,8 @@ async def create_bundle_variant(
 @router.post("/atomic/complete-set/", response_model=AtomicVariantSetResponse, status_code=status.HTTP_201_CREATED)
 async def create_complete_variant_set(
     request: CreateCompleteSetRequest,
-    variant_service: VariantService = Depends(get_variant_service)
+    variant_service: VariantService = Depends(get_variant_service),
+    stock_level_service: StockLevelService = Depends(get_stock_level_service)
 ):
     """
     Create a complete set of atomic variants for a cylinder size.
@@ -534,6 +554,38 @@ async def create_complete_variant_set(
             default_price=float(request.bundle_price) if request.bundle_price else None,
             created_by=request.created_by
         )
+        
+        # Create initial stock levels for all variants across all warehouses
+        try:
+            await stock_level_service.create_initial_stock_levels_for_variant(
+                tenant_id=UUID(request.tenant_id),
+                variant_id=empty_variant.id,
+                created_by=UUID(request.created_by) if request.created_by else None
+            )
+            await stock_level_service.create_initial_stock_levels_for_variant(
+                tenant_id=UUID(request.tenant_id),
+                variant_id=full_variant.id,
+                created_by=UUID(request.created_by) if request.created_by else None
+            )
+            await stock_level_service.create_initial_stock_levels_for_variant(
+                tenant_id=UUID(request.tenant_id),
+                variant_id=gas_variant.id,
+                created_by=UUID(request.created_by) if request.created_by else None
+            )
+            await stock_level_service.create_initial_stock_levels_for_variant(
+                tenant_id=UUID(request.tenant_id),
+                variant_id=deposit_variant.id,
+                created_by=UUID(request.created_by) if request.created_by else None
+            )
+            await stock_level_service.create_initial_stock_levels_for_variant(
+                tenant_id=UUID(request.tenant_id),
+                variant_id=bundle_variant.id,
+                created_by=UUID(request.created_by) if request.created_by else None
+            )
+        except Exception as e:
+            # Log the error but don't fail variant creation
+            # Stock levels can be created manually later if needed
+            print(f"Warning: Failed to create initial stock levels for complete variant set: {str(e)}")
         
         return AtomicVariantSetResponse(
             cylinder_empty=VariantResponse(**empty_variant.to_dict()),
