@@ -126,6 +126,28 @@ class CustomerService {
     }
   }
 
+  async updateCustomerStatus(customerId, status) {
+    try {
+      console.log('customerService - Updating customer status:', customerId, 'to:', status);
+      
+      const response = await api.put(`/customers/${customerId}/status?new_status=${status}`);
+      
+      console.log('customerService - Status update response:', response.data);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Update customer status error:', error);
+      console.error('Error response data:', error.response?.data);
+      return {
+        success: false,
+        error: this.extractErrorMessage(error.response?.data) || 'Failed to update customer status.'
+      };
+    }
+  }
+
 
 
   async deleteCustomer(customerId) {

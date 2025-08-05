@@ -1,5 +1,6 @@
 from typing import Optional, List
 from uuid import UUID
+from datetime import datetime
 from app.domain.entities.customers import Customer, CustomerStatus, CustomerType
 from app.domain.repositories.customer_repository import CustomerRepository
 from app.services.addresses.address_service import AddressService
@@ -144,6 +145,53 @@ class CustomerService:
                 setattr(customer, key, value)
         customer.updated_by = updated_by
         return await self.customer_repository.update_customer(customer_id, customer) 
+
+    async def update_customer_status(self, customer_id: str, new_status: CustomerStatus, updated_by: UUID, user_role: str) -> Optional[Customer]:
+        """Update customer status with role-based permissions"""
+        print(f"DEBUG: Service method update_customer_status called with customer_id={customer_id}, new_status={new_status}, user_role={user_role}")
+        
+        print(f"DEBUG: About to call get_customer_by_id in service")
+        # Get customer without addresses to avoid potential issues
+        customer = await self.customer_repository.get_by_id(customer_id)
+        if not customer:
+            raise CustomerNotFoundError(customer_id)
+        print(f"DEBUG: Customer fetched from repository successfully")
+        
+        # Debug logging
+        print(f"DEBUG: Updating customer status - customer_type: {customer.customer_type}, user_role: {user_role}, new_status: {new_status}")
+        
+        # Role-based permissions for status updates
+        if user_role == "accounts":
+            # Accounts can change any status
+            print("DEBUG: Accounts role - allowing any status change")
+            pass
+        elif user_role in ["sales_rep", "tenant_admin", "admin"]:
+            print(f"DEBUG: Sales/Admin role ({user_role}) - checking permissions")
+            # Sales, tenant admin, and admin can only activate cash customers or set credit customers to pending
+            if customer.customer_type == CustomerType.CASH:
+                if new_status not in [CustomerStatus.ACTIVE, CustomerStatus.INACTIVE]:
+                    raise ValueError("Sales/Admin can only set cash customers to active or inactive")
+                print("DEBUG: Cash customer - allowing active/inactive status")
+            else:  # Credit customer
+                if new_status not in [CustomerStatus.PENDING, CustomerStatus.INACTIVE]:
+                    raise ValueError("Sales/Admin can only set credit customers to pending or inactive")
+                print("DEBUG: Credit customer - allowing pending/inactive status")
+        else:
+            print(f"DEBUG: Insufficient permissions - user_role: {user_role}")
+            raise ValueError("Insufficient permissions to update customer status")
+        
+        print(f"DEBUG: About to update customer status to: {new_status}")
+        customer.status = new_status
+        # Ensure updated_by is a proper UUID object
+        if isinstance(updated_by, str):
+            customer.updated_by = UUID(updated_by)
+        else:
+            customer.updated_by = updated_by
+        # Don't set updated_at here, let the repository handle it
+        print(f"DEBUG: About to call repository update_customer")
+        result = await self.customer_repository.update_customer(customer_id, customer)
+        print(f"DEBUG: Repository update_customer completed successfully")
+        return result
 
     async def inactivate_customer(self, customer_id: str, inactivated_by: UUID) -> Optional[Customer]:
         return await self.customer_repository.inactivate_customer(customer_id, inactivated_by) 

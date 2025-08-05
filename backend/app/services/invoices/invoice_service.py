@@ -748,21 +748,10 @@ class InvoiceService:
         )
 
     async def get_invoice_summary(self, user: User) -> Dict[str, Any]:
-        """Get invoice summary statistics"""
+        """Get optimized invoice summary statistics (single query)"""
         
-        # Get counts by status
-        draft_count = await self.invoice_repository.count_invoices(user.tenant_id, InvoiceStatus.DRAFT)
-        sent_count = await self.invoice_repository.count_invoices(user.tenant_id, InvoiceStatus.SENT)
-        paid_count = await self.invoice_repository.count_invoices(user.tenant_id, InvoiceStatus.PAID)
-        overdue_count = len(await self.get_overdue_invoices(user, limit=1000))  # Quick count
-        
-        return {
-            "draft_invoices": draft_count,
-            "sent_invoices": sent_count,
-            "paid_invoices": paid_count,
-            "overdue_invoices": overdue_count,
-            "total_invoices": draft_count + sent_count + paid_count + overdue_count
-        }
+        # Use optimized repository method that does everything in one query
+        return await self.invoice_repository.get_invoice_summary(user.tenant_id)
 
     # ============================================================================
     # BULK OPERATIONS

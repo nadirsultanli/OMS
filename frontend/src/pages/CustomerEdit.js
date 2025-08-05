@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import customerService from '../services/customerService';
 import fileUploadService from '../services/fileUploadService';
+import authService from '../services/authService';
 import { 
   ArrowLeft, 
   Building2, 
@@ -35,12 +36,17 @@ const CustomerEdit = () => {
     owner_sales_rep_id: '',
     email: '',
     country_code: '+1',
-    phone_number: ''
+    phone_number: '',
+    status: 'pending'
   });
 
   // File state for incorporation document
   const [incorporationFile, setIncorporationFile] = useState(null);
   const [fileError, setFileError] = useState('');
+  
+  // Get current user role for status permissions
+  const currentUser = authService.getCurrentUser();
+  const userRole = currentUser ? currentUser.role : null;
 
   useEffect(() => {
     fetchCustomerDetails();
@@ -65,7 +71,8 @@ const CustomerEdit = () => {
           owner_sales_rep_id: customerData.owner_sales_rep_id || '',
           email: customerData.email || '',
           country_code: '+1', // Default
-          phone_number: customerData.phone_number || ''
+          phone_number: customerData.phone_number || '',
+          status: customerData.status || 'pending'
         });
       } else {
         setErrors({ general: result.error });
@@ -159,9 +166,10 @@ const CustomerEdit = () => {
       // Handle file upload if there's a new file
       let incorporationDocPath = formData.incorporation_doc;
       if (incorporationFile) {
-        const uploadResult = await fileUploadService.uploadFile(incorporationFile, 'incorporation-docs');
+        const tenantId = authService.getCurrentTenantId();
+        const uploadResult = await fileUploadService.uploadFile(incorporationFile, customerId, tenantId);
         if (uploadResult.success) {
-          incorporationDocPath = uploadResult.data.path;
+          incorporationDocPath = uploadResult.path;
         } else {
           setErrors({ general: uploadResult.error });
           setSaving(false);
@@ -185,7 +193,20 @@ const CustomerEdit = () => {
         updateData.credit_limit = parseFloat(formData.credit_limit) || 0;
       }
       
+      // Update customer data first
       const result = await customerService.updateCustomer(customerId, updateData);
+      
+      // Then update status if it has changed
+      if (result.success && formData.status !== customer.status) {
+        const statusResult = await customerService.updateCustomerStatus(customerId, formData.status);
+        if (statusResult.success) {
+          setCustomer(prev => ({ ...prev, status: formData.status }));
+        } else {
+          setErrors({ general: statusResult.error });
+          setSaving(false);
+          return;
+        }
+      }
       
       if (result.success) {
         setMessage('Customer updated successfully!');
@@ -220,6 +241,105 @@ const CustomerEdit = () => {
     } catch (error) {
       console.error('Error downloading document:', error);
       setErrors({ general: 'Failed to download document' });
+    }
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    console.log('🔥 handleStatusChange called with:', newStatus);
+    setSaving(true);
+    setMessage('');
+    setErrors({});
+    
+    try {
+      console.log('🔥 Calling customerService.updateCustomerStatus with:', customerId, newStatus);
+      const result = await customerService.updateCustomerStatus(customerId, newStatus);
+      
+      if (result.success) {
+        setFormData(prev => ({ ...prev, status: newStatus }));
+        setCustomer(prev => ({ ...prev, status: newStatus }));
+        setMessage('Customer status updated successfully!');
+        
+        // Clear the message after 3 seconds
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        // Set specific error for status field
+        setErrors(prev => ({ ...prev, status: result.error }));
+        console.error('Status update failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Error updating customer status:', error);
+      setErrors(prev => ({ ...prev, status: 'Failed to update customer status. Please try again.' }));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getAvailableStatusOptions = () => {
+    if (!customer || !userRole) return [];
+    
+    const isAccounts = userRole === 'accounts';
+    const isSalesOrAdmin = ['sales_rep', 'tenant_admin', 'admin'].includes(userRole);
+    const isCashCustomer = customer.customer_type === 'cash';
+    
+    if (isAccounts) {
+      // Accounts can set any status
+      return [
+        { value: 'pending', label: 'Pending' },
+        { value: 'active', label: 'Active' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'inactive', label: 'Inactive' }
+      ];
+    } else if (isSalesOrAdmin) {
+      if (isCashCustomer) {
+        // For cash customers, show current status + only active/inactive options
+        const options = [];
+        
+        // Always include current status first
+        options.push({ value: customer.status, label: customer.status.charAt(0).toUpperCase() + customer.status.slice(1) });
+        
+        // Add active and inactive options (but not current status again)
+        if (customer.status !== 'active') {
+          options.push({ value: 'active', label: 'Active' });
+        }
+        if (customer.status !== 'inactive') {
+          options.push({ value: 'inactive', label: 'Inactive' });
+        }
+        
+        return options;
+      } else {
+        // Credit customers - only pending or inactive
+        const options = [];
+        
+        // Always include current status first
+        options.push({ value: customer.status, label: customer.status.charAt(0).toUpperCase() + customer.status.slice(1) });
+        
+        // Add pending and inactive options (but not current status again)
+        if (customer.status !== 'pending') {
+          options.push({ value: 'pending', label: 'Pending' });
+        }
+        if (customer.status !== 'inactive') {
+          options.push({ value: 'inactive', label: 'Inactive' });
+        }
+        
+        return options;
+      }
+    }
+    
+    return []; // No permissions
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'active':
+        return 'status-badge active';
+      case 'pending':
+        return 'status-badge pending';
+      case 'rejected':
+        return 'status-badge rejected';
+      case 'inactive':
+        return 'status-badge inactive';
+      default:
+        return 'status-badge';
     }
   };
 
@@ -361,6 +481,65 @@ const CustomerEdit = () => {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Customer Status */}
+          <div className="form-section">
+            <h2>
+              <Building2 size={20} />
+              Customer Status
+            </h2>
+            
+            <div className="form-grid">
+              <div className="form-group">
+                <label>Current Status</label>
+                <div className="status-display">
+                  <span className={getStatusBadgeClass(customer.status)}>
+                    {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
+                  </span>
+                </div>
+                <small className="status-help">
+                  {customer.customer_type === 'credit' 
+                    ? 'Credit customers can only be activated by accounts role'
+                    : 'Cash customers can be activated by sales/admin roles'
+                  }
+                </small>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="status">Update Status</label>
+                <select
+                  id="status"
+                  name="status"
+                  value={formData.status}
+                  onChange={(e) => {
+                    const newStatus = e.target.value;
+                    console.log('🔥 Status dropdown changed to:', newStatus);
+                    setFormData(prev => ({ ...prev, status: newStatus }));
+                    handleStatusChange(newStatus);
+                  }}
+                  disabled={saving}
+                  className={errors.status ? 'error' : ''}
+                >
+                  {getAvailableStatusOptions().map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                
+                {/* Status Update Feedback */}
+                {formData.status !== customer.status && (
+                  <small className="status-change-notice">
+                    Status will change from <strong>{customer.status}</strong> to <strong>{formData.status}</strong>
+                  </small>
+                )}
+                
+                {errors.status && <span className="error-text">{errors.status}</span>}
+              </div>
+            </div>
+            
+         
           </div>
 
           {/* Credit Information */}

@@ -189,6 +189,143 @@ async def get_customer_for_invoice(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
+@router.get("/test-status-endpoint")
+async def test_status_endpoint():
+    """Test endpoint to verify routing is working"""
+    print("🔥 TEST STATUS ENDPOINT CALLED")
+    return {"message": "Status endpoint is working"}
+
+@router.put("/{customer_id}/test-status-update", response_model=CustomerResponse)
+async def test_update_customer_status(
+    customer_id: str,
+    new_status: str = Query(..., description="New status for the customer"),
+    customer_service: CustomerService = Depends(get_customer_service),
+    context: UserContext = user_context
+):
+    """Test endpoint for customer status update"""
+    print(f"🔥 TEST STATUS UPDATE ENDPOINT CALLED: customer_id={customer_id}, new_status={new_status}")
+    
+    try:
+        from app.domain.entities.customers import CustomerStatus
+        
+        # Validate status
+        status_enum = CustomerStatus(new_status.lower())
+        updated_by = UUID(context.user_id)
+        
+        customer = await customer_service.update_customer_status(
+            customer_id, 
+            status_enum, 
+            updated_by, 
+            context.role.value
+        )
+        
+        print(f"🔥 Customer object returned: {type(customer)}")
+        print(f"🔥 Customer addresses: {customer.addresses}")
+        print(f"🔥 About to call customer.to_dict()")
+        customer_dict = customer.to_dict()
+        print(f"🔥 customer.to_dict() completed successfully")
+        
+        return CustomerResponse(**customer_dict)
+        
+    except Exception as e:
+        print(f"🔥 TEST ENDPOINT ERROR: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Test endpoint error: {str(e)}")
+
+@router.put("/{customer_id}/status", response_model=CustomerResponse)
+async def update_customer_status(
+    customer_id: str,
+    new_status: str = Query(..., description="New status for the customer"),
+    customer_service: CustomerService = Depends(get_customer_service),
+    context: UserContext = user_context
+):
+    """Update customer status with role-based permissions"""
+    
+    logger.info(
+        "Updating customer status",
+        user_id=context.user_id,
+        tenant_id=context.tenant_id,
+        user_role=context.role.value,
+        customer_id=customer_id,
+        new_status=new_status,
+        operation="update_customer_status"
+    )
+    
+    # Only Sales Rep, Admin, and Accounts can update status
+    if not context.is_sales_rep() and not context.is_admin() and context.role.value != "accounts":
+        logger.error(
+            "Failed to update customer status - insufficient permissions",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            user_role=context.role.value,
+            customer_id=customer_id,
+            required_roles="sales_rep, admin, accounts"
+        )
+        raise HTTPException(status_code=403, detail="Only Sales Rep, Admin, and Accounts can update customer status.")
+    
+    try:
+        from app.domain.entities.customers import CustomerStatus
+        
+        # Validate status
+        try:
+            status_enum = CustomerStatus(new_status.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {new_status}. Valid statuses are: pending, active, rejected, inactive")
+        
+        # context.user_id is already a UUID object, no need to convert
+        updated_by = context.user_id
+        
+        customer = await customer_service.update_customer_status(
+            customer_id, 
+            status_enum, 
+            updated_by, 
+            context.role.value
+        )
+        
+        logger.info(
+            "Customer status updated successfully",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=str(customer.id),
+            customer_name=customer.name,
+            old_status="(not logged to avoid extra db call)",
+            new_status=status_enum.value,
+            updated_by=str(updated_by)
+        )
+        
+        return CustomerResponse(**customer.to_dict())
+        
+    except ValueError as e:
+        logger.error(
+            "Failed to update customer status - validation error",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e)
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is (for the status validation error)
+        raise
+    except CustomerNotFoundError as e:
+        logger.warning(
+            "Cannot update customer status - customer not found",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e)
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to update customer status - unexpected error",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=500, detail="Failed to update customer status")
+
 @router.put("/{customer_id}", response_model=CustomerResponse)
 async def update_customer(
     customer_id: str, 

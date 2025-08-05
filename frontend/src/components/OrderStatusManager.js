@@ -274,6 +274,7 @@ const OrderStatusManager = ({ order, onStatusChange, onError }) => {
   
   // Debug logging for render
   console.log('OrderStatusManager Render - Current Status:', currentStatus);
+  console.log('OrderStatusManager Render - Status Type:', typeof currentStatus);
   console.log('OrderStatusManager Render - Available Actions:', availableActions);
   console.log('OrderStatusManager Render - User Role:', userRole);
 
@@ -391,8 +392,36 @@ const OrderStatusManager = ({ order, onStatusChange, onError }) => {
           {['Draft', 'Submitted', 'Approved', 'Allocated', 'Loaded', 'In Transit', 'Delivered', 'Closed'].map((step, index) => {
             const stepStatus = step.toLowerCase();
             const isActive = stepStatus === currentStatus?.toLowerCase();
-            const isPast = getStepOrder(stepStatus) < getStepOrder(currentStatus?.toLowerCase());
             
+            // Determine if step is completed based on actual order status
+            let isCompleted = false;
+            console.log(`DEBUG: Checking step "${step}" (${stepStatus}) for status "${currentStatus}"`);
+            
+            if (currentStatus?.toLowerCase() === 'approved') {
+              // If status is approved, only draft, submitted, and approved are completed
+              isCompleted = ['draft', 'submitted', 'approved'].includes(stepStatus);
+            } else if (currentStatus?.toLowerCase() === 'allocated') {
+              // If status is allocated, draft, submitted, approved, and allocated are completed
+              isCompleted = ['draft', 'submitted', 'approved', 'allocated'].includes(stepStatus);
+            } else if (currentStatus?.toLowerCase() === 'loaded') {
+              // If status is loaded, draft, submitted, approved, allocated, and loaded are completed
+              isCompleted = ['draft', 'submitted', 'approved', 'allocated', 'loaded'].includes(stepStatus);
+            } else if (currentStatus?.toLowerCase() === 'in_transit') {
+              // If status is in_transit, all previous steps plus in_transit are completed
+              isCompleted = ['draft', 'submitted', 'approved', 'allocated', 'loaded', 'in transit'].includes(stepStatus);
+            } else if (currentStatus?.toLowerCase() === 'delivered') {
+              // If status is delivered, all previous steps plus delivered are completed
+              isCompleted = ['draft', 'submitted', 'approved', 'allocated', 'loaded', 'in transit', 'delivered'].includes(stepStatus);
+            } else if (currentStatus?.toLowerCase() === 'closed') {
+              // If status is closed, all steps are completed
+              isCompleted = true;
+            } else {
+              // For other statuses, use the original logic
+              isCompleted = getStepOrder(stepStatus) < getStepOrder(currentStatus?.toLowerCase());
+            }
+            
+            console.log(`DEBUG: Step "${step}" isCompleted: ${isCompleted}`);
+
             return (
               <div 
                 key={step}
@@ -404,12 +433,12 @@ const OrderStatusManager = ({ order, onStatusChange, onError }) => {
                   borderRadius: '16px',
                   fontSize: '12px',
                   fontWeight: '500',
-                  backgroundColor: isActive ? '#dbeafe' : isPast ? '#d1fae5' : '#f3f4f6',
-                  color: isActive ? '#1e40af' : isPast ? '#065f46' : '#6b7280',
+                  backgroundColor: isActive ? '#dbeafe' : isCompleted ? '#d1fae5' : '#f3f4f6',
+                  color: isActive ? '#1e40af' : isCompleted ? '#065f46' : '#6b7280',
                   border: isActive ? '2px solid #3b82f6' : '1px solid transparent'
                 }}
               >
-                <span>{isPast ? '✅' : isActive ? '⏳' : '⚪'}</span>
+                <span>{isCompleted ? '✅' : isActive ? '⏳' : '⚪'}</span>
                 <span>{step}</span>
               </div>
             );

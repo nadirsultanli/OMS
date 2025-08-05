@@ -111,16 +111,53 @@ class CustomerRepository(CustomerRepositoryInterface):
         return self._to_entity(obj)
 
     async def update_customer(self, customer_id: str, customer: Customer) -> Optional[Customer]:
-        result = await self._session.execute(select(CustomerORM).where(CustomerORM.id == UUID(customer_id), CustomerORM.deleted_at == None))
+        result = await self._session.execute(
+            select(CustomerORM).where(
+                CustomerORM.id == UUID(customer_id), 
+                CustomerORM.deleted_at == None
+            )
+        )
         obj = result.scalar_one_or_none()
         if not obj:
             return None
-        for field in [
-            "tenant_id", "customer_type", "status", "name", "email", "phone_number", "tax_pin", "incorporation_doc", "credit_days", "credit_limit",
-            "owner_sales_rep_id", "updated_at", "updated_by", "deleted_at", "deleted_by"
-        ]:
-            setattr(obj, field, getattr(customer, field))
-        obj.updated_at = datetime.now()
+        
+        # Update fields, handling enums properly
+        obj.tenant_id = customer.tenant_id
+        obj.customer_type = customer.customer_type.value
+        obj.status = customer.status.value
+        obj.name = customer.name
+        obj.email = customer.email
+        obj.phone_number = customer.phone_number
+        obj.tax_pin = customer.tax_pin
+        obj.incorporation_doc = customer.incorporation_doc
+        obj.credit_days = customer.credit_days
+        obj.credit_limit = customer.credit_limit
+        # Handle owner_sales_rep_id UUID properly
+        if customer.owner_sales_rep_id is not None:
+            if isinstance(customer.owner_sales_rep_id, str):
+                obj.owner_sales_rep_id = UUID(customer.owner_sales_rep_id)
+            else:
+                obj.owner_sales_rep_id = customer.owner_sales_rep_id
+        # Set updated_at to current time if not provided
+        if customer.updated_at is not None:
+            obj.updated_at = customer.updated_at
+        else:
+            from datetime import datetime
+            obj.updated_at = datetime.now()
+        # Handle updated_by UUID properly
+        if customer.updated_by is not None:
+            if isinstance(customer.updated_by, str):
+                obj.updated_by = UUID(customer.updated_by)
+            else:
+                obj.updated_by = customer.updated_by    
+        obj.deleted_at = customer.deleted_at
+        # Handle deleted_by UUID properly
+        if customer.deleted_by is not None:
+            if isinstance(customer.deleted_by, str):
+                obj.deleted_by = UUID(customer.deleted_by)
+            else:
+                obj.deleted_by = customer.deleted_by
+        
         await self._session.commit()
         await self._session.refresh(obj)
         return self._to_entity(obj)
@@ -224,5 +261,6 @@ class CustomerRepository(CustomerRepositoryInterface):
             updated_at=obj.updated_at,
             updated_by=obj.updated_by,
             deleted_at=obj.deleted_at,
-            deleted_by=obj.deleted_by
+            deleted_by=obj.deleted_by,
+            addresses=[]  # Initialize addresses as empty list
         ) 

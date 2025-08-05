@@ -15,7 +15,7 @@ class FileUploadService {
     try {
       console.log('Uploading file to Supabase:', file.name, 'for customer:', customerId);
       
-      // Get JWT token from localStorage
+      // Get JWT token from localStorage (backend API token)
       const token = localStorage.getItem('accessToken');
       if (!token) {
         throw new Error('No authentication token found');

@@ -63,8 +63,8 @@ class Customer:
 
     def to_dict(self) -> dict:
         return {
-            "id": str(self.id),
-            "tenant_id": str(self.tenant_id),
+            "id": str(self.id) if self.id else None,
+            "tenant_id": str(self.tenant_id) if self.tenant_id else None,
             "customer_type": self.customer_type.value,
             "status": self.status.value,
             "name": self.name,
@@ -75,13 +75,13 @@ class Customer:
             "credit_days": self.credit_days,
             "credit_limit": self.credit_limit,
             "owner_sales_rep_id": str(self.owner_sales_rep_id) if self.owner_sales_rep_id else None,
-            "created_at": self.created_at.isoformat(),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
             "created_by": str(self.created_by) if self.created_by else None,
-            "updated_at": self.updated_at.isoformat(),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "updated_by": str(self.updated_by) if self.updated_by else None,
             "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
             "deleted_by": str(self.deleted_by) if self.deleted_by else None,
-            "addresses": [a.to_dict() for a in self.addresses] if self.addresses else []
+            "addresses": [a.to_dict() for a in (self.addresses or [])]
         }
 
     @classmethod

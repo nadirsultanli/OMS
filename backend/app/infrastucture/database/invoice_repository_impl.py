@@ -243,7 +243,7 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                 .eq("tenant_id", str(tenant_id))
             
             if status:
-                query = query.eq("status", status.value)
+                query = query.eq("invoice_status", status.value)
             
             if customer_id:
                 query = query.eq("customer_id", str(customer_id))
@@ -595,16 +595,50 @@ class InvoiceRepositoryImpl(InvoiceRepository):
             return 0
 
     async def get_invoice_summary(self, tenant_id: UUID) -> dict:
-        """Get invoice summary for dashboard"""
+        """Get optimized invoice summary for dashboard (single query)"""
         try:
-            # Get counts by status
-            draft_count = await self.get_invoices_count(tenant_id, InvoiceStatus.DRAFT)
-            sent_count = await self.get_invoices_count(tenant_id, InvoiceStatus.SENT)
-            paid_count = await self.get_invoices_count(tenant_id, InvoiceStatus.PAID)
+            from datetime import date
             
-            # Get overdue count
-            overdue_invoices = await self.get_overdue_invoices(tenant_id, limit=1000)
-            overdue_count = len(overdue_invoices)
+            # Get all invoices for tenant in one query
+            result = self.supabase.table(self.table_name)\
+                .select("invoice_status,due_date")\
+                .eq("tenant_id", str(tenant_id))\
+                .is_("deleted_at", None)\
+                .execute()
+            
+            if not result.data:
+                return {
+                    'draft_invoices': 0,
+                    'sent_invoices': 0,
+                    'paid_invoices': 0,
+                    'overdue_invoices': 0,
+                    'total_invoices': 0
+                }
+            
+            # Count by status in memory (much faster than multiple DB queries)
+            draft_count = 0
+            sent_count = 0
+            paid_count = 0
+            overdue_count = 0
+            today = date.today()
+            
+            for invoice in result.data:
+                status = invoice.get('invoice_status')
+                due_date = invoice.get('due_date')
+                
+                if status == InvoiceStatus.DRAFT.value:
+                    draft_count += 1
+                elif status == InvoiceStatus.SENT.value:
+                    sent_count += 1
+                    # Check if overdue
+                    if due_date and due_date < today.isoformat():
+                        overdue_count += 1
+                elif status == InvoiceStatus.PAID.value:
+                    paid_count += 1
+                elif status == InvoiceStatus.PARTIAL_PAID.value:
+                    # Check if overdue
+                    if due_date and due_date < today.isoformat():
+                        overdue_count += 1
             
             total_count = draft_count + sent_count + paid_count + overdue_count
             
