@@ -1,11 +1,14 @@
 from typing import List, Optional
 from uuid import UUID
 from datetime import date
+from decimal import Decimal
 from app.domain.entities.variants import (
     Variant, ProductStatus, ProductScenario, 
     SKUType, StateAttribute, RevenueCategory
 )
 from app.domain.repositories.variant_repository import VariantRepository
+from app.services.stock_levels.stock_level_service import StockLevelService
+from app.infrastucture.database.repositories.stock_level_repository import SQLAlchemyStockLevelRepository
 
 
 class VariantNotFoundError(Exception):
@@ -23,6 +26,16 @@ class VariantService:
     
     def __init__(self, variant_repository: VariantRepository):
         self.variant_repository = variant_repository
+        # Initialize stock level service for automatic stock level creation
+        stock_level_repo = SQLAlchemyStockLevelRepository()
+        self.stock_level_service = StockLevelService(stock_level_repo)
+    
+    async def _get_product_name(self, product_id: str) -> str:
+        """Get product name for SKU generation"""
+        # This is a simplified version - in a real implementation, you'd inject a product repository
+        # For now, we'll use a simple mapping or fetch from database
+        # You can enhance this by injecting a product repository
+        return "PROPAN"  # Default for now - will be enhanced with actual product lookup
     
     async def create_variant(
         self,
@@ -42,6 +55,7 @@ class VariantService:
         status: Optional[ProductStatus] = None,
         scenario: Optional[ProductScenario] = None,
         # Physical attributes
+        size: Optional[str] = None,  # Size identifier (e.g., "13" for 13kg cylinder)
         tare_weight_kg: Optional[float] = None,
         capacity_kg: Optional[float] = None,
         gross_weight_kg: Optional[float] = None,
@@ -76,13 +90,14 @@ class VariantService:
             bundle_components=bundle_components,
             revenue_category=revenue_category,
             affects_inventory=affects_inventory,
-            default_price=default_price,
+            default_price=Decimal(str(default_price)) if default_price is not None else None,
             status=status,
             scenario=scenario,
-            tare_weight_kg=tare_weight_kg,
-            capacity_kg=capacity_kg,
-            gross_weight_kg=gross_weight_kg,
-            deposit=deposit,
+            size=size,
+            tare_weight_kg=Decimal(str(tare_weight_kg)) if tare_weight_kg is not None else None,
+            capacity_kg=Decimal(str(capacity_kg)) if capacity_kg is not None else None,
+            gross_weight_kg=Decimal(str(gross_weight_kg)) if gross_weight_kg is not None else None,
+            deposit=Decimal(str(deposit)) if deposit is not None else None,
             inspection_date=inspection_date,
             active=active,
             created_by=UUID(created_by) if created_by else None
@@ -94,7 +109,21 @@ class VariantService:
             raise ValueError(f"Business rule validation failed: {', '.join(validation_errors)}")
         
         # Save to repository
-        return await self.variant_repository.create_variant(variant)
+        saved_variant = await self.variant_repository.create_variant(variant)
+        
+        # Create initial stock levels for this variant across all warehouses
+        try:
+            await self.stock_level_service.create_initial_stock_levels_for_variant(
+                tenant_id=UUID(tenant_id),
+                variant_id=saved_variant.id,
+                created_by=UUID(created_by) if created_by else None
+            )
+        except Exception as e:
+            # Log the error but don't fail variant creation
+            # Stock levels can be created manually later if needed
+            print(f"Warning: Failed to create initial stock levels for variant {saved_variant.sku}: {str(e)}")
+        
+        return saved_variant
     
     async def create_atomic_cylinder_variants(
         self,
@@ -108,16 +137,21 @@ class VariantService:
         created_by: Optional[str] = None
     ) -> tuple[Variant, Variant]:
         """Create both EMPTY and FULL variants for a cylinder size"""
+        # Get product name for SKU generation
+        product_name = await self._get_product_name(product_id)
+        product_prefix = product_name.replace(" ", "").upper()[:6]  # Use first 6 chars of product name
+        
         # Create EMPTY variant - no gross weight (empty cylinders don't have gross weight)
         empty_variant = await self.create_variant(
             tenant_id=tenant_id,
             product_id=product_id,
-            sku=f"CYL{size}-EMPTY",
+            sku=f"{product_prefix}{size}-EMPTY",
             sku_type=SKUType.ASSET,
             state_attr=StateAttribute.EMPTY,
             is_stock_item=True,
             affects_inventory=True,
             revenue_category=RevenueCategory.ASSET_SALE,
+            size=size,
             tare_weight_kg=tare_weight_kg,
             capacity_kg=capacity_kg,
             gross_weight_kg=None,  # EMPTY cylinders have no gross weight
@@ -129,12 +163,13 @@ class VariantService:
         full_variant = await self.create_variant(
             tenant_id=tenant_id,
             product_id=product_id,
-            sku=f"CYL{size}-FULL",
+            sku=f"{product_prefix}{size}-FULL",
             sku_type=SKUType.ASSET,
             state_attr=StateAttribute.FULL,
             is_stock_item=True,
             affects_inventory=True,
             revenue_category=RevenueCategory.ASSET_SALE,
+            size=size,
             tare_weight_kg=tare_weight_kg,
             capacity_kg=capacity_kg,
             gross_weight_kg=tare_weight_kg + capacity_kg,  # Full cylinder = tare + gas weight
@@ -154,15 +189,20 @@ class VariantService:
         created_by: Optional[str] = None
     ) -> Variant:
         """Create a gas service variant"""
+        # Get product name for SKU generation
+        product_name = await self._get_product_name(product_id)
+        product_prefix = product_name.replace(" ", "").upper()[:6]  # Use first 6 chars of product name
+        
         return await self.create_variant(
             tenant_id=tenant_id,
             product_id=product_id,
-            sku=f"GAS{size}",
+            sku=f"{product_prefix}GAS{size}",
             sku_type=SKUType.CONSUMABLE,
             requires_exchange=requires_exchange,
             is_stock_item=False,
             affects_inventory=False,
             revenue_category=RevenueCategory.GAS_REVENUE,
+            size=size,
             default_price=default_price,
             created_by=created_by
         )
@@ -176,14 +216,19 @@ class VariantService:
         created_by: Optional[str] = None
     ) -> Variant:
         """Create a deposit variant"""
+        # Get product name for SKU generation
+        product_name = await self._get_product_name(product_id)
+        product_prefix = product_name.replace(" ", "").upper()[:6]  # Use first 6 chars of product name
+        
         return await self.create_variant(
             tenant_id=tenant_id,
             product_id=product_id,
-            sku=f"DEP{size}",
+            sku=f"{product_prefix}DEP{size}",
             sku_type=SKUType.DEPOSIT,
             is_stock_item=False,
             affects_inventory=False,
             revenue_category=RevenueCategory.DEPOSIT_LIABILITY,
+            size=size,
             deposit=deposit_amount,
             default_price=deposit_amount,
             created_by=created_by
@@ -199,14 +244,18 @@ class VariantService:
         created_by: Optional[str] = None
     ) -> Variant:
         """Create a bundle variant"""
+        # Get product name for SKU generation
+        product_name = await self._get_product_name(product_id)
+        product_prefix = product_name.replace(" ", "").upper()[:6]  # Use first 6 chars of product name
+        
         bundle_components = [
             {
-                "sku": f"CYL{size}-FULL",
+                "sku": f"{product_prefix}{size}-FULL",
                 "quantity": 1,
                 "component_type": "PHYSICAL"
             },
             {
-                "sku": f"DEP{size}",
+                "sku": f"{product_prefix}DEP{size}",
                 "quantity": 1,
                 "component_type": "DEPOSIT"
             }
@@ -215,10 +264,11 @@ class VariantService:
         return await self.create_variant(
             tenant_id=tenant_id,
             product_id=product_id,
-            sku=f"KIT{size}-{bundle_type}",
+            sku=f"{product_prefix}KIT{size}-{bundle_type}",
             sku_type=SKUType.BUNDLE,
             is_stock_item=False,
             affects_inventory=False,
+            size=size,
             bundle_components=bundle_components,
             default_price=default_price,
             created_by=created_by

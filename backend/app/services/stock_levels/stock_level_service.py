@@ -376,3 +376,37 @@ class StockLevelService:
                 )
 
         return await self.stock_level_repository.bulk_update_stock_levels(stock_updates)
+
+    async def create_initial_stock_levels_for_variant(
+        self,
+        tenant_id: UUID,
+        variant_id: UUID,
+        created_by: Optional[UUID] = None
+    ) -> List[StockLevel]:
+        """Create initial stock levels for a variant across all warehouses"""
+        from app.domain.repositories.warehouse_repository import WarehouseRepository
+        from app.infrastucture.database.repositories.warehouse_repository import SQLAlchemyWarehouseRepository
+        
+        # Get all warehouses for the tenant
+        warehouse_repo = SQLAlchemyWarehouseRepository()
+        warehouses = await warehouse_repo.get_warehouses_by_tenant(tenant_id)
+        
+        created_stock_levels = []
+        
+        for warehouse in warehouses:
+            # Create initial stock level for each warehouse
+            stock_level = await self.stock_level_repository.create_or_update_stock_level(
+                tenant_id=tenant_id,
+                warehouse_id=warehouse.id,
+                variant_id=variant_id,
+                stock_status=StockStatus.ON_HAND,
+                quantity=Decimal('0'),
+                reserved_qty=Decimal('0'),
+                available_qty=Decimal('0'),
+                unit_cost=Decimal('0'),
+                total_cost=Decimal('0'),
+                created_by=created_by
+            )
+            created_stock_levels.append(stock_level)
+        
+        return created_stock_levels
