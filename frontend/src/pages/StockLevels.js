@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import stockService from '../services/stockService';
 import warehouseService from '../services/warehouseService';
 import variantService from '../services/variantService';
+import authService from '../services/authService';
 import StockAdjustModal from '../components/StockAdjustModal';
 import StockReserveModal from '../components/StockReserveModal';
 import StockTransferModal from '../components/StockTransferModal';
@@ -53,18 +54,10 @@ const StockLevels = () => {
       try {
         setLoading(true);
         
-        const [warehousesResponse, variantsResponse] = await Promise.all([
-          warehouseService.getWarehouses(),
-          variantService.getVariants(null, { 
-            limit: 100,
-            active_only: true
-          })
-        ]);
+        // Load warehouses first
+        const warehousesResponse = await warehouseService.getWarehouses();
         
-        console.log('Warehouses response:', warehousesResponse);
-        console.log('Variants response:', variantsResponse);
-        
-        // Handle different response formats and ensure arrays
+        // Handle different warehouse response formats
         let warehousesData = [];
         if (warehousesResponse.success && warehousesResponse.data) {
           warehousesData = warehousesResponse.data.warehouses || [];
@@ -74,22 +67,81 @@ const StockLevels = () => {
           warehousesData = warehousesResponse;
         }
         
+        setWarehouses(Array.isArray(warehousesData) ? warehousesData : []);
+        
+        // Load variants with multiple attempts to ensure we get all variants
         let variantsData = [];
-        if (variantsResponse.success && variantsResponse.data) {
-          variantsData = variantsResponse.data.variants || [];
-        } else if (variantsResponse.data?.variants) {
-          variantsData = variantsResponse.data.variants;
-        } else if (variantsResponse.variants) {
-          variantsData = variantsResponse.variants;
-        } else if (Array.isArray(variantsResponse)) {
-          variantsData = variantsResponse;
+        try {
+          // Get current tenant ID
+          const tenantId = authService.getCurrentTenantId();
+          console.log('Loading variants for tenant:', tenantId);
+          console.log('Current user:', authService.getCurrentUser());
+          
+          // First attempt: Load with high limit
+          const variantsResponse = await variantService.getVariants(tenantId, { 
+            limit: 1000,
+            active_only: true
+          });
+          
+          console.log('Initial variants response:', variantsResponse);
+          console.log('Response type:', typeof variantsResponse);
+          console.log('Response keys:', Object.keys(variantsResponse || {}));
+          
+          if (variantsResponse.success && variantsResponse.data) {
+            variantsData = variantsResponse.data.variants || [];
+          } else if (variantsResponse.data?.variants) {
+            variantsData = variantsResponse.data.variants;
+          } else if (variantsResponse.variants) {
+            variantsData = variantsResponse.variants;
+          } else if (Array.isArray(variantsResponse)) {
+            variantsData = variantsResponse;
+          }
+          
+          console.log('Initial variants loaded:', variantsData.length);
+          console.log('Sample variants:', variantsData.slice(0, 3));
+          
+          // If we got less than 100 variants, try loading without limit
+          if (variantsData.length < 100) {
+            console.log('Trying to load variants without limit...');
+            const unlimitedResponse = await variantService.getVariants(tenantId, { 
+              active_only: true
+            });
+            
+            let unlimitedVariants = [];
+            if (unlimitedResponse.success && unlimitedResponse.data) {
+              unlimitedVariants = unlimitedResponse.data.variants || [];
+            } else if (unlimitedResponse.data?.variants) {
+              unlimitedVariants = unlimitedResponse.data.variants;
+            } else if (unlimitedResponse.variants) {
+              unlimitedVariants = unlimitedResponse.variants;
+            } else if (Array.isArray(unlimitedResponse)) {
+              unlimitedVariants = unlimitedResponse;
+            }
+            
+            if (unlimitedVariants.length > variantsData.length) {
+              variantsData = unlimitedVariants;
+              console.log('Updated variants count:', variantsData.length);
+            }
+          }
+          
+        } catch (variantError) {
+          console.error('Error loading variants:', variantError);
+          // Continue with empty variants array
         }
         
-        setWarehouses(Array.isArray(warehousesData) ? warehousesData : []);
+        console.log('Final variants data:', variantsData);
+        console.log('Number of variants loaded:', variantsData.length);
+        
         setVariants(Array.isArray(variantsData) ? variantsData : []);
         
-        // Load all stock levels immediately
-        await loadStockLevels(filters);
+        // Only load stock levels after variants are loaded
+        if (variantsData.length > 0) {
+          console.log('Variants loaded successfully, now loading stock levels...');
+          await loadStockLevels(filters);
+        } else {
+          console.warn('No variants loaded, skipping stock levels load');
+          setError('Failed to load variants. Please refresh the page.');
+        }
       } catch (err) {
         setError('Failed to load initial data: ' + err.message);
       } finally {
@@ -100,18 +152,84 @@ const StockLevels = () => {
     loadInitialData();
   }, []);
 
+  // Re-render when variants are updated
+  useEffect(() => {
+    if (variants.length > 0 && stockLevels.length > 0) {
+      console.log('Variants updated, triggering re-render');
+      // Force a re-render by updating the stock levels state
+      setStockLevels([...stockLevels]);
+    }
+  }, [variants]);
+
   const loadStockLevels = useCallback(async (searchFilters = filters) => {
     try {
       setLoading(true);
       const response = await stockService.getStockLevels(searchFilters);
-      setStockLevels(response.stock_levels || []);
-      setTotalCount(response.total_count || response.stock_levels?.length || 0);
+      const stockLevelsData = response.stock_levels || [];
+      
+      console.log('Stock levels loaded:', stockLevelsData.length);
+      if (stockLevelsData.length > 0) {
+        console.log('Sample stock level:', stockLevelsData[0]);
+      }
+      
+      // Log unique variant IDs in stock levels
+      const uniqueVariantIds = [...new Set(stockLevelsData.map(sl => sl.variant_id).filter(Boolean))];
+      console.log('Unique variant IDs in stock levels:', uniqueVariantIds);
+      
+      // Check which variant IDs are missing from our loaded variants
+      const missingVariantIds = uniqueVariantIds.filter(variantId => 
+        !variants.find(v => v.id === variantId)
+      );
+      
+      if (missingVariantIds.length > 0) {
+        console.log('Missing variant IDs:', missingVariantIds);
+        console.log('Available variant IDs:', variants.map(v => v.id));
+        
+        // Try to fetch missing variants individually
+        await fetchMissingVariants(missingVariantIds);
+      }
+      
+      setStockLevels(stockLevelsData);
+      setTotalCount(response.total_count || stockLevelsData.length || 0);
     } catch (err) {
       setError('Failed to load stock levels: ' + err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [variants]); // Add variants as dependency
+
+  // Function to fetch missing variants individually
+  const fetchMissingVariants = async (missingIds) => {
+    console.log('Fetching missing variants:', missingIds);
+    
+    try {
+      const tenantId = authService.getCurrentTenantId();
+      const newVariants = [];
+      
+      for (const variantId of missingIds) {
+        try {
+          console.log(`Fetching individual variant: ${variantId}`);
+          const response = await variantService.getVariantById(variantId);
+          
+          if (response.success && response.data) {
+            console.log(`Successfully fetched variant:`, response.data);
+            newVariants.push(response.data);
+          } else {
+            console.log(`Failed to fetch variant ${variantId}:`, response.error);
+          }
+        } catch (error) {
+          console.error(`Error fetching variant ${variantId}:`, error);
+        }
+      }
+      
+      if (newVariants.length > 0) {
+        console.log(`Adding ${newVariants.length} new variants to the list`);
+        setVariants(prevVariants => [...prevVariants, ...newVariants]);
+      }
+    } catch (error) {
+      console.error('Error fetching missing variants:', error);
+    }
+  };
 
   // Only load initially, no auto-refresh on filter changes
   const handleSearch = () => {
@@ -132,10 +250,78 @@ const StockLevels = () => {
     return warehouse ? `${warehouse.code} - ${warehouse.name}` : 'Unknown';
   };
 
-  const getVariantName = (variantId) => {
-    if (!Array.isArray(variants)) return 'Unknown';
+  const getVariantName = (variantId, stockLevelData = null) => {
+    if (!variantId) return 'No Variant ID';
+    if (!Array.isArray(variants)) return 'Variants not loaded';
+    
+    console.log(`Looking for variant ID: ${variantId}`);
+    console.log(`Available variants count: ${variants.length}`);
+    console.log(`Available variant IDs:`, variants.map(v => v.id).slice(0, 10));
+    console.log(`Available variant SKUs:`, variants.map(v => v.sku).slice(0, 10));
+    
     const variant = variants.find(v => v.id === variantId);
-    return variant ? variant.sku : 'Unknown';
+    
+    if (!variant) {
+      console.log(`Variant not found for ID: ${variantId}`);
+      console.log(`This variant ID is missing from the loaded variants list`);
+      
+      // Try to get SKU from stock level data if available
+      if (stockLevelData && stockLevelData.sku) {
+        console.log(`Using SKU from stock level data: ${stockLevelData.sku}`);
+        return stockLevelData.sku;
+      }
+      
+      // Try multiple fallback strategies
+      // 1. Try to find by SKU
+      const variantBySku = variants.find(v => v.sku === variantId);
+      if (variantBySku) {
+        console.log(`Found variant by SKU: ${variantBySku.sku}`);
+        return variantBySku.sku;
+      }
+      
+      // 2. Try to find by partial SKU match
+      const variantByPartialSku = variants.find(v => 
+        v.sku && v.sku.toLowerCase().includes(variantId.toLowerCase())
+      );
+      if (variantByPartialSku) {
+        console.log(`Found variant by partial SKU: ${variantByPartialSku.sku}`);
+        return variantByPartialSku.sku;
+      }
+      
+      // 3. Try to find by name
+      const variantByName = variants.find(v => 
+        v.name && v.name.toLowerCase().includes(variantId.toLowerCase())
+      );
+      if (variantByName) {
+        console.log(`Found variant by name: ${variantByName.name}`);
+        return variantByName.name;
+      }
+      
+      // 4. If it looks like a UUID, try to fetch it individually
+      if (variantId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        console.log(`Attempting to fetch variant ${variantId} individually...`);
+        // Note: We could implement individual variant fetching here
+        // For now, return a more descriptive fallback
+        return `Variant ${variantId.slice(0, 8)}...`;
+      }
+      
+      return `Variant ${variantId}`;
+    }
+    
+    console.log(`Found variant:`, variant);
+    
+    // Return a more descriptive name with priority order
+    if (variant.name && variant.sku) {
+      return `${variant.name} (${variant.sku})`;
+    } else if (variant.name) {
+      return variant.name;
+    } else if (variant.sku) {
+      return variant.sku;
+    } else if (variant.product_name) {
+      return `${variant.product_name} (${variant.id})`;
+    } else {
+      return `Variant ${variant.id}`;
+    }
   };
 
   const formatQuantity = (qty) => {
@@ -475,7 +661,7 @@ const StockLevels = () => {
                     <td>{getWarehouseName(level.warehouse_id)}</td>
                     <td>
                       <div className="variant-info">
-                        <span className="sku">{getVariantName(level.variant_id)}</span>
+                        <span className="sku">{getVariantName(level.variant_id, level)}</span>
                       </div>
                     </td>
                     <td>

@@ -3,8 +3,9 @@ from uuid import UUID
 from app.services.invoices.invoice_service import InvoiceService
 from app.domain.repositories.invoice_repository import InvoiceRepository
 from app.domain.repositories.order_repository import OrderRepository
+from app.domain.repositories.customer_repository import CustomerRepository
 from app.infrastucture.database.invoice_repository_impl import InvoiceRepositoryImpl
-from app.services.dependencies.repositories import get_order_repository
+from app.services.dependencies.repositories import get_order_repository, get_customer_repository
 from app.services.tenants.tenant_service import TenantService
 from app.services.dependencies.tenants import get_tenant_service
 from app.services.orders.order_service import OrderService
@@ -19,8 +20,9 @@ def get_invoice_repository() -> InvoiceRepository:
 def get_invoice_service(
     invoice_repository: InvoiceRepository = Depends(get_invoice_repository),
     order_repository: OrderRepository = Depends(get_order_repository),
+    customer_repository: CustomerRepository = Depends(get_customer_repository),
     order_service: OrderService = Depends(get_order_service),
     tenant_service: TenantService = Depends(get_tenant_service)
 ) -> InvoiceService:
     """Get the invoice service with dependencies"""
-    return InvoiceService(invoice_repository, order_repository, order_service, tenant_service)
+    return InvoiceService(invoice_repository, order_repository, customer_repository, order_service, tenant_service)

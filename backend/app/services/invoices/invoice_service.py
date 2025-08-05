@@ -15,6 +15,7 @@ from app.domain.entities.users import User, UserRoleType
 from app.domain.entities.customers import Customer
 from app.domain.repositories.invoice_repository import InvoiceRepository
 from app.domain.repositories.order_repository import OrderRepository
+from app.domain.repositories.customer_repository import CustomerRepository
 from app.services.orders.order_service import OrderService
 from app.domain.exceptions.invoices import (
     InvoiceNotFoundError,
@@ -28,9 +29,10 @@ from app.domain.exceptions.invoices import (
 class InvoiceService:
     """Service for invoice business logic"""
     
-    def __init__(self, invoice_repository: InvoiceRepository, order_repository: OrderRepository, order_service: OrderService = None, tenant_service=None):
+    def __init__(self, invoice_repository: InvoiceRepository, order_repository: OrderRepository, customer_repository: CustomerRepository, order_service: OrderService = None, tenant_service=None):
         self.invoice_repository = invoice_repository
         self.order_repository = order_repository
+        self.customer_repository = customer_repository
         self.order_service = order_service
         self.tenant_service = tenant_service
 
@@ -112,13 +114,29 @@ class InvoiceService:
                 # Log error but continue with default currency
                 print(f"Warning: Could not get tenant currency, using default KES: {e}")
 
+        # Get customer information
+        customer = await self.customer_repository.get_by_id(str(order.customer_id))
+        if not customer:
+            raise InvoiceNotFoundError(f"Customer {order.customer_id} not found")
+            
+        customer_name = customer.name
+        customer_address = f"{customer.address_line_1}"
+        if customer.address_line_2:
+            customer_address += f", {customer.address_line_2}"
+        if customer.city:
+            customer_address += f", {customer.city}"
+        if customer.postal_code:
+            customer_address += f" {customer.postal_code}"
+        if customer.country:
+            customer_address += f", {customer.country}"
+
         # Create the invoice
         invoice = Invoice.create(
             tenant_id=user.tenant_id,
             invoice_no=invoice_no,
             customer_id=order.customer_id,
-            customer_name="Customer Name",  # Would get from customer service
-            customer_address="Customer Address",  # Would get from customer service
+            customer_name=customer_name,
+            customer_address=customer_address,
             invoice_date=invoice_date,
             due_date=due_date,
             order_id=order.id,
@@ -172,6 +190,11 @@ class InvoiceService:
         print(f"DEBUG: Invoice lines count: {len(saved_invoice.invoice_lines)}")
         for i, line in enumerate(saved_invoice.invoice_lines):
             print(f"DEBUG: Line {i}: unit_price={line.unit_price}, line_total={line.line_total}")
+        
+        # Mark as generated (ready for payment)
+        saved_invoice.mark_as_generated(user.id)
+        await self.invoice_repository.update_invoice(str(saved_invoice.id), saved_invoice)
+        
         return saved_invoice
 
     async def generate_invoice_pdf(self, invoice: Invoice) -> bytes:
@@ -553,7 +576,14 @@ class InvoiceService:
             )
             invoice.add_line(invoice_line)
 
-        return await self.invoice_repository.create_invoice(invoice)
+        # Save the invoice
+        saved_invoice = await self.invoice_repository.create_invoice(invoice)
+        
+        # Mark as generated (ready for payment)
+        saved_invoice.mark_as_generated(user.id)
+        await self.invoice_repository.update_invoice(str(saved_invoice.id), saved_invoice)
+        
+        return saved_invoice
 
     async def get_invoice_by_id(self, user: User, invoice_id: str) -> Invoice:
         """Get invoice by ID"""

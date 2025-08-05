@@ -140,6 +140,54 @@ async def get_customer(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
+@router.get("/{customer_id}/for-invoice", response_model=CustomerResponse)
+async def get_customer_for_invoice(
+    customer_id: str, 
+    customer_service: CustomerService = Depends(get_customer_service),
+    context: UserContext = user_context
+):
+    """Get customer details with addresses for invoice creation"""
+    logger.info(
+        "Retrieving customer for invoice",
+        user_id=context.user_id,
+        tenant_id=context.tenant_id,
+        customer_id=customer_id
+    )
+    
+    try:
+        customer = await customer_service.get_customer_by_id(customer_id)
+        
+        logger.info(
+            "Customer retrieved for invoice successfully",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=str(customer.id),
+            customer_name=customer.name,
+            addresses_count=len(customer.addresses) if hasattr(customer, 'addresses') and customer.addresses else 0
+        )
+        
+        return CustomerResponse(**customer.to_dict())
+        
+    except CustomerNotFoundError as e:
+        logger.warning(
+            "Customer not found for invoice",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e)
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to retrieve customer for invoice",
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            customer_id=customer_id,
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
 
 @router.put("/{customer_id}", response_model=CustomerResponse)
 async def update_customer(

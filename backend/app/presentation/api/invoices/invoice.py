@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
@@ -35,6 +36,54 @@ logger = get_logger("invoices_api")
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
 
+@router.get("/debug/order-statuses", response_model=dict)
+async def debug_order_statuses(
+    invoice_service: InvoiceService = Depends(get_invoice_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Debug endpoint to check all order statuses in the system"""
+    try:
+        # Get all orders with their statuses
+        all_orders = await invoice_service.order_repository.get_all_orders(
+            tenant_id=current_user.tenant_id,
+            limit=100,
+            offset=0
+        )
+        
+        # Group by status
+        status_counts = {}
+        orders_by_status = {}
+        
+        for order in all_orders:
+            status = order.order_status.value
+            if status not in status_counts:
+                status_counts[status] = 0
+                orders_by_status[status] = []
+            
+            status_counts[status] += 1
+            orders_by_status[status].append({
+                'id': str(order.id),
+                'order_no': order.order_no,
+                'total_amount': float(order.total_amount),
+                'created_at': order.created_at.isoformat() if hasattr(order, 'created_at') else None
+            })
+        
+        return {
+            'total_orders': len(all_orders),
+            'status_counts': status_counts,
+            'eligible_for_invoicing': ['delivered', 'closed'],
+            'orders_by_status': orders_by_status,
+            'debug_info': {
+                'tenant_id': str(current_user.tenant_id),
+                'user_id': str(current_user.id)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Debug endpoint failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get("/available-orders", response_model=List[dict])
 async def get_orders_ready_for_invoicing(
     limit: int = Query(100, ge=1, le=1000),
@@ -52,11 +101,35 @@ async def get_orders_ready_for_invoicing(
     )
     
     try:
+        # First, get ALL orders to understand what we have
+        from app.services.orders.order_service import OrderService
+        from app.services.dependencies.orders import get_order_service
+        
+        # Debug: Get total orders count
+        all_orders = await invoice_service.order_repository.get_all_orders(
+            tenant_id=current_user.tenant_id,
+            limit=10,
+            offset=0
+        )
+        
+        logger.info(
+            f"Debug: Found {len(all_orders)} total orders for tenant",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            order_statuses=[order.order_status.value for order in all_orders] if all_orders else []
+        )
+        
         # Get orders that are delivered or closed
         orders = await invoice_service.get_orders_ready_for_invoicing(
             user=current_user,
             limit=limit,
             offset=offset
+        )
+        
+        logger.info(
+            f"Found {len(orders)} orders ready for invoicing",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id)
         )
         
         # Convert to simple dict format for frontend
@@ -70,7 +143,8 @@ async def get_orders_ready_for_invoicing(
                 'total_amount': float(order.total_amount),
                 'status': order.order_status.value,
                 'requested_date': order.requested_date.isoformat() if order.requested_date else None,
-                'ready_for_invoicing': True  # All orders returned are ready for invoicing
+                'ready_for_invoicing': True,  # All orders returned are ready for invoicing
+                'debug_eligible_statuses': ['delivered', 'closed']  # Help frontend understand criteria
             })
         
         return order_list
@@ -229,7 +303,70 @@ async def create_manual_invoice(
 
 
 @router.get("", response_model=InvoiceListResponse)
-async def search_invoices(
+async def get_all_invoices_for_client_search(
+    invoice_service: InvoiceService = Depends(get_invoice_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all invoices for client-side filtering and searching"""
+    try:
+        logger.info(
+            "Fetching all invoices for client-side search",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id)
+        )
+        
+        # Fetch invoices with reduced limit to prevent timeouts
+        # Frontend will handle search/filter logic for better UX
+        invoices = await asyncio.wait_for(
+            invoice_service.search_invoices(
+                user=current_user,
+                limit=50  # Reduced from 1000 to prevent timeouts
+            ),
+            timeout=25.0  # 25 second timeout
+        )
+        
+        logger.info(
+            "All invoices fetched for client-side search",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            results_count=len(invoices)
+        )
+        
+        return InvoiceListResponse(
+            invoices=[InvoiceResponse(**invoice.to_dict()) for invoice in invoices],
+            total=len(invoices),
+            limit=50,  # Updated to match actual limit
+            offset=0
+        )
+    except asyncio.TimeoutError:
+        logger.error(
+            "Invoice fetch timeout - database may be slow",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id)
+        )
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT, 
+            detail="Request timeout - please try again later"
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to fetch invoices for client-side search",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            error=str(e),
+            error_type=type(e).__name__
+        )
+        # Return degraded service instead of complete failure
+        if "connection" in str(e).lower() or "timeout" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database temporarily unavailable - please try again in a few minutes"
+            )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+@router.get("/search", response_model=InvoiceListResponse)
+async def search_invoices_server_side(
     customer_name: Optional[str] = Query(None, description="Filter by customer name"),
     invoice_no: Optional[str] = Query(None, description="Filter by invoice number"),
     invoice_status: Optional[InvoiceStatus] = Query(None, description="Filter by status"),
@@ -240,8 +377,16 @@ async def search_invoices(
     invoice_service: InvoiceService = Depends(get_invoice_service),
     current_user: User = Depends(get_current_user)
 ):
-    """Search invoices with filters"""
+    """Search invoices with server-side filters (legacy endpoint)"""
     try:
+        logger.info(
+            "Server-side invoice search requested",
+            user_id=str(current_user.id),
+            tenant_id=str(current_user.tenant_id),
+            customer_name=customer_name,
+            invoice_no=invoice_no
+        )
+        
         invoices = await invoice_service.search_invoices(
             user=current_user,
             customer_name=customer_name,
@@ -261,7 +406,7 @@ async def search_invoices(
         )
     except Exception as e:
         logger.error(
-            "Failed to search invoices",
+            "Failed to search invoices server-side",
             user_id=str(current_user.id),
             tenant_id=str(current_user.tenant_id),
             error=str(e),

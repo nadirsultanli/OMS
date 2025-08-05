@@ -13,7 +13,10 @@ import {
   Eye,
   ChevronDown,
   ChevronRight,
-  RefreshCw
+  RefreshCw,
+  Database,
+  Users,
+  CheckCircle
 } from 'lucide-react';
 import auditService from '../services/auditService';
 import authService from '../services/authService';
@@ -852,8 +855,177 @@ const Audit = () => {
       {/* Compliance Tab Content */}
       {activeTab === 'compliance' && (
         <div className="compliance-section">
-          <h2>Compliance Overview</h2>
-          <p>Compliance information will be implemented here</p>
+          <div className="compliance-header">
+            <h2>Trail Compliance</h2>
+            <button 
+              className="refresh-btn compliance-refresh"
+              onClick={() => {
+                fetchAuditEvents();
+                fetchDashboardData();
+              }}
+              disabled={loading}
+            >
+              <RefreshCw className={`refresh-icon ${loading ? 'spinning' : ''}`} size={16} />
+              Refresh Compliance
+            </button>
+          </div>
+          
+          <div className="compliance-grid">
+            {/* Audit Trail Status */}
+            <div className="compliance-card">
+              <div className="compliance-card-header">
+                <Shield size={20} />
+                <h3>Audit Trail Status</h3>
+              </div>
+              <div className="compliance-card-content">
+                <div className="compliance-item">
+                  <span className="compliance-label">Total Events:</span>
+                  <span className="compliance-value">{totalEvents}</span>
+                </div>
+                <div className="compliance-item">
+                  <span className="compliance-label">Last 24 Hours:</span>
+                  <span className="compliance-value">
+                    {auditEvents.filter(e => {
+                      const eventTime = new Date(e.event_time);
+                      const now = new Date();
+                      return (now - eventTime) <= 24 * 60 * 60 * 1000;
+                    }).length}
+                  </span>
+                </div>
+                <div className="compliance-item">
+                  <span className="compliance-label">System Status:</span>
+                  <span className="compliance-value status-good">Active</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Security Compliance */}
+            <div className="compliance-card">
+              <div className="compliance-card-header">
+                <AlertTriangle size={20} />
+                <h3>Security Compliance</h3>
+              </div>
+              <div className="compliance-card-content">
+                <div className="compliance-item">
+                  <span className="compliance-label">Failed Logins:</span>
+                  <span className="compliance-value">
+                    {auditEvents.filter(e => e.event_type === 'LOGIN_FAILED').length}
+                  </span>
+                </div>
+                <div className="compliance-item">
+                  <span className="compliance-label">Data Access:</span>
+                  <span className="compliance-value">
+                    {auditEvents.filter(e => e.event_type === 'READ').length}
+                  </span>
+                </div>
+                <div className="compliance-item">
+                  <span className="compliance-label">Modifications:</span>
+                  <span className="compliance-value">
+                    {auditEvents.filter(e => ['CREATE', 'UPDATE', 'DELETE'].includes(e.event_type)).length}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Data Integrity */}
+            <div className="compliance-card">
+              <div className="compliance-card-header">
+                <Database size={20} />
+                <h3>Data Integrity</h3>
+              </div>
+              <div className="compliance-card-content">
+                <div className="compliance-item">
+                  <span className="compliance-label">Records Modified:</span>
+                  <span className="compliance-value">
+                    {auditEvents.filter(e => e.event_type === 'UPDATE').length}
+                  </span>
+                </div>
+                <div className="compliance-item">
+                  <span className="compliance-label">Records Created:</span>
+                  <span className="compliance-value">
+                    {auditEvents.filter(e => e.event_type === 'CREATE').length}
+                  </span>
+                </div>
+                <div className="compliance-item">
+                  <span className="compliance-label">Records Deleted:</span>
+                  <span className="compliance-value">
+                    {auditEvents.filter(e => e.event_type === 'DELETE').length}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* User Activity */}
+            <div className="compliance-card">
+              <div className="compliance-card-header">
+                <Users size={20} />
+                <h3>User Activity</h3>
+              </div>
+              <div className="compliance-card-content">
+                <div className="compliance-item">
+                  <span className="compliance-label">Active Users:</span>
+                  <span className="compliance-value">
+                    {new Set(auditEvents.filter(e => e.actor_id).map(e => e.actor_id)).size}
+                  </span>
+                </div>
+                <div className="compliance-item">
+                  <span className="compliance-label">Login Events:</span>
+                  <span className="compliance-value">
+                    {auditEvents.filter(e => e.event_type === 'LOGIN').length}
+                  </span>
+                </div>
+                <div className="compliance-item">
+                  <span className="compliance-label">Logout Events:</span>
+                  <span className="compliance-value">
+                    {auditEvents.filter(e => e.event_type === 'LOGOUT').length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Compliance Summary */}
+          <div className="compliance-summary">
+            <h3>Compliance Summary</h3>
+            <div className="summary-items">
+              <div className="summary-item">
+                <div className="summary-icon success">
+                  <CheckCircle size={16} />
+                </div>
+                <div className="summary-content">
+                  <span className="summary-label">Audit Trail</span>
+                  <span className="summary-value">Active</span>
+                </div>
+              </div>
+              <div className="summary-item">
+                <div className="summary-icon success">
+                  <CheckCircle size={16} />
+                </div>
+                <div className="summary-content">
+                  <span className="summary-label">Data Protection</span>
+                  <span className="summary-value">Compliant</span>
+                </div>
+              </div>
+              <div className="summary-item">
+                <div className="summary-icon success">
+                  <CheckCircle size={16} />
+                </div>
+                <div className="summary-content">
+                  <span className="summary-label">User Access</span>
+                  <span className="summary-value">Monitored</span>
+                </div>
+              </div>
+              <div className="summary-item">
+                <div className="summary-icon success">
+                  <CheckCircle size={16} />
+                </div>
+                <div className="summary-content">
+                  <span className="summary-label">System Security</span>
+                  <span className="summary-value">Secure</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

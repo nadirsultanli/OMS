@@ -170,29 +170,29 @@ class DirectDatabaseConnection:
 
     def configure(self, url: str):
         self._url = url
-        # Conservative connection pool settings to prevent connection leaks
+        # Optimized connection pool settings to prevent timeouts
         self._engine = create_async_engine(
             url, 
             echo=False, 
             future=True,
-            # Aggressive connection pool settings to prevent idle transactions
-            pool_size=3,            # Reduced to 3 connections
-            max_overflow=5,         # Reduced to 5 (allow up to 8 total connections)
+            # Emergency connection pool settings for timeout issues
+            pool_size=5,            # Reduced to prevent connection exhaustion
+            max_overflow=5,         # Reduced to 5 (max 10 total connections)
             pool_pre_ping=True,     # Validate connections before use
-            pool_recycle=60,        # Recycle connections every 1 minute
-            pool_timeout=5,         # Reduced timeout to 5 seconds
-            # Query performance settings with very strict timeouts
+            pool_recycle=180,       # Recycle connections every 3 minutes
+            pool_timeout=10,        # Reduced timeout to 10 seconds
+            # Query performance settings with reasonable timeouts
             connect_args={
                 "statement_cache_size": 0,  # Disable statement cache for pooled connections
                 "prepared_statement_cache_size": 0,
-                "command_timeout": 15,      # Reduced to 15 seconds
+                "command_timeout": 15,      # Reduced to 15 seconds for faster failures
                 "server_settings": {
                     "application_name": "oms_backend",
-                    "tcp_keepalives_idle": "15",      # Very aggressive keepalive
-                    "tcp_keepalives_interval": "5",   
+                    "tcp_keepalives_idle": "30",      # Reduced keepalive timeout
+                    "tcp_keepalives_interval": "5",
                     "tcp_keepalives_count": "2",
                     "statement_timeout": "15000",     # Reduced to 15 seconds
-                    "idle_in_transaction_session_timeout": "30000"  # Reduced to 30 seconds
+                    "idle_in_transaction_session_timeout": "60000"  # Reduced to 1 minute
                 }
             }
         )
@@ -224,10 +224,10 @@ class DirectDatabaseConnection:
         for attempt in range(max_retries):
             try:
                 # Add timeout to connection test
-                async with await asyncio.wait_for(self._engine.connect(), timeout=15.0) as conn:
+                async with await asyncio.wait_for(self._engine.connect(), timeout=30.0) as conn:
                     await asyncio.wait_for(
                         conn.execute(sqlalchemy.text("SELECT 1")), 
-                        timeout=10.0
+                        timeout=20.0
                     )
                 default_logger.info("Direct SQLAlchemy connection test successful")
                 return True
@@ -267,35 +267,45 @@ async def init_direct_database() -> None:
     await direct_db_connection.test_connection()
 
 async def cleanup_idle_connections():
-    """
-    Clean up idle database connections using aggressive cleanup (30-second threshold).
-    This should be called periodically (e.g., every 30 seconds) from your application.
-    """
+    """Industry-standard connection cleanup with monitoring"""
     try:
-        async for session in direct_db_connection.get_session():
-            # Call the aggressive cleanup function
-            result = await session.execute(text("SELECT cleanup_idle_connections_aggressive();"))
-            terminated_count = result.scalar()
-            
-            # Log the cleanup
-            if terminated_count > 0:
-                default_logger.info(f"✅ Aggressive connection cleanup completed: {terminated_count} connections terminated")
-            else:
-                default_logger.info("✅ No connections needed cleanup")
-            
-            # Also get current connection status
-            try:
-                status_result = await session.execute(text("SELECT get_connection_status();"))
-                status = status_result.scalar()
-                default_logger.info(f"Current connection status: {status}")
-            except:
-                # Status function might not exist, that's okay
-                pass
-            
-            break  # Exit after first iteration
-            
+        # Use the database function for cleanup
+        if direct_db_connection._engine:
+            async with direct_db_connection._engine.connect() as conn:
+                # Get connection stats before cleanup
+                stats_before = await conn.execute(sqlalchemy.text("""
+                    SELECT state, COUNT(*) as count 
+                    FROM pg_stat_activity 
+                    WHERE datname = current_database() 
+                    GROUP BY state
+                """))
+                before_stats = {row.state: row.count for row in stats_before}
+                
+                # Call cleanup function (targets idle transactions > 60 seconds)
+                result = await conn.execute(sqlalchemy.text("SELECT cleanup_idle_connections_aggressive()"))
+                terminated_count = result.scalar()
+                
+                # Log results with context
+                if terminated_count > 0:
+                    default_logger.info(f"🧹 Cleaned up {terminated_count} idle connections")
+                    # Get stats after cleanup for monitoring
+                    stats_after = await conn.execute(sqlalchemy.text("""
+                        SELECT state, COUNT(*) as count 
+                        FROM pg_stat_activity 
+                        WHERE datname = current_database() 
+                        GROUP BY state
+                    """))
+                    after_stats = {row.state: row.count for row in stats_after}
+                    default_logger.info(f"📊 Connection states after cleanup: {after_stats}")
+                else:
+                    # Only log every 10th attempt to reduce noise
+                    import time
+                    if int(time.time()) % 1200 == 0:  # Every 20 minutes
+                        default_logger.info(f"📊 Connection health check: {before_stats}")
+                    
     except Exception as e:
-        default_logger.error(f"❌ Failed to cleanup idle connections: {str(e)}")
+        default_logger.error(f"❌ Connection cleanup failed: {str(e)}")
+        # Don't raise - let the app continue running
 
 
 def get_database() -> Client:

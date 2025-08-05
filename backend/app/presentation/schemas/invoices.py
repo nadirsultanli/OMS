@@ -62,18 +62,29 @@ class UpdateInvoiceRequest(BaseModel):
 
 class InvoiceLineResponse(BaseModel):
     id: str = Field(..., description="Line ID")
-    description: str = Field(..., description="Line description")
-    quantity: float = Field(..., description="Quantity")
-    unit_price: float = Field(..., description="Unit price")
-    line_total: float = Field(..., description="Line total")
-    tax_code: str = Field(..., description="Tax code")
-    tax_rate: float = Field(..., description="Tax rate")
-    tax_amount: float = Field(..., description="Tax amount")
-    net_amount: float = Field(..., description="Net amount")
-    gross_amount: float = Field(..., description="Gross amount")
-    product_code: Optional[str] = Field(None, description="Product code")
-    variant_sku: Optional[str] = Field(None, description="Variant SKU")
-    component_type: str = Field(..., description="Component type")
+    description: str = Field(..., description="Product/Service description")
+    quantity: float = Field(..., description="Quantity ordered")
+    unit_price: float = Field(..., description="Unit price (before tax)")
+    line_total: float = Field(..., description="Subtotal (quantity × unit_price)")
+    tax_code: str = Field(..., description="Tax classification code")
+    tax_rate: float = Field(..., description="Tax rate percentage (e.g., 23.00 for 23%)")
+    tax_amount: float = Field(..., description="Calculated tax amount")
+    net_amount: float = Field(..., description="Amount before tax (same as line_total)")
+    gross_amount: float = Field(..., description="TOTAL AMOUNT (net + tax) - This is the final amount")
+    product_code: Optional[str] = Field(None, description="Internal product code")
+    variant_sku: Optional[str] = Field(None, description="Product variant SKU")
+    component_type: str = Field(..., description="Line type (STANDARD/DISCOUNT/SURCHARGE)")
+    
+    # Add computed properties for clarity
+    @property
+    def display_total(self) -> float:
+        """The final amount for this line (gross_amount)"""
+        return self.gross_amount
+    
+    @property
+    def is_tax_inclusive(self) -> bool:
+        """Whether this line includes tax in the final amount"""
+        return True
 
     class Config:
         from_attributes = True
@@ -101,12 +112,12 @@ class InvoiceResponse(BaseModel):
     due_date: str = Field(..., description="Due date")
     delivery_date: Optional[str] = Field(None, description="Delivery date")
     
-    # Financial totals
-    subtotal: float = Field(..., description="Subtotal")
-    total_tax: float = Field(..., description="Total tax")
-    total_amount: float = Field(..., description="Total amount")
-    paid_amount: float = Field(..., description="Paid amount")
-    balance_due: float = Field(..., description="Balance due")
+    # Financial totals (clearly explained)
+    subtotal: float = Field(..., description="Subtotal (sum of all line totals before tax)")
+    total_tax: float = Field(..., description="Total tax amount")
+    total_amount: float = Field(..., description="FINAL TOTAL (subtotal + tax) - Amount customer pays")
+    paid_amount: float = Field(..., description="Amount already paid by customer")
+    balance_due: float = Field(..., description="Outstanding amount (total_amount - paid_amount)")
     
     # Additional information
     currency: str = Field(..., description="Currency")

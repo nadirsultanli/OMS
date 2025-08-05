@@ -149,7 +149,7 @@ const paymentService = {
   // Create refund
   createRefund: async (originalPaymentId, refundData) => {
     try {
-      const response = await api.post('/payments/refund', {
+      const response = await api.post('/payments/refunds', {
         original_payment_id: originalPaymentId,
         refund_amount: refundData.refund_amount,
         reason: refundData.reason

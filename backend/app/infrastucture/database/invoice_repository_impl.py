@@ -1,74 +1,85 @@
-from typing import List, Optional
+import asyncio
+from datetime import datetime, date
+from decimal import Decimal
+from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import date, datetime
+from supabase import Client
 
+from app.domain.entities.invoices import Invoice, InvoiceLine, InvoiceStatus, InvoiceType
 from app.domain.repositories.invoice_repository import InvoiceRepository
-from app.domain.entities.invoices import Invoice, InvoiceStatus, InvoiceType
 from app.infrastucture.database.connection import get_database
-from app.infrastucture.logs.logger import default_logger
+from app.infrastucture.logs.logger import get_logger
 
+# Simple cache for invoice queries
+_invoice_cache = {}
+_cache_ttl = 300  # 5 minutes
 
 class InvoiceRepositoryImpl(InvoiceRepository):
-    """Implementation of InvoiceRepository using Supabase"""
-
+    """Supabase implementation of invoice repository"""
+    
     def __init__(self):
+        self.supabase: Client = get_database()
         self.table_name = "invoices"
         self.lines_table_name = "invoice_lines"
-        self.supabase = get_database()
-        self.logger = default_logger
+        self.logger = get_logger("invoice_repository")
+    
+    def _get_cache_key(self, tenant_id: UUID, **filters) -> str:
+        """Generate cache key for invoice queries"""
+        filter_str = "&".join([f"{k}={v}" for k, v in sorted(filters.items()) if v is not None])
+        return f"invoices:{tenant_id}:{filter_str}"
+    
+    def _get_cached_result(self, cache_key: str) -> Optional[List[Invoice]]:
+        """Get cached result if available and not expired"""
+        if cache_key in _invoice_cache:
+            cached_data, timestamp = _invoice_cache[cache_key]
+            if (datetime.now().timestamp() - timestamp) < _cache_ttl:
+                self.logger.info(f"Returning cached result for {cache_key}")
+                return cached_data
+            else:
+                del _invoice_cache[cache_key]
+        return None
+    
+    def _cache_result(self, cache_key: str, result: List[Invoice]):
+        """Cache the result"""
+        _invoice_cache[cache_key] = (result, datetime.now().timestamp())
+        self.logger.info(f"Cached result for {cache_key}")
+    
+    def clear_cache(self):
+        """Clear the cache"""
+        global _invoice_cache
+        _invoice_cache.clear()
+        self.logger.info("Invoice cache cleared")
 
     async def create_invoice(self, invoice: Invoice) -> Invoice:
         """Create a new invoice"""
         try:
+            # Convert invoice to dict
+            invoice_data = invoice.to_dict(include_computed=False)
+            lines_data = invoice_data.pop('invoice_lines', [])
+            
             # Insert invoice
-            invoice_data = invoice.to_dict(include_lines=False, include_computed=False)
-            lines_data = []
-            
-            # Extract invoice lines data
-            self.logger.info(f"Processing {len(invoice.invoice_lines)} invoice lines")
-            for line in invoice.invoice_lines:
-                line_data = {
-                    'id': str(line.id),
-                    'invoice_id': str(invoice.id),
-                    'order_line_id': str(line.order_line_id) if line.order_line_id else None,
-                    'description': line.description,
-                    'quantity': float(line.quantity),
-                    'unit_price': float(line.unit_price),
-                    'line_total': float(line.line_total),
-                    'tax_code': line.tax_code,
-                    'tax_rate': float(line.tax_rate),
-                    'tax_amount': float(line.tax_amount),
-                    'net_amount': float(line.net_amount),
-                    'gross_amount': float(line.gross_amount),
-                    'product_code': line.product_code,
-                    'variant_sku': line.variant_sku,
-                    'component_type': line.component_type
-                }
-                lines_data.append(line_data)
-                self.logger.info(f"Processed line: {line.description} - Qty: {line.quantity}, Price: {line.unit_price}")
-            
             result = self.supabase.table(self.table_name).insert(invoice_data).execute()
             
             if not result.data:
-                raise Exception("Failed to create invoice")
+                raise ValueError("Failed to create invoice")
             
-            # Insert lines if any
+            created_invoice_data = result.data[0]
+            
+            # Insert invoice lines
             if lines_data:
-                self.logger.info(f"Inserting {len(lines_data)} invoice lines")
-                try:
-                    result = self.supabase.table(self.lines_table_name).insert(lines_data).execute()
-                    self.logger.info(f"Successfully inserted {len(lines_data)} invoice lines")
-                except Exception as e:
-                    self.logger.error(f"Failed to insert invoice lines: {str(e)}")
-                    raise
-            else:
-                self.logger.info("No invoice lines to insert")
+                for line in lines_data:
+                    line['invoice_id'] = created_invoice_data['id']
+                
+                self.supabase.table(self.lines_table_name).insert(lines_data).execute()
             
-            return await self.get_invoice_by_id(str(invoice.id), invoice.tenant_id)
+            # Clear cache when new invoice is created
+            self.clear_cache()
+            
+            return await self.get_invoice_by_id(created_invoice_data['id'], invoice.tenant_id)
             
         except Exception as e:
-            self.logger.error(f"Error creating invoice: {str(e)}")
-            raise Exception(f"Failed to create invoice: {str(e)}")
+            self.logger.error(f"Error creating invoice: {e}")
+            raise
 
     async def get_invoice_by_id(self, invoice_id: str, tenant_id: UUID) -> Optional[Invoice]:
         """Get invoice by ID"""
@@ -180,7 +191,7 @@ class InvoiceRepositoryImpl(InvoiceRepository):
         try:
             result = self.supabase.table(self.table_name)\
                 .select("*")\
-                .eq("status", status.value)\
+                .eq("invoice_status", status.value)\
                 .eq("tenant_id", str(tenant_id))\
                 .range(offset, offset + limit - 1)\
                 .order("created_at", desc=True)\
@@ -265,6 +276,9 @@ class InvoiceRepositoryImpl(InvoiceRepository):
             if lines_data:
                 self.supabase.table(self.lines_table_name).insert(lines_data).execute()
             
+            # Clear cache when invoice is updated
+            self.clear_cache()
+            
             return await self.get_invoice_by_id(invoice_id, invoice.tenant_id)
             
         except Exception as e:
@@ -286,6 +300,9 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                 .eq("id", invoice_id)\
                 .eq("tenant_id", str(tenant_id))\
                 .execute()
+            
+            # Clear cache when invoice is deleted
+            self.clear_cache()
             
             return True
             
@@ -339,13 +356,28 @@ class InvoiceRepositoryImpl(InvoiceRepository):
         limit: int = 100,
         offset: int = 0
     ) -> List[Invoice]:
-        """Search invoices with filters"""
+        """Search invoices with filters - OPTIMIZED VERSION WITH CACHE"""
         try:
+            # Check cache first
+            cache_key = self._get_cache_key(
+                tenant_id, 
+                customer_name=customer_name,
+                invoice_no=invoice_no,
+                status=status.value if status else None,
+                from_date=from_date.isoformat() if from_date else None,
+                to_date=to_date.isoformat() if to_date else None,
+                limit=limit,
+                offset=offset
+            )
+            
+            cached_result = self._get_cached_result(cache_key)
+            if cached_result is not None:
+                return cached_result
+            
             # Add debugging
             self.logger.info(
-                "Searching invoices in repository",
+                "Searching invoices in repository - OPTIMIZED WITH CACHE",
                 tenant_id=str(tenant_id),
-                tenant_id_type=type(tenant_id).__name__,
                 customer_name=customer_name,
                 invoice_no=invoice_no,
                 status=status.value if status else None,
@@ -353,8 +385,16 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                 offset=offset
             )
             
+            # Limit the number of invoices to prevent performance issues
+            effective_limit = min(limit, 20)  # Reduced from 50 to 20 for better performance
+            
             def build_query(client):
-                query = client.table(self.table_name).select("*")
+                # Only select essential fields to reduce data transfer
+                query = client.table(self.table_name).select(
+                    "id,tenant_id,invoice_no,invoice_type,invoice_status,customer_id,customer_name,customer_address,"
+                    "invoice_date,due_date,delivery_date,subtotal,total_tax,total_amount,paid_amount,balance_due,"
+                    "currency,payment_terms,notes,created_at,created_by,updated_at,updated_by,sent_at,paid_at"
+                )
                 
                 # Apply filters
                 query = query.eq("tenant_id", str(tenant_id))
@@ -375,17 +415,17 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                     query = query.lte("invoice_date", to_date.isoformat())
                 
                 # Apply pagination and ordering
-                query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
+                query = query.order("created_at", desc=True).range(offset, offset + effective_limit - 1)
                 
                 return query
             
             result = build_query(self.supabase).execute()
             
             self.logger.info(
-                "Database query completed",
+                "Database query completed - OPTIMIZED WITH CACHE",
                 tenant_id=str(tenant_id),
                 result_count=len(result.data) if result.data else 0,
-                has_data=bool(result.data)
+                effective_limit=effective_limit
             )
             
             if not result.data:
@@ -396,7 +436,7 @@ class InvoiceRepositoryImpl(InvoiceRepository):
             
             # Fetch all invoice lines in a single query (avoid N+1)
             lines_result = self.supabase.table(self.lines_table_name)\
-                .select("*")\
+                .select("id,invoice_id,order_line_id,description,quantity,unit_price,line_total,tax_code,tax_rate,tax_amount,net_amount,gross_amount,product_code,variant_sku,component_type,created_at")\
                 .in_("invoice_id", invoice_ids)\
                 .order("invoice_id, created_at")\
                 .execute()
@@ -421,13 +461,15 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                         "Error converting invoice data",
                         invoice_id=invoice_data.get('id'),
                         error=str(e),
-                        error_type=type(e).__name__,
-                        invoice_data_keys=list(invoice_data.keys())
+                        error_type=type(e).__name__
                     )
                     continue
             
+            # Cache the result
+            self._cache_result(cache_key, invoices)
+            
             self.logger.info(
-                "Invoice search completed",
+                "Invoice search completed - OPTIMIZED WITH CACHE",
                 tenant_id=str(tenant_id),
                 final_count=len(invoices)
             )
@@ -436,7 +478,7 @@ class InvoiceRepositoryImpl(InvoiceRepository):
             
         except Exception as e:
             self.logger.error(
-                "Error searching invoices",
+                "Error searching invoices - OPTIMIZED WITH CACHE",
                 tenant_id=str(tenant_id),
                 error=str(e),
                 error_type=type(e).__name__

@@ -212,34 +212,67 @@ const StockDocuments = () => {
   };
 
   const getToEntityName = (doc) => {
-    // For truck transfers, show truck information
-    if (doc.doc_type === 'ISS_LOAD' || doc.doc_type === 'TRF_TRUCK' || doc.doc_type === 'LOAD_MOB') {
-      // First check if there's a direct vehicle_id on the document
-      if (doc.vehicle_id) {
-        const vehicleInfo = doc.vehicle_plate || doc.vehicle_id;
-        return `Truck: ${vehicleInfo}`;
-      }
-      
-      // Try to extract vehicle ID from notes
-      if (doc.notes) {
-        const vehicleMatch = doc.notes.match(/(?:vehicle|truck|load\s+vehicle)\s+([a-f0-9-]+)/i);
-        if (vehicleMatch) {
-          const vehicleId = vehicleMatch[1];
-          // Try to find the vehicle in our loaded vehicles
-          const vehicle = vehicles.find(v => v.id === vehicleId);
-          if (vehicle) {
-            return `Truck: ${vehicle.plate_number || vehicle.plate}`;
-          }
-          // If we have the ID but no vehicle data, show loading
-          return 'Truck: Loading...';
+    // Handle different document types and their source/target entities
+    switch (doc.doc_type) {
+      case 'ISS_LOAD':
+      case 'TRF_TRUCK':
+      case 'LOAD_MOB':
+        // These are truck-related operations
+        if (doc.vehicle_id) {
+          const vehicle = vehicles.find(v => v.id === doc.vehicle_id);
+          return vehicle ? `Truck: ${vehicle.plate_number || vehicle.plate || vehicle.id}` : `Truck: ${doc.vehicle_id}`;
         }
-      }
-      
-      return 'Truck (Not specified)';
+        return 'Truck (Not specified)';
+        
+      case 'TRF_WH':
+        // Warehouse transfer - show destination warehouse
+        if (doc.dest_wh_id) {
+          return `Warehouse: ${getWarehouseName(doc.dest_wh_id)}`;
+        }
+        return 'Warehouse (Not specified)';
+        
+      case 'REC_SUPP':
+      case 'REC_RET':
+      case 'REC_FILL':
+        // Receipt operations - show source warehouse
+        if (doc.source_wh_id) {
+          return `Warehouse: ${getWarehouseName(doc.source_wh_id)}`;
+        }
+        return 'External';
+        
+      case 'ISS_SALE':
+        // Sales issue - show destination (customer)
+        return 'Customer';
+        
+      case 'ADJ_SCRAP':
+      case 'ADJ_VARIANCE':
+        // Adjustments - show warehouse
+        if (doc.source_wh_id) {
+          return `Warehouse: ${getWarehouseName(doc.source_wh_id)}`;
+        }
+        return 'Warehouse (Not specified)';
+        
+      case 'CONV_FIL':
+        // Conversion - show warehouse
+        if (doc.source_wh_id) {
+          return `Warehouse: ${getWarehouseName(doc.source_wh_id)}`;
+        }
+        return 'Warehouse (Not specified)';
+        
+      default:
+        // For unknown types, try to determine from available fields
+        if (doc.dest_wh_id) {
+          return `Warehouse: ${getWarehouseName(doc.dest_wh_id)}`;
+        }
+        if (doc.source_wh_id) {
+          return `Warehouse: ${getWarehouseName(doc.source_wh_id)}`;
+        }
+        if (doc.vehicle_id) {
+          const vehicle = vehicles.find(v => v.id === doc.vehicle_id);
+          return vehicle ? `Truck: ${vehicle.plate_number || vehicle.plate || vehicle.id}` : `Truck: ${doc.vehicle_id}`;
+        }
+        return 'Unknown';
     }
-    // For warehouse transfers and other types, show warehouse
-    const warehouseName = getWarehouseName(doc.dest_wh_id);
-    return warehouseName;
   };
 
   const handlePostDocument = async (docId) => {

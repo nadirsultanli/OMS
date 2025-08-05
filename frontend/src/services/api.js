@@ -20,7 +20,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   // Add timeout and retry configuration
-  timeout: 30000, // Increased from 10000 to 30000 for better performance
+  timeout: 60000, // Increased from 30000 to 60000 for better performance
 });
 
 // Debug logging
@@ -69,6 +69,13 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
+    
+    // Handle timeout errors specifically
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      console.error('Request timeout - the server is taking too long to respond');
+      error.message = 'Request timed out. Please try again or contact support if the issue persists.';
+      return Promise.reject(error);
+    }
     
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;

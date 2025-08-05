@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from decimal import Decimal
 from typing import List, Optional, Dict, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.domain.entities.payments import Payment, PaymentStatus, PaymentMethod, PaymentType, PaymentSummary
 from app.domain.entities.users import User, UserRoleType
@@ -52,6 +52,7 @@ class PaymentService:
         amount: Decimal,
         payment_method: PaymentMethod,
         payment_date: date,
+        payment_status: Optional[PaymentStatus] = PaymentStatus.PENDING,
         customer_id: Optional[UUID] = None,
         invoice_id: Optional[UUID] = None,
         order_id: Optional[UUID] = None,
@@ -78,6 +79,7 @@ class PaymentService:
             amount=amount,
             payment_method=payment_method,
             payment_date=payment_date,
+            payment_status=payment_status,
             customer_id=customer_id,
             invoice_id=invoice_id,
             order_id=order_id,

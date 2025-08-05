@@ -337,68 +337,68 @@ select.form-control option {
   letter-spacing: -0.5px;
 }
 
-/* Table Section */
+/* Stock Documents Table - Fixed Column Widths and Centering */
 .stock-docs-table {
   background: white;
   border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  position: relative;
+  margin-top: 24px;
 }
 
-/* Table scroll wrapper for horizontal scrolling */
 .table-scroll-wrapper {
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
   border-radius: 16px;
 }
 
-/* Table scroll wrapper for horizontal scrolling */
 .table-scroll-wrapper {
-  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 .table {
   width: 100%;
-  margin: 0;
-  font-size: 14px;
   border-collapse: collapse;
+  font-size: 14px;
+  min-width: 1200px; /* Ensure minimum width for all columns */
 }
 
 .table thead {
-  background: #f8f9fb;
-  border-bottom: 2px solid #e5e7eb;
+  background: #f9fafb;
 }
 
 .table th {
-  padding: 16px;
-  font-weight: 600;
-  color: #1f2937;
+  padding: 16px 12px;
   text-align: left;
-  letter-spacing: 0.5px;
-  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
   white-space: nowrap;
-  position: relative;
+  position: sticky;
+  top: 0;
+  background: #f9fafb;
+  z-index: 10;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Ensure proper column widths */
-.table th:nth-child(1) { min-width: 140px; } /* Document No */
-.table th:nth-child(2) { min-width: 180px; } /* Type */
-.table th:nth-child(3) { min-width: 120px; } /* Status */
-.table th:nth-child(4) { min-width: 200px; } /* From Warehouse */
-.table th:nth-child(5) { min-width: 250px; } /* To Entity */
-.table th:nth-child(6) { min-width: 120px; } /* Created Date */
-.table th:nth-child(7) { min-width: 120px; } /* Created By */
+/* Fixed column widths to prevent truncation and ensure proper spacing */
+.table th:nth-child(1) { width: 160px; min-width: 160px; } /* Document No */
+.table th:nth-child(2) { width: 200px; min-width: 200px; } /* Type */
+.table th:nth-child(3) { width: 120px; min-width: 120px; } /* Status */
+.table th:nth-child(4) { width: 200px; min-width: 200px; } /* From Warehouse */
+.table th:nth-child(5) { width: 250px; min-width: 250px; } /* To Entity */
+.table th:nth-child(6) { width: 140px; min-width: 140px; } /* Created Date */
+.table th:nth-child(7) { width: 140px; min-width: 140px; } /* Created By */
 .table th:nth-child(8) { 
-  min-width: 200px; 
-  text-align: center;
+  width: 180px; 
+  min-width: 180px; 
+  text-align: center; /* Center align actions column */
 } /* Actions */
 
 .table tbody tr {
-  border-bottom: 1px solid #e5e7eb;
-  transition: background-color 0.2s ease-in-out;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s ease;
 }
 
 .table tbody tr:last-child {
@@ -406,39 +406,39 @@ select.form-control option {
 }
 
 .table tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: #f0f7ff;
 }
 
 .table td {
-  padding: 16px;
-  color: #374151;
+  padding: 12px;
   vertical-align: middle;
-  max-width: 300px;
-}
-
-/* Specific column width overrides */
-.table td:nth-child(5) {
-  max-width: 250px;
-  min-width: 250px;
-}
-
-/* Text overflow handling for specific columns */
-.table td:nth-child(4) {
-  white-space: nowrap;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 14px;
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* To Entity column - allow full text display */
+/* Center align the To Entity column */
+.table th:nth-child(5),
 .table td:nth-child(5) {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
-  word-wrap: break-word;
-  line-height: 1.4;
+  text-align: center;
 }
 
-/* Document Number */
+/* Center align the From Warehouse column */
+.table th:nth-child(4),
+.table td:nth-child(4) {
+  text-align: center;
+}
+
+/* Center align the Actions column */
+.table th:nth-child(8),
+.table td:nth-child(8) {
+  text-align: center;
+}
+
+/* Document number styling */
 .doc-number {
   display: flex;
   flex-direction: column;
@@ -448,16 +448,16 @@ select.form-control option {
 .doc-number .number {
   font-weight: 600;
   color: #1f2937;
-  font-size: 14px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
 .doc-number .id {
+  font-size: 11px;
   color: #6b7280;
-  font-size: 12px;
-  font-family: monospace;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
-/* Document Type */
+/* Document type styling */
 .doc-type {
   display: flex;
   flex-direction: column;
@@ -467,21 +467,19 @@ select.form-control option {
 .doc-type .type-label {
   font-weight: 600;
   color: #1f2937;
-  font-size: 14px;
 }
 
 .doc-type .type-desc {
+  font-size: 11px;
   color: #6b7280;
-  font-size: 12px;
 }
 
-/* Document Status Badges */
+/* Document status styling */
 .doc-status {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -489,79 +487,74 @@ select.form-control option {
 }
 
 .status-draft {
-  background-color: #f3f4f6;
-  color: #374151;
-  border: 1px solid #e5e7eb;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .status-confirmed {
-  background-color: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: #d1fae5;
+  color: #065f46;
 }
 
 .status-posted {
-  background-color: #d1fae5;
+  background: #d1fae5;
   color: #065f46;
-  border: 1px solid #a7f3d0;
 }
 
 .status-cancelled {
-  background-color: #fee2e2;
+  background: #fee2e2;
   color: #991b1b;
-  border: 1px solid #fecaca;
 }
 
 .status-transit {
-  background-color: #dbeafe;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .status-received {
-  background-color: #d1fae5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .status-default {
-  background-color: #f3f4f6;
+  background: #f3f4f6;
   color: #374151;
-  border: 1px solid #e5e7eb;
 }
 
-/* Action Buttons */
+/* Action buttons */
 .action-buttons {
   display: flex;
-  gap: 6px;
-  align-items: center;
+  gap: 4px;
   justify-content: center;
-  min-width: 140px;
   flex-wrap: wrap;
 }
 
 .action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
+  padding: 6px 10px;
   border: none;
   border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 14px;
-  font-weight: 500;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  white-space: nowrap;
 }
 
 .action-btn:hover:not(:disabled) {
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
 .action-btn.view {
@@ -571,27 +564,24 @@ select.form-control option {
 
 .action-btn.view:hover:not(:disabled) {
   background: #2563eb;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .action-btn.edit {
-  background: #f59e0b;
-  color: white;
-}
-
-.action-btn.edit:hover:not(:disabled) {
-  background: #d97706;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
-}
-
-.action-btn.post {
   background: #10b981;
   color: white;
 }
 
-.action-btn.post:hover:not(:disabled) {
+.action-btn.edit:hover:not(:disabled) {
   background: #059669;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.action-btn.post {
+  background: #f59e0b;
+  color: white;
+}
+
+.action-btn.post:hover:not(:disabled) {
+  background: #d97706;
 }
 
 .action-btn.cancel {
@@ -601,7 +591,6 @@ select.form-control option {
 
 .action-btn.cancel:hover:not(:disabled) {
   background: #dc2626;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
 }
 
 /* Loading States */

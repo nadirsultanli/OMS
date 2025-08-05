@@ -18,7 +18,8 @@ const Payments = () => {
     customer_id: '',
     invoice_id: '',
     amount: '',
-    payment_method: 'CASH',
+    payment_method: 'cash',
+    payment_status: 'pending',
     payment_date: new Date().toISOString().split('T')[0],
     reference_number: '',
     notes: ''
@@ -163,7 +164,8 @@ const Payments = () => {
           customer_id: '',
           invoice_id: '',
           amount: '',
-          payment_method: 'CASH',
+          payment_method: 'cash',
+          payment_status: 'pending',
           payment_date: new Date().toISOString().split('T')[0],
           reference_number: '',
           notes: '',
@@ -307,10 +309,6 @@ const Payments = () => {
             >
               {statusLabel}
             </span>
-            <div 
-              className="status-dot"
-              style={{ backgroundColor: statusColor }}
-            ></div>
           </div>
         </td>
         <td>
@@ -602,13 +600,9 @@ const Payments = () => {
                 value={paymentData.payment_method}
                 onChange={(e) => setPaymentData(prev => ({ ...prev, payment_method: e.target.value }))}
               >
-                <option value="CASH">Cash</option>
-                <option value="CARD">Card</option>
-                <option value="MPESA">M-PESA</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CHECK">Check</option>
-                <option value="STRIPE">Stripe</option>
-                <option value="PAYPAL">PayPal</option>
+                <option value="cash">Cash</option>
+                <option value="stripe">Stripe</option>
+                <option value="mpesa">M-PESA</option>
               </select>
             </div>
             
@@ -627,6 +621,19 @@ const Payments = () => {
                 </small>
               </div>
             )}
+            
+            <div className="form-group">
+              <label>Payment Status:</label>
+              <select
+                value={paymentData.payment_status}
+                onChange={(e) => setPaymentData(prev => ({ ...prev, payment_status: e.target.value }))}
+              >
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
             
             <div className="form-group">
               <label>Payment Date:</label>

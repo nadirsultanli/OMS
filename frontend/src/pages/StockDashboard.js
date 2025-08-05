@@ -22,6 +22,7 @@ const StockDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warehouses, setWarehouses] = useState([]);
+  const [variants, setVariants] = useState([]);
   const [retryCount, setRetryCount] = useState(0);
 
   const loadDashboardData = async (isRetry = false) => {
@@ -31,8 +32,14 @@ const StockDashboard = () => {
       }
       setError(null);
       
-      // Load warehouses first
-      const warehousesResponse = await warehouseService.getWarehouses();
+      // Load warehouses and variants first
+      const [warehousesResponse, variantsResponse] = await Promise.all([
+        warehouseService.getWarehouses(),
+        variantService.getVariants(null, { 
+          limit: 1000,
+          active_only: true
+        })
+      ]);
       
       // Handle the warehouse service response structure
       let warehousesList = [];
@@ -42,7 +49,21 @@ const StockDashboard = () => {
         warehousesList = warehousesResponse.warehouses;
       }
       
+      // Handle variants response
+      let variantsList = [];
+      if (variantsResponse.success && variantsResponse.data) {
+        variantsList = variantsResponse.data.variants || [];
+      } else if (variantsResponse.data?.variants) {
+        variantsList = variantsResponse.data.variants;
+      } else if (variantsResponse.variants) {
+        variantsList = variantsResponse.variants;
+      } else if (Array.isArray(variantsResponse)) {
+        variantsList = variantsResponse;
+      }
+      
+      console.log('Dashboard - Variants loaded:', variantsList.length);
       setWarehouses(warehousesList);
+      setVariants(variantsList);
 
       // Load comprehensive stock data across all warehouses
       const stockLevelsResponse = await stockService.getStockLevels({ 
@@ -81,6 +102,11 @@ const StockDashboard = () => {
         })
       ]);
 
+      console.log('Recent documents response:', recentDocsResponse);
+      if (recentDocsResponse.stock_docs && recentDocsResponse.stock_docs.length > 0) {
+        console.log('Sample document:', recentDocsResponse.stock_docs[0]);
+      }
+
       // Load warehouse summaries
       const warehouseSummaries = [];
       
@@ -99,59 +125,77 @@ const StockDashboard = () => {
           const warehouseStocks = stockLevels.filter(stock => stock.warehouse_id === warehouse.id);
           const warehouseVariants = new Set(warehouseStocks.map(s => s.variant_id));
           const warehouseValue = warehouseStocks.reduce((sum, stock) => {
-            return sum + (parseFloat(stock.total_cost || 0));
+            return sum + (stock.total_cost ? parseFloat(stock.total_cost) : 0);
           }, 0);
           
-          if (warehouseStocks.length > 0 || warehouseValue > 0) {
-            warehouseSummaries.push({
-              warehouse: warehouse,
-              totalVariants: warehouseVariants.size,
-              totalValue: warehouseValue,
-              stockCount: warehouseStocks.length,
-              summaries: warehouseStocks.slice(0, 3)
-            });
-          }
-        }
-        
-        // If still no data, show a fallback summary
-        if (warehouseSummaries.length === 0) {
           warehouseSummaries.push({
-            warehouse: { id: 'default', code: 'ALL', name: 'All Warehouses', type: 'STO' },
-            totalVariants: uniqueVariants.size,
-            totalValue: totalValue,
-            stockCount: stockLevels.length,
-            summaries: stockLevels.slice(0, 3)
+            warehouse: warehouse,
+            variantCount: warehouseVariants.size,
+            totalValue: warehouseValue,
+            stockLevels: warehouseStocks.length
           });
         }
       } else {
-        for (const warehouse of warehousesList.slice(0, 6)) {
-          try {
-            const warehouseStocks = stockLevels.filter(stock => stock.warehouse_id === warehouse.id);
-            const warehouseVariants = new Set(warehouseStocks.map(s => s.variant_id));
-            const warehouseValue = warehouseStocks.reduce((sum, stock) => {
-              return sum + (parseFloat(stock.total_cost || 0));
-            }, 0);
-            
-            warehouseSummaries.push({
-              warehouse: warehouse,
-              totalVariants: warehouseVariants.size,
-              totalValue: warehouseValue,
-              stockCount: warehouseStocks.length,
-              summaries: warehouseStocks.slice(0, 3) // Show top 3 items
-            });
-          } catch (err) {
-            console.warn(`Failed to load summary for warehouse ${warehouse.code}:`, err);
-            warehouseSummaries.push({
-              warehouse: warehouse,
-              totalVariants: 0,
-              totalValue: 0,
-              stockCount: 0,
-              summaries: []
-            });
-          }
+        for (const warehouse of warehousesList) {
+          const warehouseStocks = stockLevels.filter(stock => stock.warehouse_id === warehouse.id);
+          const warehouseVariants = new Set(warehouseStocks.map(s => s.variant_id));
+          const warehouseValue = warehouseStocks.reduce((sum, stock) => {
+            return sum + (stock.total_cost ? parseFloat(stock.total_cost) : 0);
+          }, 0);
+          
+          warehouseSummaries.push({
+            warehouse: warehouse,
+            variantCount: warehouseVariants.size,
+            totalValue: warehouseValue,
+            stockLevels: warehouseStocks.length
+          });
         }
       }
-      
+
+      // Combine all alerts and resolve variant names
+      const allAlerts = [
+        ...(lowStockResponse.alerts || []).map(alert => {
+          const variantName = getVariantName(alert.variant_id, variantsList);
+          const warehouseName = getWarehouseName(alert.warehouse_id, warehousesList);
+          
+          console.log('Processing low stock alert:', {
+            variant_id: alert.variant_id,
+            resolved_variant_name: variantName,
+            warehouse_id: alert.warehouse_id,
+            resolved_warehouse_name: warehouseName
+          });
+          
+          return {
+            ...alert,
+            type: 'low_stock',
+            severity: 'warning',
+            variant_name: variantName,
+            warehouse_name: warehouseName
+          };
+        }),
+        ...(negativeStockResponse.negative_stocks || []).map(stock => {
+          const variantName = getVariantName(stock.variant_id, variantsList);
+          const warehouseName = getWarehouseName(stock.warehouse_id, warehousesList);
+          
+          console.log('Processing negative stock alert:', {
+            variant_id: stock.variant_id,
+            resolved_variant_name: variantName,
+            warehouse_id: stock.warehouse_id,
+            resolved_warehouse_name: warehouseName
+          });
+          
+          return {
+            ...stock,
+            type: 'negative_stock',
+            severity: 'danger',
+            variant_name: variantName,
+            warehouse_name: warehouseName
+          };
+        })
+      ];
+
+      console.log('Final processed alerts:', allAlerts);
+
       setDashboardData({
         stockSummary: {
           totalVariants: uniqueVariants.size,
@@ -159,93 +203,172 @@ const StockDashboard = () => {
           lowStockCount: lowStockResponse.total_alerts || 0,
           negativeStockCount: negativeStockResponse.total_count || 0
         },
-        stockAlerts: lowStockResponse.alerts || [],
+        stockAlerts: allAlerts.slice(0, 10), // Show top 10 alerts
         recentDocuments: recentDocsResponse.stock_docs || [],
         warehouseSummary: warehouseSummaries
       });
-
-      setRetryCount(0); // Reset retry count on success
-
+      
     } catch (err) {
-      console.error('Dashboard loading error:', err);
+      console.error('Error loading dashboard data:', err);
       setError('Failed to load dashboard data: ' + extractErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRetry = () => {
-    setRetryCount(prev => prev + 1);
-    loadDashboardData(true);
+  // Helper function to get variant name
+  const getVariantName = (variantId, variantsList) => {
+    if (!variantId) return 'No Variant ID';
+    if (!Array.isArray(variantsList)) return 'Variants not loaded';
+    
+    const variant = variantsList.find(v => v.id === variantId);
+    
+    if (!variant) {
+      // Try fallback strategies
+      const variantBySku = variantsList.find(v => v.sku === variantId);
+      if (variantBySku) return variantBySku.sku;
+      
+      const variantByPartialSku = variantsList.find(v => 
+        v.sku && v.sku.toLowerCase().includes(variantId.toLowerCase())
+      );
+      if (variantByPartialSku) return variantByPartialSku.sku;
+      
+      const variantByName = variantsList.find(v => 
+        v.name && v.name.toLowerCase().includes(variantId.toLowerCase())
+      );
+      if (variantByName) return variantByName.name;
+      
+      return `Variant ${variantId}`;
+    }
+    
+    // Return descriptive name
+    if (variant.name && variant.sku) {
+      return `${variant.name} (${variant.sku})`;
+    } else if (variant.name) {
+      return variant.name;
+    } else if (variant.sku) {
+      return variant.sku;
+    } else if (variant.product_name) {
+      return `${variant.product_name} (${variant.id})`;
+    } else {
+      return `Variant ${variant.id}`;
+    }
+  };
+
+  // Helper function to get warehouse name
+  const getWarehouseName = (warehouseId, warehousesList) => {
+    if (!warehouseId) return 'Unknown';
+    if (!Array.isArray(warehousesList)) return 'Unknown';
+    
+    const warehouse = warehousesList.find(w => w.id === warehouseId);
+    return warehouse ? `${warehouse.code} - ${warehouse.name}` : 'Unknown';
   };
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
+  // Reload dashboard when variants are updated
+  useEffect(() => {
+    if (variants.length > 0 && dashboardData.stockAlerts.length > 0) {
+      console.log('Variants updated, reloading dashboard data');
+      loadDashboardData(true); // Reload with retry flag
+    }
+  }, [variants]);
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    loadDashboardData(true);
+  };
+
   const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined) return '$0.00';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-              currency: 'KES'
-    }).format(amount);
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount || 0);
   };
 
   const getDocTypeLabel = (docType) => {
-    const types = {
-      'REC_FIL': 'Receive',
-      'ISS_FIL': 'Issue', 
-      'XFER': 'Transfer',
-      'CONV_FIL': 'Conversion',
-      'LOAD_MOB': 'Load',
-      'UNLD_MOB': 'Unload'
+    const docTypes = {
+      'REC_SUPP': 'Receive from Supplier',
+      'REC_RET': 'Receive Return',
+      'ISS_LOAD': 'Issue for Load',
+      'ISS_SALE': 'Issue for Sale',
+      'ADJ_SCRAP': 'Adjustment Scrap',
+      'ADJ_VARIANCE': 'Adjustment Variance',
+      'REC_FILL': 'Receive to Filling',
+      'TRF_WH': 'Transfer Warehouse',
+      'TRF_TRUCK': 'Transfer Truck',
+      'CONV_FIL': 'Conversion Fill',
+      'LOAD_MOB': 'Load Mobile'
     };
-    return types[docType] || docType;
+    return docTypes[docType] || docType;
   };
 
   const getWarehouseTypeLabel = (type) => {
     const types = {
       'STO': 'Storage',
-      'FIL': 'Filling',
       'MOB': 'Mobile',
-      'BLK': 'Bulk'
+      'FIL': 'Filling'
     };
     return types[type] || type;
   };
 
   const getWarehouseTypeColor = (type) => {
     const colors = {
-      'STO': '#28a745',
-      'FIL': '#007bff', 
-      'MOB': '#ffc107',
-      'BLK': '#6f42c1'
+      'STO': '#3b82f6',
+      'MOB': '#10b981',
+      'FIL': '#f59e0b'
     };
-    return colors[type] || '#6c757d';
+    return colors[type] || '#6b7280';
   };
 
   const getStatusClassName = (status) => {
-    const statusClasses = {
+    const statusMap = {
+      'open': 'status-open',
+      'posted': 'status-posted',
+      'cancelled': 'status-cancelled',
       'DRAFT': 'status-draft',
       'CONFIRMED': 'status-confirmed',
-      'POSTED': 'status-posted',
-      'CANCELLED': 'status-cancelled'
+      'IN_TRANSIT': 'status-transit',
+      'RECEIVED': 'status-received'
     };
-    return statusClasses[status] || 'status-default';
+    return statusMap[status] || 'status-default';
   };
 
   const getAlertSeverityClass = (severity) => {
-    return severity === 'critical' ? 'alert-critical' : 'alert-low';
+    const severityMap = {
+      'low': 'alert-info',
+      'medium': 'alert-warning',
+      'high': 'alert-danger',
+      'warning': 'alert-warning',
+      'danger': 'alert-danger'
+    };
+    return severityMap[severity] || 'alert-info';
   };
 
   if (loading) {
     return (
       <div className="stock-dashboard">
-        <div className="page-header">
-          <h1>Stock Management Dashboard</h1>
-        </div>
-        <div className="loading-state">
+        <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>Loading dashboard...</p>
+          <p>Loading stock dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="stock-dashboard">
+        <div className="error-container">
+          <h2>Error Loading Dashboard</h2>
+          <p>{error}</p>
+          <button className="btn btn-primary" onClick={handleRetry}>
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -253,213 +376,180 @@ const StockDashboard = () => {
 
   return (
     <div className="stock-dashboard">
-      <div className="page-header">
-        <h1>Stock Management Dashboard</h1>
+      {/* Header Section */}
+      <div className="dashboard-header">
+        <div className="header-content">
+          <h1>Stock Management Dashboard</h1>
+          <p className="subtitle">Real-time inventory overview and management</p>
+        </div>
         <div className="header-actions">
           <Link to="/stock-levels" className="btn btn-primary">
             View Stock Levels
           </Link>
           <Link to="/stock-documents" className="btn btn-secondary">
-            View Documents
+            Stock Documents
           </Link>
         </div>
       </div>
 
-      {error && (
-        <div className="alert alert-danger">
-          <div className="error-content">
-            <span>{typeof error === 'string' ? error : 'An error occurred'}</span>
-            <button 
-              className="btn btn-sm btn-primary retry-btn" 
-              onClick={handleRetry}
-              disabled={loading}
-            >
-              {loading ? 'Retrying...' : 'Retry'}
-            </button>
+      {/* Summary Cards */}
+      <div className="summary-cards">
+        <div className="summary-card">
+          <div className="card-icon variants-icon">📦</div>
+          <div className="card-content">
+            <h3>{dashboardData.stockSummary.totalVariants}</h3>
+            <p>Total Variants</p>
           </div>
         </div>
-      )}
-
-      {/* Summary Cards */}
-      <div className="summary-section">
-        <div className="summary-cards">
-          <div className="summary-card primary">
-            <div className="card-icon">📦</div>
-            <div className="card-content">
-              <div className="card-value">{dashboardData.stockSummary.totalVariants}</div>
-              <div className="card-label">Stock Items</div>
-            </div>
+        
+        <div className="summary-card">
+          <div className="card-icon value-icon">💰</div>
+          <div className="card-content">
+            <h3>{formatCurrency(dashboardData.stockSummary.totalValue)}</h3>
+            <p>Total Value</p>
           </div>
-          
-          <div className="summary-card success">
-            <div className="card-icon">💰</div>
-            <div className="card-content">
-              <div className="card-value">{formatCurrency(dashboardData.stockSummary.totalValue)}</div>
-              <div className="card-label">Total Value</div>
-            </div>
+        </div>
+        
+        <div className="summary-card">
+          <div className="card-icon alert-icon">⚠️</div>
+          <div className="card-content">
+            <h3>{dashboardData.stockSummary.lowStockCount}</h3>
+            <p>Low Stock Alerts</p>
           </div>
-          
-          <div className="summary-card warning">
-            <div className="card-icon">⚠️</div>
-            <div className="card-content">
-              <div className="card-value">{dashboardData.stockSummary.lowStockCount}</div>
-              <div className="card-label">Low Stock Alerts</div>
-            </div>
-          </div>
-          
-          <div className="summary-card danger">
-            <div className="card-icon">🚨</div>
-            <div className="card-content">
-              <div className="card-value">{dashboardData.stockSummary.negativeStockCount}</div>
-              <div className="card-label">Negative Stock</div>
-            </div>
+        </div>
+        
+        <div className="summary-card">
+          <div className="card-icon negative-icon">❌</div>
+          <div className="card-content">
+            <h3>{dashboardData.stockSummary.negativeStockCount}</h3>
+            <p>Negative Stock</p>
           </div>
         </div>
       </div>
 
+      {/* Main Content Grid */}
       <div className="dashboard-grid">
-        {/* Stock Alerts */}
-        <div className="dashboard-widget">
-          <div className="widget-header">
+        {/* Stock Alerts Section */}
+        <div className="dashboard-section alerts-section">
+          <div className="section-header">
             <h2>Stock Alerts</h2>
-            <Link to="/stock-levels?alerts=true" className="widget-link">View All</Link>
+            <Link to="/stock-levels" className="view-all-link">View All</Link>
           </div>
-          
-          <div className="widget-content">
-            {dashboardData.stockAlerts.length === 0 ? (
-              <div className="empty-state">No stock alerts</div>
-            ) : (
+          <div className="section-content">
+            {dashboardData.stockAlerts.length > 0 ? (
               <div className="alerts-list">
                 {dashboardData.stockAlerts.slice(0, 5).map((alert, index) => (
                   <div key={index} className={`alert-item ${getAlertSeverityClass(alert.severity)}`}>
-                    <div className="alert-warehouse">
-                      {warehouses.find(w => w.id === alert.warehouse_id)?.code || 'Unknown'}
+                    <div className="alert-icon">
+                      {alert.type === 'low_stock' ? '⚠️' : '❌'}
                     </div>
-                    <div className="alert-details">
-                      <div className="alert-variant">{alert.variant_id.slice(0, 8)}</div>
-                      <div className="alert-quantity">
-                        Available: {parseFloat(alert.available_quantity || 0).toFixed(0)}
-                      </div>
+                    <div className="alert-content">
+                      <h4>{alert.variant_name || alert.variant_sku || 'Unknown Variant'}</h4>
+                      <p>{alert.warehouse_name || 'Unknown Warehouse'}</p>
+                      <span className="alert-quantity">Qty: {alert.quantity || 0}</span>
                     </div>
-                    <div className="alert-severity">{alert.severity}</div>
                   </div>
                 ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <p>No stock alerts at the moment</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Recent Documents */}
-        <div className="dashboard-widget">
-          <div className="widget-header">
+        {/* Recent Documents Section */}
+        <div className="dashboard-section documents-section">
+          <div className="section-header">
             <h2>Recent Stock Documents</h2>
-            <Link to="/stock-documents" className="widget-link">View All</Link>
+            <Link to="/stock-documents" className="view-all-link">View All</Link>
           </div>
-          
-          <div className="widget-content">
-            {dashboardData.recentDocuments.length === 0 ? (
-              <div className="empty-state">No recent documents</div>
-            ) : (
+          <div className="section-content">
+            {dashboardData.recentDocuments.length > 0 ? (
               <div className="documents-list">
-                {dashboardData.recentDocuments.map(doc => (
-                  <div key={doc.id} className="document-item">
-                    <div className="document-number">{doc.doc_no}</div>
-                    <div className="document-details">
-                      <div className="document-type">{getDocTypeLabel(doc.doc_type)}</div>
-                      <div className="document-date">
-                        {new Date(doc.created_at).toLocaleDateString()}
+                {dashboardData.recentDocuments.slice(0, 5).map((doc, index) => {
+                  console.log('Processing document:', doc);
+                  
+                  // Generate a proper document number
+                  let documentNumber = doc.doc_no;
+                  
+                  // If doc_no is missing, looks like a document type, or is a UUID, generate a proper number
+                  if (!documentNumber || 
+                      documentNumber.includes('_') || 
+                      documentNumber === doc.doc_type ||
+                      documentNumber.includes('-') && documentNumber.length > 20) { // UUID detection
+                    if (doc.id && typeof doc.id === 'number') {
+                      documentNumber = `${doc.doc_type}-${String(doc.id).padStart(6, '0')}`;
+                    } else {
+                      documentNumber = `${doc.doc_type}-${String(index + 1).padStart(6, '0')}`;
+                    }
+                  }
+                  
+                  return (
+                    <div key={index} className="document-item">
+                      <div className="document-icon">
+                        📄
+                      </div>
+                      <div className="document-content">
+                        <h4>{getDocTypeLabel(doc.doc_type)}</h4>
+                        <p>{documentNumber}</p>
+                        {doc.status && doc.status.trim() !== '' && (
+                          <span className={`status-badge ${getStatusClassName(doc.status)}`}>
+                            {doc.status}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className={`document-status ${getStatusClassName(doc.status)}`}>
-                      {doc.status}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <p>No recent documents</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Warehouse Summary */}
-        <div className="dashboard-widget warehouse-summary">
-          <div className="widget-header">
-            <h2>Warehouse Overview</h2>
-            <Link to="/warehouses" className="widget-link">Manage</Link>
+        {/* Warehouse Summary Section */}
+        <div className="dashboard-section warehouses-section">
+          <div className="section-header">
+            <h2>Warehouse Summary</h2>
+            <Link to="/warehouses" className="view-all-link">View All</Link>
           </div>
-          
-          <div className="widget-content">
-            {dashboardData.warehouseSummary.length === 0 ? (
-              <div className="empty-state">No warehouse data available</div>
-            ) : (
-              <div className="warehouse-grid">
-                {dashboardData.warehouseSummary.map(summary => (
-                  <div key={summary.warehouse.id} className="warehouse-card">
+          <div className="section-content">
+            {dashboardData.warehouseSummary.length > 0 ? (
+              <div className="warehouses-list">
+                {dashboardData.warehouseSummary.map((summary, index) => (
+                  <div key={index} className="warehouse-item">
                     <div className="warehouse-header">
-                      <div className="warehouse-name">{summary.warehouse.code}</div>
-                      <div className="warehouse-type" style={{ color: getWarehouseTypeColor(summary.warehouse.type) }}>
-                        {getWarehouseTypeLabel(summary.warehouse.type)}
+                      <div className="warehouse-icon" style={{ backgroundColor: getWarehouseTypeColor(summary.warehouse.type) }}>
+                        🏢
+                      </div>
+                      <div className="warehouse-info">
+                        <h4>{summary.warehouse.name}</h4>
+                        <p>{summary.warehouse.code} - {getWarehouseTypeLabel(summary.warehouse.type)}</p>
                       </div>
                     </div>
                     <div className="warehouse-stats">
                       <div className="stat">
-                        <span className="stat-value">{summary.totalVariants}</span>
+                        <span className="stat-value">{summary.variantCount}</span>
                         <span className="stat-label">Variants</span>
                       </div>
                       <div className="stat">
-                        <span className="stat-value">{summary.stockCount}</span>
-                        <span className="stat-label">Stock Lines</span>
-                      </div>
-                      <div className="stat">
                         <span className="stat-value">{formatCurrency(summary.totalValue)}</span>
-                        <span className="stat-label">Total Value</span>
+                        <span className="stat-label">Value</span>
                       </div>
                     </div>
-                    {summary.summaries.length > 0 && (
-                      <div className="warehouse-preview">
-                        <div className="preview-label">Top Items:</div>
-                        {summary.summaries.map((stock, index) => (
-                          <div key={index} className="preview-item">
-                            <span className="item-variant">{stock.variant_id?.slice(-8) || 'N/A'}</span>
-                            <span className="item-quantity">{parseFloat(stock.quantity || 0).toFixed(0)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
+            ) : (
+              <div className="empty-state">
+                <p>No warehouse data available</p>
+              </div>
             )}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="dashboard-widget">
-          <div className="widget-header">
-            <h2>Quick Actions</h2>
-          </div>
-          
-          <div className="widget-content">
-            <div className="quick-actions">
-              <Link to="/stock-documents/create" className="quick-action">
-                <div className="action-icon">📄</div>
-                <div className="action-label">Create Stock Document</div>
-              </Link>
-              
-              <Link to="/stock-levels?action=adjust" className="quick-action">
-                <div className="action-icon">📊</div>
-                <div className="action-label">Stock Adjustment</div>
-              </Link>
-              
-              <Link to="/stock-levels?action=transfer" className="quick-action">
-                <div className="action-icon">🔄</div>
-                <div className="action-label">Transfer Stock</div>
-              </Link>
-              
-              <Link to="/stock-levels?action=count" className="quick-action">
-                <div className="action-icon">🔍</div>
-                <div className="action-label">Physical Count</div>
-              </Link>
-            </div>
           </div>
         </div>
       </div>

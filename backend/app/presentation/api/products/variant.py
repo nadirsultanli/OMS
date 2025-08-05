@@ -62,6 +62,7 @@ async def create_variant(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.get("/{variant_id}", response_model=VariantResponse)
+@router.get("/{variant_id}/", response_model=VariantResponse)
 async def get_variant(
     variant_id: str, 
     variant_service: VariantService = Depends(get_variant_service)
@@ -226,6 +227,7 @@ async def calculate_exchange_requirements(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.get("/{variant_id}/bundle-components", response_model=BundleComponentsResponse)
+@router.get("/{variant_id}/", response_model=BundleComponentsResponse)
 async def get_bundle_components(
     variant_id: str,
     variant_service: VariantService = Depends(get_variant_service)
@@ -253,6 +255,7 @@ async def get_bundle_components(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.get("/{variant_id}/validate-business-rules", response_model=BusinessValidationResponse)
+@router.get("/{variant_id}/", response_model=BusinessValidationResponse)
 async def validate_business_rules(
     variant_id: str,
     variant_service: VariantService = Depends(get_variant_service)
@@ -279,6 +282,7 @@ async def validate_business_rules(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 @router.get("/{variant_id}/relationships", response_model=VariantRelationshipsResponse)
+@router.get("/{variant_id}/", response_model=VariantRelationshipsResponse)
 async def get_variant_relationships(
     variant_id: str,
     lpg_service: LPGBusinessService = Depends(get_lpg_business_service),
@@ -672,6 +676,7 @@ async def calculate_bulk_gas_pricing(
 
 
 @router.get("/bulk-gas/{variant_id}", response_model=BulkGasResponse)
+@router.get("/bulk-gas/{variant_id}/", response_model=BulkGasResponse)
 async def get_bulk_gas_variant(
     variant_id: str,
     variant_service: VariantService = Depends(get_variant_service)

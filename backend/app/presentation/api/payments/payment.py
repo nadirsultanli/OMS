@@ -59,6 +59,7 @@ async def create_payment(
             amount=request.amount,
             payment_method=request.payment_method,
             payment_date=request.payment_date or date.today(),
+            payment_status=request.payment_status,
             customer_id=request.customer_id,
             invoice_id=request.invoice_id,
             order_id=request.order_id,

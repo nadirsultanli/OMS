@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import invoiceService from '../services/invoiceService';
-import customerService from '../services/customerService';
 import orderService from '../services/orderService';
 
 import './Invoices.css';
 
 const Invoices = () => {
-  const [invoices, setInvoices] = useState([]);
-  const [customers, setCustomers] = useState([]);
+  const [allInvoices, setAllInvoices] = useState([]); // All invoices loaded once
+  const [filteredInvoices, setFilteredInvoices] = useState([]); // Filtered results
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -50,14 +49,17 @@ const Invoices = () => {
 
   // Filters
   const [filters, setFilters] = useState({
-    customer_name: '',
     invoice_no: '',
     status: '',
     from_date: '',
     to_date: ''
   });
 
-  // Pagination
+  // Get unique values for dropdowns
+  const [uniqueInvoiceNumbers, setUniqueInvoiceNumbers] = useState([]);
+  const [showInvoiceNoDropdown, setShowInvoiceNoDropdown] = useState(false);
+
+  // Pagination for filtered results
   const [pagination, setPagination] = useState({
     limit: 20,
     offset: 0,
@@ -65,8 +67,7 @@ const Invoices = () => {
   });
 
   useEffect(() => {
-    loadInvoices();
-    loadCustomers();
+    loadAllInvoices();
     loadOrders();
     
     // Check for success/cancel messages from Stripe redirect
@@ -77,7 +78,28 @@ const Invoices = () => {
     } else if (urlParams.get('canceled') === 'true') {
       setError('Payment was canceled');
     }
-  }, [filters, pagination.offset]);
+  }, []); // Only run once on mount
+
+  // Apply filters whenever filters change
+  useEffect(() => {
+    applyFilters();
+  }, [filters, allInvoices]);
+
+  // Update pagination when filtered results change
+  useEffect(() => {
+    setPagination(prev => ({
+      ...prev,
+      total: filteredInvoices.length
+    }));
+  }, [filteredInvoices]);
+
+  // Extract unique values from all invoices for dropdowns
+  useEffect(() => {
+    if (allInvoices.length > 0) {
+      const invoiceNumbers = [...new Set(allInvoices.map(inv => inv.invoice_no).filter(Boolean))];
+      setUniqueInvoiceNumbers(invoiceNumbers.sort());
+    }
+  }, [allInvoices]);
 
   // Close payment dropdown when clicking outside
   useEffect(() => {
@@ -85,31 +107,28 @@ const Invoices = () => {
       if (showPaymentDropdown && !event.target.closest('.payment-dropdown')) {
         setShowPaymentDropdown(null);
       }
+      
+      // Close invoice number dropdown
+      if (showInvoiceNoDropdown && !event.target.closest('.dropdown-input-container')) {
+        setShowInvoiceNoDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showPaymentDropdown]);
+  }, [showPaymentDropdown, showInvoiceNoDropdown]);
 
-  const loadInvoices = async () => {
+  const loadAllInvoices = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const result = await invoiceService.getInvoices({
-        ...filters,
-        limit: pagination.limit,
-        offset: pagination.offset
-      });
+      const result = await invoiceService.getAllInvoices();
       
       if (result.success) {
-        setInvoices(result.data.invoices || []);
-        setPagination(prev => ({
-          ...prev,
-          total: result.data.total || 0
-        }));
+        setAllInvoices(result.data.invoices || []);
       } else {
         setError(result.error);
       }
@@ -121,22 +140,17 @@ const Invoices = () => {
     }
   };
 
-  const loadCustomers = async () => {
-    try {
-      const result = await customerService.getCustomers({ limit: 1000 });
-      if (result.success) {
-        setCustomers(result.data.customers || []);
-      }
-    } catch (err) {
-      console.error('Error loading customers:', err);
-    }
+  const applyFilters = () => {
+    const filtered = invoiceService.filterInvoices(allInvoices, filters);
+    setFilteredInvoices(filtered);
+    setPagination(prev => ({ ...prev, offset: 0 })); // Reset to first page when filtering
   };
 
   const loadOrders = async () => {
     try {
-      const result = await invoiceService.getOrdersReadyForInvoicing(1000);
+      const result = await orderService.getOrders();
       if (result.success) {
-        setOrders(result.data || []);
+        setOrders(result.data.orders || []);
       }
     } catch (err) {
       console.error('Error loading orders:', err);
@@ -145,11 +159,32 @@ const Invoices = () => {
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
-    setPagination(prev => ({ ...prev, offset: 0 }));
+    // Filters will be applied automatically via useEffect
+  };
+
+  const handleSearch = () => {
+    // Filters are applied automatically via useEffect
+    // This function is kept for backward compatibility
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      invoice_no: '',
+      status: '',
+      from_date: '',
+      to_date: ''
+    });
   };
 
   const handlePageChange = (newOffset) => {
     setPagination(prev => ({ ...prev, offset: newOffset }));
+  };
+
+  // Get paginated results from filtered invoices
+  const getPaginatedInvoices = () => {
+    const start = pagination.offset;
+    const end = start + pagination.limit;
+    return filteredInvoices.slice(start, end);
   };
 
   const handleInvoiceClick = (invoice) => {
@@ -179,7 +214,7 @@ const Invoices = () => {
             payment_reference: '',
             payment_method: 'cash'
           });
-          loadInvoices();
+          loadAllInvoices(); // Refresh all invoices
           if (showInvoiceDetail) {
             // Refresh selected invoice
             const invoiceResult = await invoiceService.getInvoiceById(selectedInvoice.id);
@@ -222,7 +257,7 @@ const Invoices = () => {
                 payment_reference: '',
                 payment_method: 'cash'
               });
-              loadInvoices();
+              loadAllInvoices(); // Refresh all invoices
             }
           }
         } else {
@@ -252,25 +287,17 @@ const Invoices = () => {
             payment_method: 'cash',
             phone_number: ''
           });
-          loadInvoices();
+          loadAllInvoices(); // Refresh all invoices
           
           // Show success message for M-PESA
-          alert(`M-PESA payment initiated successfully!\n\nPlease check your phone for the payment prompt.\n\nCheckout Request ID: ${result.data.checkout_request_id}`);
-          
-          if (showInvoiceDetail) {
-            // Refresh selected invoice
-            const invoiceResult = await invoiceService.getInvoiceById(selectedInvoice.id);
-            if (invoiceResult.success) {
-              setSelectedInvoice(invoiceResult.data);
-            }
-          }
+          alert('M-PESA payment initiated. Please check your phone for the payment prompt.');
         } else {
           setError(result.error);
         }
       }
     } catch (err) {
-      setError('Failed to process payment');
-      console.error('Error processing payment:', err);
+      setError('Failed to record payment');
+      console.error('Error recording payment:', err);
     }
   };
 
@@ -309,11 +336,12 @@ const Invoices = () => {
     if (!selectedInvoice || !emailData.email) return;
 
     try {
-      const result = await invoiceService.emailInvoice(selectedInvoice.id, emailData);
+      const result = await invoiceService.sendInvoice(selectedInvoice.id, emailData);
+      
       if (result.success) {
         setShowSendModal(false);
         setEmailData({ email: '', subject: '', message: '' });
-        loadInvoices();
+        loadAllInvoices(); // Refresh all invoices
       } else {
         setError(result.error);
       }
@@ -325,61 +353,53 @@ const Invoices = () => {
 
   const handleDownloadPDF = async (invoiceId) => {
     try {
-      console.log('Downloading PDF for invoice:', invoiceId);
-      const result = await invoiceService.downloadInvoicePDF(invoiceId);
+      const result = await invoiceService.downloadPDF(invoiceId);
       
       if (result.success) {
-        console.log('PDF downloaded successfully');
+        // Create a blob from the PDF data and download it
+        const blob = new Blob([result.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `invoice-${invoiceId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
       } else {
-        console.error('Failed to download PDF:', result.error);
-        setError(result.error || 'Failed to download PDF');
+        setError(result.error);
       }
-    } catch (error) {
-      console.error('Error downloading PDF:', error);
+    } catch (err) {
       setError('Failed to download PDF');
+      console.error('Error downloading PDF:', err);
     }
   };
 
   const handleStatusClick = async (invoice, currentStatus) => {
-    // Don't allow changing PAID invoices
-    if (currentStatus === 'paid') {
-      alert('Cannot change status of paid invoices');
-      return;
-    }
+    const statusOptions = [
+      { value: 'DRAFT', label: 'Draft' },
+      { value: 'GENERATED', label: 'Generated' },
+      { value: 'SENT', label: 'Sent' },
+      { value: 'PAID', label: 'Paid' },
+      { value: 'OVERDUE', label: 'Overdue' },
+      { value: 'CANCELLED', label: 'Cancelled' },
+      { value: 'PARTIAL_PAID', label: 'Partial Paid' }
+    ];
 
-    // Define status flow
-    const statusFlow = {
-      'draft': ['generated', 'sent'],
-      'generated': ['sent', 'draft'],
-      'sent': ['draft', 'generated'],
-      'partial_paid': ['draft', 'generated', 'sent'],
-      'overdue': ['draft', 'generated', 'sent']
-    };
-
-    const availableStatuses = statusFlow[currentStatus] || ['draft', 'generated', 'sent'];
-    
-    // Create status options
-    const statusOptions = availableStatuses.map(status => ({
-      value: status,
-      label: invoiceService.getInvoiceStatusLabel(status),
-      color: invoiceService.getInvoiceStatusColor(status)
-    }));
-
-    // Show status selection dialog
     const newStatus = await showStatusSelectionDialog(statusOptions, currentStatus);
     
     if (newStatus && newStatus !== currentStatus) {
       try {
         const result = await invoiceService.updateStatus(invoice.id, newStatus);
         if (result.success) {
-          loadInvoices();
+          loadAllInvoices(); // Refresh all invoices
           setError(null);
         } else {
           setError(result.error);
         }
-      } catch (error) {
-        setError('Failed to update invoice status');
-        console.error('Error updating invoice status:', error);
+      } catch (err) {
+        setError('Failed to update status');
+        console.error('Error updating status:', err);
       }
     }
   };
@@ -458,110 +478,65 @@ const Invoices = () => {
   };
 
   const handleGenerateInvoiceFromOrder = async () => {
+    if (!selectedOrder || !generateInvoiceData.invoice_date || !generateInvoiceData.due_date) {
+      setError('Please select an order and fill in all required fields');
+      return;
+    }
+
     try {
-      if (!generateInvoiceData.order_id) {
-        setError('Please select an order');
-        return;
-      }
-
-      // Validate invoice amount
-      if (!generateInvoiceData.invoice_amount || parseFloat(generateInvoiceData.invoice_amount) <= 0) {
-        setError('Please enter a valid invoice amount');
-        return;
-      }
-
-      console.log('DEBUG: Sending invoice data:', {
-        order_id: generateInvoiceData.order_id,
-        invoice_date: generateInvoiceData.invoice_date,
-        due_date: generateInvoiceData.due_date,
-        payment_terms: generateInvoiceData.payment_terms,
-        invoice_amount: parseFloat(generateInvoiceData.invoice_amount)
-      });
-      
       const result = await invoiceService.generateInvoiceFromOrder(
-        generateInvoiceData.order_id,
-        {
-          invoice_date: generateInvoiceData.invoice_date,
-          due_date: generateInvoiceData.due_date,
-          payment_terms: generateInvoiceData.payment_terms,
-          invoice_amount: parseFloat(generateInvoiceData.invoice_amount)
-        }
+        selectedOrder.id,
+        generateInvoiceData
       );
-
+      
       if (result.success) {
         setShowGenerateInvoiceModal(false);
         setGenerateInvoiceData({
           order_id: '',
-          mode: '',
           invoice_date: new Date().toISOString().split('T')[0],
           due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           payment_terms: '30 days',
           invoice_amount: ''
         });
         setSelectedOrder(null);
-        loadInvoices(); // Refresh the list
+        loadAllInvoices(); // Refresh all invoices
         setError(null);
       } else {
         setError(result.error);
       }
-    } catch (error) {
+    } catch (err) {
       setError('Failed to generate invoice');
-      console.error('Error generating invoice:', error);
+      console.error('Error generating invoice:', err);
     }
   };
 
   const handleCreateInvoice = async () => {
+    if (!createInvoiceData.customer_id || !createInvoiceData.customer_name) {
+      setError('Please select a customer');
+      return;
+    }
+
+    // Validate invoice lines
+    const validLines = createInvoiceData.invoice_lines.filter(line => 
+      line.description && line.quantity > 0 && line.unit_price > 0
+    );
+
+    if (validLines.length === 0) {
+      setError('Please add at least one valid invoice line');
+      return;
+    }
+
     try {
-      if (!createInvoiceData.customer_id || !createInvoiceData.customer_name) {
-        setError('Please select a customer');
-        return;
-      }
-
-      // Validate invoice lines
-      if (!createInvoiceData.invoice_lines || createInvoiceData.invoice_lines.length === 0) {
-        setError('Please add at least one invoice line');
-        return;
-      }
-
-      // Validate each invoice line
-      for (let i = 0; i < createInvoiceData.invoice_lines.length; i++) {
-        const line = createInvoiceData.invoice_lines[i];
-        if (!line.description || line.description.trim() === '') {
-          setError(`Please enter a description for line ${i + 1}`);
-          return;
-        }
-        if (!line.quantity || parseFloat(line.quantity) <= 0) {
-          setError(`Please enter a valid quantity for line ${i + 1}`);
-          return;
-        }
-        if (!line.unit_price || parseFloat(line.unit_price) < 0) {
-          setError(`Please enter a valid unit price for line ${i + 1}`);
-          return;
-        }
-      }
-
-      // Format data according to backend schema
-      const formattedData = {
+      const result = await invoiceService.createInvoice({
         customer_id: createInvoiceData.customer_id,
         customer_name: createInvoiceData.customer_name,
         customer_address: createInvoiceData.customer_address,
         invoice_date: createInvoiceData.invoice_date,
         due_date: createInvoiceData.due_date,
         payment_terms: createInvoiceData.payment_terms,
-        notes: '',
-        invoice_lines: createInvoiceData.invoice_lines.map(line => ({
-          description: line.description,
-          quantity: parseFloat(line.quantity) || 0,
-          unit_price: parseFloat(line.unit_price) || 0,
-          tax_code: 'TX_STD',
-          tax_rate: 23.00,
-          product_code: null,
-          variant_sku: null
-        }))
-      };
-
-      const result = await invoiceService.createInvoice(formattedData);
-
+        invoice_lines: validLines
+      });
+      
       if (result.success) {
         setShowCreateInvoiceModal(false);
         setCreateInvoiceData({
@@ -573,14 +548,14 @@ const Invoices = () => {
           payment_terms: '30 days',
           invoice_lines: [{ description: '', quantity: 1, unit_price: 0, line_total: 0 }]
         });
-        loadInvoices(); // Refresh the list
+        loadAllInvoices(); // Refresh all invoices
         setError(null);
       } else {
         setError(result.error);
       }
-    } catch (error) {
+    } catch (err) {
       setError('Failed to create invoice');
-      console.error('Error creating invoice:', error);
+      console.error('Error creating invoice:', err);
     }
   };
 
@@ -599,24 +574,22 @@ const Invoices = () => {
   };
 
   const updateInvoiceLine = (index, field, value) => {
-    setCreateInvoiceData(prev => {
-      const newLines = [...prev.invoice_lines];
-      newLines[index] = { ...newLines[index], [field]: value };
-      
-      // Calculate line total
-      if (field === 'quantity' || field === 'unit_price') {
-        const quantity = parseFloat(newLines[index].quantity) || 0;
-        const unitPrice = parseFloat(newLines[index].unit_price) || 0;
-        newLines[index].line_total = quantity * unitPrice;
-      }
-      
-      return { ...prev, invoice_lines: newLines };
-    });
-  };
-
-  const getCustomerName = (customerId) => {
-    const customer = customers.find(c => c.id === customerId);
-    return customer ? customer.name : 'Unknown Customer';
+    setCreateInvoiceData(prev => ({
+      ...prev,
+      invoice_lines: prev.invoice_lines.map((line, i) => {
+        if (i === index) {
+          const updatedLine = { ...line, [field]: value };
+          // Calculate line total
+          if (field === 'quantity' || field === 'unit_price') {
+            const quantity = field === 'quantity' ? parseFloat(value) || 0 : parseFloat(line.quantity) || 0;
+            const unitPrice = field === 'unit_price' ? parseFloat(value) || 0 : parseFloat(line.unit_price) || 0;
+            updatedLine.line_total = quantity * unitPrice;
+          }
+          return updatedLine;
+        }
+        return line;
+      })
+    }));
   };
 
   const calculateRemainingAmount = (invoice) => {
@@ -636,7 +609,7 @@ const Invoices = () => {
         onClick={() => handleInvoiceClick(invoice)}
       >
         <td>{invoice.invoice_no}</td>
-        <td>{getCustomerName(invoice.customer_id)}</td>
+        <td>{invoice.customer_name || 'Unknown Customer'}</td>
         <td>{invoiceService.formatDate(invoice.invoice_date)}</td>
         <td>{invoiceService.formatDate(invoice.due_date)}</td>
         <td>{invoiceService.formatCurrency(invoice.total_amount, invoice.currency)}</td>
@@ -774,7 +747,7 @@ const Invoices = () => {
             <div className="invoice-info">
               <div className="info-row">
                 <span className="label">Customer:</span>
-                <span className="value">{getCustomerName(selectedInvoice.customer_id)}</span>
+                <span className="value">{selectedInvoice.customer_name}</span>
               </div>
               <div className="info-row">
                 <span className="label">Invoice Date:</span>
@@ -910,7 +883,7 @@ const Invoices = () => {
               <div className="invoice-details">
                 <div className="detail-row">
                   <span className="label">Customer:</span>
-                  <span className="value">{getCustomerName(selectedInvoice.customer_id)}</span>
+                  <span className="value">{selectedInvoice.customer_name}</span>
                 </div>
                 <div className="detail-row">
                   <span className="label">Total Amount:</span>
@@ -1210,34 +1183,17 @@ const Invoices = () => {
           <div className="modal-body">
             <div className="form-group">
               <label>Customer:</label>
-              <select
-                value={createInvoiceData.customer_id}
-                onChange={(e) => {
-                  const customer = customers.find(c => c.id === e.target.value);
-                  setCreateInvoiceData(prev => ({
-                    ...prev,
-                    customer_id: e.target.value,
-                    customer_name: customer ? customer.name : '',
-                    customer_address: customer ? `${customer.name}\n${customer.email || ''}\n${customer.phone_number || ''}` : ''
-                  }));
-                }}
-              >
-                <option value="">Select a customer</option>
-                {customers.map(customer => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label>Customer Name:</label>
               <input
                 type="text"
                 value={createInvoiceData.customer_name}
-                onChange={(e) => setCreateInvoiceData(prev => ({ ...prev, customer_name: e.target.value }))}
-                placeholder="Customer name"
+                onChange={(e) => {
+                  setCreateInvoiceData(prev => ({
+                    ...prev,
+                    customer_name: e.target.value,
+                    customer_id: e.target.value // Use customer name as ID for simplicity
+                  }));
+                }}
+                placeholder="Enter customer name"
               />
             </div>
             
@@ -1283,6 +1239,13 @@ const Invoices = () => {
             
             <div className="form-group">
               <label>Invoice Lines:</label>
+              <div className="invoice-lines-header">
+                <span className="line-description-header">Description</span>
+                <span className="line-quantity-header">Qty</span>
+                <span className="line-price-header">Unit Price</span>
+                <span className="line-total-header">Line Total</span>
+                <span className="line-actions-header">Actions</span>
+              </div>
               {createInvoiceData.invoice_lines.map((line, index) => (
                 <div key={index} className="invoice-line">
                   <div className="line-row">
@@ -1290,7 +1253,7 @@ const Invoices = () => {
                       type="text"
                       value={line.description}
                       onChange={(e) => updateInvoiceLine(index, 'description', e.target.value)}
-                      placeholder="Description"
+                      placeholder="Item description"
                       className="line-description"
                     />
                     <input
@@ -1299,6 +1262,8 @@ const Invoices = () => {
                       onChange={(e) => updateInvoiceLine(index, 'quantity', e.target.value)}
                       placeholder="Qty"
                       className="line-quantity"
+                      min="1"
+                      step="1"
                     />
                     <input
                       type="number"
@@ -1307,6 +1272,7 @@ const Invoices = () => {
                       onChange={(e) => updateInvoiceLine(index, 'unit_price', e.target.value)}
                       placeholder="Unit Price"
                       className="line-price"
+                      min="0"
                     />
                     <span className="line-total">${line.line_total.toFixed(2)}</span>
                     <button
@@ -1323,6 +1289,28 @@ const Invoices = () => {
               <button type="button" onClick={addInvoiceLine} className="btn btn-secondary btn-sm">
                 + Add Line
               </button>
+              
+              {/* Calculate and display totals */}
+              <div className="invoice-totals">
+                <div className="total-row">
+                  <span className="total-label">Subtotal:</span>
+                  <span className="total-value">
+                    ${createInvoiceData.invoice_lines.reduce((sum, line) => sum + line.line_total, 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="total-row">
+                  <span className="total-label">Tax (23%):</span>
+                  <span className="total-value">
+                    ${(createInvoiceData.invoice_lines.reduce((sum, line) => sum + line.line_total, 0) * 0.23).toFixed(2)}
+                  </span>
+                </div>
+                <div className="total-row total-grand">
+                  <span className="total-label">Total:</span>
+                  <span className="total-value">
+                    ${(createInvoiceData.invoice_lines.reduce((sum, line) => sum + line.line_total, 0) * 1.23).toFixed(2)}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
           <div className="modal-footer">
@@ -1338,7 +1326,7 @@ const Invoices = () => {
     );
   };
 
-  if (loading && invoices.length === 0) {
+  if (loading && allInvoices.length === 0) {
     return (
       <div className="invoices-container">
         <div className="loading">Loading invoices...</div>
@@ -1363,32 +1351,63 @@ const Invoices = () => {
       )}
 
       <div className="filters-section">
+        <h3>Filter Invoices</h3>
         <div className="filter-row">
           <div className="filter-group">
-            <label>Customer:</label>
-            <input
-              type="text"
-              value={filters.customer_name}
-              onChange={(e) => handleFilterChange('customer_name', e.target.value)}
-              placeholder="Search by customer name"
-            />
+            <label>Invoice Number:</label>
+            <div className="dropdown-input-container">
+              <input
+                type="text"
+                value={filters.invoice_no}
+                onChange={(e) => {
+                  handleFilterChange('invoice_no', e.target.value);
+                  setShowInvoiceNoDropdown(true);
+                }}
+                onFocus={() => setShowInvoiceNoDropdown(true)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                    setShowInvoiceNoDropdown(false);
+                  }
+                }}
+                placeholder="Search by invoice number"
+                title="Filter invoices by invoice number"
+                className="dropdown-input"
+              />
+              {showInvoiceNoDropdown && uniqueInvoiceNumbers.length > 0 && (
+                <div className="dropdown-list">
+                  {uniqueInvoiceNumbers
+                    .filter(invoiceNo => 
+                      invoiceNo.toLowerCase().includes(filters.invoice_no.toLowerCase())
+                    )
+                    .map((invoiceNo, index) => (
+                      <div
+                        key={index}
+                        className="dropdown-item"
+                        onClick={() => {
+                          handleFilterChange('invoice_no', invoiceNo);
+                          setShowInvoiceNoDropdown(false);
+                        }}
+                      >
+                        {invoiceNo}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="filter-group">
-            <label>Invoice No:</label>
-            <input
-              type="text"
-              value={filters.invoice_no}
-              onChange={(e) => handleFilterChange('invoice_no', e.target.value)}
-              placeholder="Search by invoice number"
-            />
-          </div>
-          
-          <div className="filter-group">
-            <label>Status:</label>
+            <label>Invoice Status:</label>
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch();
+                }
+              }}
+              title="Filter invoices by status"
             >
               <option value="">All Statuses</option>
               <option value="DRAFT">Draft</option>
@@ -1409,6 +1428,7 @@ const Invoices = () => {
               type="date"
               value={filters.from_date}
               onChange={(e) => handleFilterChange('from_date', e.target.value)}
+              title="Filter invoices from this date"
             />
           </div>
           
@@ -1418,22 +1438,22 @@ const Invoices = () => {
               type="date"
               value={filters.to_date}
               onChange={(e) => handleFilterChange('to_date', e.target.value)}
+              title="Filter invoices up to this date"
             />
           </div>
           
           <div className="filter-group">
             <button 
+              className="btn btn-primary"
+              onClick={handleSearch}
+              title="Search invoices with current filters"
+            >
+              Search
+            </button>
+            <button 
               className="btn btn-secondary"
-              onClick={() => {
-                setFilters({
-                  customer_name: '',
-                  invoice_no: '',
-                  status: '',
-                  from_date: '',
-                  to_date: ''
-                });
-                setPagination(prev => ({ ...prev, offset: 0 }));
-              }}
+              onClick={handleClearFilters}
+              title="Clear all filters"
             >
               Clear Filters
             </button>
@@ -1456,11 +1476,11 @@ const Invoices = () => {
             </tr>
           </thead>
           <tbody>
-            {invoices.map(renderInvoiceRow)}
+            {getPaginatedInvoices().map(renderInvoiceRow)}
           </tbody>
         </table>
         
-        {invoices.length === 0 && !loading && (
+        {getPaginatedInvoices().length === 0 && !loading && (
           <div className="no-data">
             No invoices found matching your criteria.
           </div>

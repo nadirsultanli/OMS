@@ -414,7 +414,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                         # Some endpoints might use non-UUID IDs
                         potential_id = parts[3]
                         # Exclude action endpoints and common non-ID paths, including auth-specific paths
-                        excluded_paths = ['', 'new', 'create', 'list', 'estimate-volume-for-gas-type', 'calculate-mixed-load-capacity', 'tenants', 'exceeding-limits', 'renewal-needed', 'plans', 'usage', 'summary', 'available-orders', 'overdue', 'dashboard', 'pdf', 'send', 'payment', 'from-order', 'upgrade', 'current', 'me', 'profile', 'login', 'logout', 'signup', 'refresh', 'forgot-password', 'reset-password']
+                        excluded_paths = ['', 'new', 'create', 'list', 'estimate-volume-for-gas-type', 'calculate-mixed-load-capacity', 'tenants', 'exceeding-limits', 'renewal-needed', 'plans', 'usage', 'summary', 'available-orders', 'orders-ready-for-invoicing', 'overdue', 'dashboard', 'pdf', 'send', 'payment', 'from-order', 'upgrade', 'current', 'me', 'profile', 'login', 'logout', 'signup', 'refresh', 'forgot-password', 'reset-password', 'refunds']
                         if potential_id and potential_id not in excluded_paths:
                             # This could be a valid ID (non-UUID)
                             object_id = potential_id

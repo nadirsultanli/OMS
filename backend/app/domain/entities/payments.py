@@ -22,6 +22,7 @@ class PaymentMethod(str, Enum):
     CASH = "cash"                    # Cash payment
     CARD = "card"                    # Credit/debit card (Stripe)
     MPESA = "mpesa"                  # M-Pesa mobile money
+    STRIPE = "stripe"                # Stripe payment
     BANK_TRANSFER = "bank_transfer"  # Bank transfer
     CHECK = "check"                  # Check payment
     DIGITAL_WALLET = "digital_wallet" # Digital wallet
@@ -88,6 +89,7 @@ class Payment:
         amount: Decimal,
         payment_method: PaymentMethod,
         payment_date: date,
+        payment_status: Optional[PaymentStatus] = PaymentStatus.PENDING,
         customer_id: Optional[UUID] = None,
         invoice_id: Optional[UUID] = None,
         order_id: Optional[UUID] = None,
@@ -101,7 +103,7 @@ class Payment:
             tenant_id=tenant_id,
             payment_no=payment_no,
             payment_type=PaymentType.INVOICE_PAYMENT,
-            payment_status=PaymentStatus.PENDING,
+            payment_status=payment_status,
             payment_method=payment_method,
             amount=amount,
             payment_date=payment_date,

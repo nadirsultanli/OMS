@@ -43,8 +43,8 @@ import time
 from collections import defaultdict
 
 # Get configuration from environment
-LOG_LEVEL = config("LOG_LEVEL", default="INFO")
 ENVIRONMENT = config("ENVIRONMENT", default="development")
+LOG_LEVEL = config("LOG_LEVEL", default="WARNING" if ENVIRONMENT == "development" else "INFO")
 AUDIT_ENABLED = config("AUDIT_ENABLED", default="true", cast=bool)
 
 # CORS configuration
@@ -75,26 +75,27 @@ async def lifespan(app: FastAPI):
                 async with direct_db_connection._engine.connect() as conn:
                     await conn.execute(sqlalchemy.text("SELECT 1"))
                 default_logger.info("Direct SQLAlchemy connection successful (local development)")
-                
-                # Start automatic connection cleanup task
-                async def periodic_cleanup():
-                    """Background task to periodically cleanup connections"""
-                    while True:
-                        try:
-                            await asyncio.sleep(30)  # Run every 30 seconds
-                            await cleanup_idle_connections()
-                        except Exception as e:
-                            default_logger.error(f"Periodic cleanup failed: {str(e)}")
-                            await asyncio.sleep(60)  # Wait longer on error
-                
-                # Start the cleanup task
-                asyncio.create_task(periodic_cleanup())
-                default_logger.info("✅ Automatic connection cleanup started (every 30 seconds)")
-                
         except Exception as e:
             default_logger.error(f"Failed to initialize direct SQLAlchemy connection: {str(e)}")
     else:
         default_logger.info("Skipping direct SQLAlchemy connection (Railway mode enabled)")
+    
+    # Start automatic connection cleanup task (works in both local and production)
+    async def periodic_cleanup():
+        """Background task to periodically cleanup connections"""
+        while True:
+            try:
+                # Industry standard: cleanup every 2-5 minutes for production workloads
+                await asyncio.sleep(120)  # Run every 2 minutes (industry standard)
+                await cleanup_idle_connections()
+                default_logger.debug("✅ Periodic connection cleanup completed")
+            except Exception as e:
+                default_logger.error(f"Periodic cleanup failed: {str(e)}")
+                await asyncio.sleep(300)  # Wait 5 minutes on error
+    
+    # Start the cleanup task
+    asyncio.create_task(periodic_cleanup())
+    default_logger.info("✅ Automatic connection cleanup started (every 2 minutes)")
     
     yield
     

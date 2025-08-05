@@ -13,6 +13,7 @@ from app.domain.entities.payments import PaymentStatus, PaymentMethod, PaymentTy
 class CreatePaymentRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Payment amount")
     payment_method: PaymentMethod = Field(..., description="Payment method")
+    payment_status: Optional[PaymentStatus] = Field(PaymentStatus.PENDING, description="Payment status (defaults to pending)")
     payment_date: Optional[date] = Field(None, description="Payment date (defaults to today)")
     customer_id: Optional[UUID] = Field(None, description="Customer ID")
     invoice_id: Optional[UUID] = Field(None, description="Invoice ID")
