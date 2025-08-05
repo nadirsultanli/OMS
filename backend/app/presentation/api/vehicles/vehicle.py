@@ -17,10 +17,12 @@ from app.services.dependencies.vehicles import get_vehicle_service
 from app.domain.entities.vehicles import Vehicle
 from datetime import datetime
 from app.infrastucture.logs.logger import default_logger
+from app.services.dependencies.auth import get_tenant_aware_user
+from app.domain.entities.users import User
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
 
-@router.post("/", response_model=VehicleResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=VehicleResponse, status_code=status.HTTP_201_CREATED)
 async def create_vehicle(
     request: CreateVehicleRequest,
     vehicle_service: VehicleService = Depends(get_vehicle_service)
@@ -57,15 +59,15 @@ async def get_vehicle(vehicle_id: UUID, vehicle_service: VehicleService = Depend
 
 @router.get("/summary/dashboard")
 async def get_vehicles_dashboard_summary(
-    tenant_id: UUID = Query(...),
+    current_user: User = Depends(get_tenant_aware_user),
     vehicle_service: VehicleService = Depends(get_vehicle_service)
 ):
     """
     Get optimized vehicles summary for dashboard (cached and lightweight)
     """
     try:
-        # Use optimized summary method (single COUNT query with CASE WHEN)
-        summary = await vehicle_service.get_vehicle_summary(tenant_id)
+        # Use optimized summary method with tenant from user (no redundant tenant check)
+        summary = await vehicle_service.get_vehicle_summary(current_user.tenant_id)
         
         return {
             "success": True,
@@ -81,16 +83,17 @@ async def get_vehicles_dashboard_summary(
 
 @router.get("/", response_model=VehicleListResponse)
 async def list_vehicles(
-    tenant_id: UUID = Query(...),
+    current_user: User = Depends(get_tenant_aware_user),
     active: Optional[bool] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     vehicle_service: VehicleService = Depends(get_vehicle_service)
 ):
-    vehicles = await vehicle_service.get_all_vehicles(tenant_id, active, limit, offset)
+    # Use tenant from authenticated user (no redundant tenant check)
+    vehicles = await vehicle_service.get_all_vehicles(current_user.tenant_id, active, limit, offset)
     
     # Get accurate total count for pagination
-    total = await vehicle_service.get_vehicle_count(tenant_id, active)
+    total = await vehicle_service.get_vehicle_count(current_user.tenant_id, active)
     
     return VehicleListResponse(
         vehicles=[VehicleResponse(**v.__dict__) for v in vehicles], 

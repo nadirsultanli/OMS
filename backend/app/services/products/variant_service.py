@@ -30,10 +30,26 @@ class VariantService:
     
     async def _get_product_name(self, product_id: str) -> str:
         """Get product name for SKU generation"""
-        # This is a simplified version - in a real implementation, you'd inject a product repository
-        # For now, we'll use a simple mapping or fetch from database
-        # You can enhance this by injecting a product repository
-        return "PROPAN"  # Default for now - will be enhanced with actual product lookup
+        try:
+            # Import here to avoid circular imports
+            from app.infrastucture.database.repositories.product_repository import ProductRepositoryImpl
+            from app.services.dependencies.common import get_db_session
+            
+            # Get database session
+            session = await get_db_session().__anext__()
+            product_repo = ProductRepositoryImpl(session)
+            
+            # Get product by ID
+            product = await product_repo.get_product_by_id(UUID(product_id))
+            if product:
+                # Clean the product name for SKU generation (remove spaces, special chars)
+                clean_name = product.name.replace(" ", "").replace("-", "").replace("_", "").upper()
+                return clean_name[:6]  # Use first 6 characters
+            else:
+                return "PROPAN"  # Fallback
+        except Exception as e:
+            print(f"Warning: Failed to get product name for {product_id}: {str(e)}")
+            return "PROPAN"  # Fallback
     
     async def create_variant(
         self,
@@ -107,7 +123,11 @@ class VariantService:
             raise ValueError(f"Business rule validation failed: {', '.join(validation_errors)}")
         
         # Save to repository
-        return await self.variant_repository.create_variant(variant)
+        saved_variant = await self.variant_repository.create_variant(variant)
+        
+
+        
+        return saved_variant
     
     async def create_atomic_cylinder_variants(
         self,
@@ -122,8 +142,8 @@ class VariantService:
     ) -> tuple[Variant, Variant]:
         """Create both EMPTY and FULL variants for a cylinder size"""
         # Get product name for SKU generation
-        product_name = await self._get_product_name(product_id)
-        product_prefix = product_name.replace(" ", "").upper()[:6]  # Use first 6 chars of product name
+        product_prefix = await self._get_product_name(product_id)
+        print(f"🔧 Using product prefix '{product_prefix}' for SKU generation")
         
         # Create EMPTY variant - no gross weight (empty cylinders don't have gross weight)
         empty_variant = await self.create_variant(
@@ -174,8 +194,7 @@ class VariantService:
     ) -> Variant:
         """Create a gas service variant"""
         # Get product name for SKU generation
-        product_name = await self._get_product_name(product_id)
-        product_prefix = product_name.replace(" ", "").upper()[:6]  # Use first 6 chars of product name
+        product_prefix = await self._get_product_name(product_id)
         
         return await self.create_variant(
             tenant_id=tenant_id,
@@ -201,8 +220,7 @@ class VariantService:
     ) -> Variant:
         """Create a deposit variant"""
         # Get product name for SKU generation
-        product_name = await self._get_product_name(product_id)
-        product_prefix = product_name.replace(" ", "").upper()[:6]  # Use first 6 chars of product name
+        product_prefix = await self._get_product_name(product_id)
         
         return await self.create_variant(
             tenant_id=tenant_id,
@@ -229,8 +247,7 @@ class VariantService:
     ) -> Variant:
         """Create a bundle variant"""
         # Get product name for SKU generation
-        product_name = await self._get_product_name(product_id)
-        product_prefix = product_name.replace(" ", "").upper()[:6]  # Use first 6 chars of product name
+        product_prefix = await self._get_product_name(product_id)
         
         bundle_components = [
             {

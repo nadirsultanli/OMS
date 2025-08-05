@@ -267,7 +267,6 @@ async def adjust_stock_level(
         quantity_change=float(request.quantity_change),
         stock_status=request.stock_status.value,
         reason=request.reason or "Manual adjustment",
-        unit_cost=float(request.unit_cost) if request.unit_cost else None,
         operation="stock_adjustment"
     )
     
@@ -278,7 +277,6 @@ async def adjust_stock_level(
             request.variant_id,
             request.quantity_change,
             request.reason or "Manual adjustment",
-            request.unit_cost,
             request.stock_status
         )
 

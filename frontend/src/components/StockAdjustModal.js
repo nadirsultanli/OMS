@@ -17,9 +17,7 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
     warehouseId: '',
     variantId: '',
     quantityChange: '',
-    reason: '',
-    unitCost: '',
-    stockStatus: 'on_hand'
+    reason: ''
   });
   
   const [warehouses, setWarehouses] = useState([]);
@@ -58,18 +56,48 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
 
   const loadData = async () => {
     try {
+      console.log('Loading warehouses and variants for stock adjustment...');
+      
       const [warehousesResponse, variantsResponse] = await Promise.all([
         warehouseService.getWarehouses(),
-        variantService.getVariants()
+        variantService.getStockVariants() // Only get stock variants (FULL and EMPTY)
       ]);
       
+      console.log('Warehouses response:', warehousesResponse);
+      console.log('Variants response:', variantsResponse);
+      
       // Handle different response formats and ensure arrays
-      const warehouses = warehousesResponse.warehouses || warehousesResponse || [];
-      const variants = variantsResponse.data?.variants || variantsResponse.variants || variantsResponse || [];
+      let warehouses = [];
+      if (warehousesResponse.success && warehousesResponse.data) {
+        warehouses = warehousesResponse.data.warehouses || warehousesResponse.data || [];
+      } else if (warehousesResponse.warehouses) {
+        warehouses = warehousesResponse.warehouses;
+      } else if (Array.isArray(warehousesResponse)) {
+        warehouses = warehousesResponse;
+      }
+      
+      let variants = [];
+      if (variantsResponse.success && variantsResponse.data) {
+        variants = variantsResponse.data.variants || variantsResponse.data || [];
+      } else if (variantsResponse.variants) {
+        variants = variantsResponse.variants;
+      } else if (Array.isArray(variantsResponse)) {
+        variants = variantsResponse;
+      }
+      
+      // Filter variants to only show FULL and EMPTY (stock variants)
+      const stockVariants = variants.filter(variant => {
+        const sku = variant.sku || '';
+        return sku.includes('-FULL') || sku.includes('-EMPTY');
+      });
+      
+      console.log('Filtered stock variants:', stockVariants);
+      console.log('Warehouses loaded:', warehouses.length);
       
       setWarehouses(Array.isArray(warehouses) ? warehouses : []);
-      setVariants(Array.isArray(variants) ? variants : []);
+      setVariants(Array.isArray(stockVariants) ? stockVariants : []);
     } catch (err) {
+      console.error('Error loading data:', err);
       setError('Failed to load data: ' + err.message);
       // Set empty arrays on error to prevent map errors
       setWarehouses([]);
@@ -93,8 +121,8 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
       return;
     }
 
-    if (parseFloat(formData.quantityChange) === 0) {
-      setError('Quantity change cannot be zero');
+    if (parseFloat(formData.quantityChange) <= 0) {
+      setError('Quantity must be greater than zero');
       return;
     }
 
@@ -107,12 +135,8 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
         variant_id: formData.variantId,
         quantity_change: parseFloat(formData.quantityChange),
         reason: formData.reason,
-        stock_status: formData.stockStatus
+        stock_status: 'on_hand' // Default to on_hand
       };
-
-      if (formData.unitCost) {
-        adjustmentData.unit_cost = parseFloat(formData.unitCost);
-      }
 
       const response = await stockService.adjustStockLevel(adjustmentData);
       
@@ -130,9 +154,7 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
       warehouseId: '',
       variantId: '',
       quantityChange: '',
-      reason: '',
-      unitCost: '',
-      stockStatus: 'on_hand'
+      reason: ''
     });
     setError(null);
     onClose();
@@ -187,9 +209,17 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
               </div>
             )}
 
-            <div className="form-grid">
+            {/* Show info for creating new stock levels */}
+            {!selectedStockLevel && (
+              <div className="new-stock-info">
+                <h4>📦 Stock Adjustment</h4>
+                <p>Select warehouse and variant, then enter quantity to add to stock.</p>
+              </div>
+            )}
+
+            <div className="form-simple">
               <div className="form-group">
-                <label htmlFor="warehouse">Warehouse *</label>
+                <label htmlFor="warehouse">🏢 Warehouse</label>
                 <select
                   id="warehouse"
                   value={formData.warehouseId}
@@ -198,17 +228,21 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
                   required
                   disabled={selectedStockLevel && usePreselected}
                 >
-                  <option value="">Select Warehouse</option>
-                  {Array.isArray(warehouses) && warehouses.map(warehouse => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                      {warehouse.code} - {warehouse.name}
-                    </option>
-                  ))}
+                  <option value="">Choose warehouse...</option>
+                  {Array.isArray(warehouses) && warehouses.length > 0 ? (
+                    warehouses.map(warehouse => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.code} - {warehouse.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No warehouses available</option>
+                  )}
                 </select>
               </div>
 
               <div className="form-group">
-                <label htmlFor="variant">Variant *</label>
+                <label htmlFor="variant">📦 Variant</label>
                 <select
                   id="variant"
                   value={formData.variantId}
@@ -217,70 +251,67 @@ const StockAdjustModal = ({ isOpen, onClose, onSuccess, selectedStockLevel = nul
                   required
                   disabled={selectedStockLevel && usePreselected}
                 >
-                  <option value="">Select Variant</option>
-                  {Array.isArray(variants) && variants.map(variant => (
-                    <option key={variant.id} value={variant.id}>
-                      {variant.sku}
-                    </option>
-                  ))}
+                  <option value="">Choose variant...</option>
+                  {Array.isArray(variants) && variants.length > 0 ? (
+                    variants.map(variant => (
+                      <option key={variant.id} value={variant.id}>
+                        {variant.sku}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No variants available</option>
+                  )}
                 </select>
               </div>
 
-              <div className="form-group">
-                <label htmlFor="stockStatus">Stock Status *</label>
-                <select
-                  id="stockStatus"
-                  value={formData.stockStatus}
-                  onChange={(e) => handleInputChange('stockStatus', e.target.value)}
-                  className="form-control"
-                  required
-                >
-                  {STOCK_STATUS_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="form-group quantity-section">
+                <label htmlFor="quantityChange">📊 Quantity</label>
+                <div className="quantity-input-wrapper">
+                  <input
+                    type="number"
+                    id="quantityChange"
+                    value={formData.quantityChange}
+                    onChange={(e) => handleInputChange('quantityChange', e.target.value)}
+                    className="form-control quantity-input"
+                    placeholder="Enter quantity"
+                    required
+                  />
+                  <div className="quantity-helpers">
+                    <button 
+                      type="button" 
+                      className="btn-quantity-helper"
+                      onClick={() => handleInputChange('quantityChange', '100')}
+                    >
+                      +100
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn-quantity-helper"
+                      onClick={() => handleInputChange('quantityChange', '50')}
+                    >
+                      +50
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn-quantity-helper"
+                      onClick={() => handleInputChange('quantityChange', '25')}
+                    >
+                      +25
+                    </button>
+                  </div>
+                </div>
+                <small className="form-text text-muted">Enter quantity to add to stock</small>
               </div>
 
               <div className="form-group">
-                <label htmlFor="quantityChange">Quantity Change *</label>
-                <input
-                  type="number"
-                  id="quantityChange"
-                  value={formData.quantityChange}
-                  onChange={(e) => handleInputChange('quantityChange', e.target.value)}
-                  className="form-control"
-                  placeholder="Enter + or - quantity"
-                  step="0.001"
-                  required
-                />
-                <small className="form-text">Use negative values to reduce stock</small>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="unitCost">Unit Cost</label>
-                <input
-                  type="number"
-                  id="unitCost"
-                  value={formData.unitCost}
-                  onChange={(e) => handleInputChange('unitCost', e.target.value)}
-                  className="form-control"
-                  placeholder="Enter unit cost"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="form-group full-width">
-                <label htmlFor="reason">Reason *</label>
+                <label htmlFor="reason">📝 Reason</label>
                 <textarea
                   id="reason"
                   value={formData.reason}
                   onChange={(e) => handleInputChange('reason', e.target.value)}
                   className="form-control"
-                  placeholder="Enter reason for adjustment"
-                  rows="3"
+                  placeholder="Why are you adjusting this stock?"
+                  rows="2"
                   required
                 />
               </div>

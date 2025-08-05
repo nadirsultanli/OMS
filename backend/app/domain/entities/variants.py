@@ -73,6 +73,7 @@ class Variant:
     status: Optional[ProductStatus] = None
     scenario: Optional[ProductScenario] = None
     # Physical attributes
+    size: Optional[str] = None  # Size identifier (e.g., "13" for 13kg cylinder)
     tare_weight_kg: Optional[Decimal] = None
     capacity_kg: Optional[Decimal] = None
     gross_weight_kg: Optional[Decimal] = None
@@ -195,6 +196,7 @@ class Variant:
         status: Optional[ProductStatus] = None,
         scenario: Optional[ProductScenario] = None,
         # Physical attributes
+        size: Optional[str] = None,  # Size identifier (e.g., "13" for 13kg cylinder)
         tare_weight_kg: Optional[Decimal] = None,
         capacity_kg: Optional[Decimal] = None,
         gross_weight_kg: Optional[Decimal] = None,
@@ -240,6 +242,7 @@ class Variant:
             default_price=default_price,
             status=status,
             scenario=scenario,
+            size=size,
             tare_weight_kg=tare_weight_kg,
             capacity_kg=capacity_kg,
             gross_weight_kg=gross_weight_kg,
@@ -611,6 +614,7 @@ class Variant:
             "default_price": float(self.default_price) if self.default_price else None,
             "status": self.status.value if self.status else None,
             "scenario": self.scenario.value if self.scenario else None,
+            "size": self.size,
             "tare_weight_kg": float(self.tare_weight_kg) if self.tare_weight_kg else None,
             "capacity_kg": float(self.capacity_kg) if self.capacity_kg else None,
             "gross_weight_kg": float(self.gross_weight_kg) if self.gross_weight_kg else None,

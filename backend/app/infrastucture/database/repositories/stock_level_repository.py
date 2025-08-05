@@ -256,10 +256,9 @@ class SQLAlchemyStockLevelRepository(StockLevelRepository):
         warehouse_id: UUID, 
         variant_id: UUID, 
         stock_status: StockStatus, 
-        quantity_change: Decimal, 
-        unit_cost: Optional[Decimal] = None
+        quantity_change: Decimal
     ) -> StockLevel:
-        """Update stock quantity with positive or negative change"""
+        """Update stock quantity with positive change only"""
         # Get or create stock level
         existing = await self.get_stock_level(tenant_id, warehouse_id, variant_id, stock_status)
         
@@ -275,15 +274,12 @@ class SQLAlchemyStockLevelRepository(StockLevelRepository):
                 quantity=Decimal('0'),
                 reserved_qty=Decimal('0'),
                 available_qty=Decimal('0'),
-                unit_cost=unit_cost or Decimal('0'),
+                unit_cost=Decimal('0'),
                 total_cost=Decimal('0')
             )
 
-        # Apply quantity change with costing
-        if quantity_change > 0:
-            existing.add_quantity(quantity_change, unit_cost)
-        elif quantity_change < 0:
-            existing.reduce_quantity(abs(quantity_change))
+        # Apply quantity change (only positive quantities allowed)
+        existing.add_quantity(quantity_change, Decimal('0'))
 
         # Save updated stock level
         return await self.create_or_update_stock_level(existing)

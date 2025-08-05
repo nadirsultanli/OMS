@@ -285,32 +285,16 @@ class StockLevelService:
         variant_id: UUID,
         adjustment_quantity: Decimal,
         reason: str,
-        unit_cost: Optional[Decimal] = None,
         stock_status: StockStatus = StockStatus.ON_HAND
     ) -> StockLevel:
         """Perform manual stock adjustment with audit trail"""
-        if adjustment_quantity == 0:
-            raise StockDocValidationError("Adjustment quantity cannot be zero")
+        if adjustment_quantity <= 0:
+            raise StockDocValidationError("Adjustment quantity must be positive")
 
-        # Get current stock level to validate adjustment
-        current_level = await self.get_current_stock_level(
-            user.tenant_id, warehouse_id, variant_id, stock_status
-        )
-        
-        if current_level:
-            # Check if reduction would violate reserved quantity constraint
-            if adjustment_quantity < 0:
-                new_quantity = current_level.quantity + adjustment_quantity
-                if new_quantity < current_level.reserved_qty:
-                    raise StockDocValidationError(
-                        f"Cannot reduce stock to {new_quantity} when {current_level.reserved_qty} units are reserved. "
-                        f"Available for reduction: {current_level.quantity - current_level.reserved_qty}"
-                    )
-
-        # Apply adjustment
+        # Apply adjustment (only positive quantities allowed)
         updated_level = await self.stock_level_repository.update_stock_quantity(
             user.tenant_id, warehouse_id, variant_id, stock_status, 
-            adjustment_quantity, unit_cost
+            adjustment_quantity
         )
 
         # TODO: Create audit log entry for manual adjustment
@@ -384,18 +368,21 @@ class StockLevelService:
         created_by: Optional[UUID] = None
     ) -> List[StockLevel]:
         """Create initial stock levels for a variant across all warehouses"""
-        from app.domain.repositories.warehouse_repository import WarehouseRepository
-        from app.infrastucture.database.repositories.warehouse_repository import SQLAlchemyWarehouseRepository
+        from app.infrastucture.database.repositories.warehouse_repository import WarehouseRepositoryImpl
+        from app.services.dependencies.common import get_db_session
+        from uuid import uuid4
         
-        # Get all warehouses for the tenant
-        warehouse_repo = SQLAlchemyWarehouseRepository()
-        warehouses = await warehouse_repo.get_warehouses_by_tenant(tenant_id)
+        # Get database session and create warehouse repository
+        session = await get_db_session().__anext__()
+        warehouse_repo = WarehouseRepositoryImpl(session)
+        warehouses = await warehouse_repo.get_all(str(tenant_id))
         
         created_stock_levels = []
         
         for warehouse in warehouses:
-            # Create initial stock level for each warehouse
-            stock_level = await self.stock_level_repository.create_or_update_stock_level(
+            # Create StockLevel entity for each warehouse
+            stock_level_entity = StockLevel(
+                id=uuid4(),
                 tenant_id=tenant_id,
                 warehouse_id=warehouse.id,
                 variant_id=variant_id,
@@ -404,9 +391,11 @@ class StockLevelService:
                 reserved_qty=Decimal('0'),
                 available_qty=Decimal('0'),
                 unit_cost=Decimal('0'),
-                total_cost=Decimal('0'),
-                created_by=created_by
+                total_cost=Decimal('0')
             )
+            
+            # Create initial stock level for each warehouse
+            stock_level = await self.stock_level_repository.create_or_update_stock_level(stock_level_entity)
             created_stock_levels.append(stock_level)
         
         return created_stock_levels

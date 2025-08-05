@@ -418,6 +418,8 @@ async def create_cylinder_variant_set(
             created_by=request.created_by
         )
         
+
+        
         return AtomicVariantSetResponse(
             cylinder_empty=VariantResponse(**empty_variant.to_dict()),
             cylinder_full=VariantResponse(**full_variant.to_dict())
@@ -541,7 +543,7 @@ async def create_complete_variant_set(
             tenant_id=request.tenant_id,
             product_id=request.product_id,
             size=request.size,
-            deposit_amount=float(request.deposit_amount) if request.deposit_amount else 0.0,
+            deposit_amount=float(request.deposit_amount) if request.deposit_amount is not None else 0.0,
             created_by=request.created_by
         )
         
@@ -555,37 +557,7 @@ async def create_complete_variant_set(
             created_by=request.created_by
         )
         
-        # Create initial stock levels for all variants across all warehouses
-        try:
-            await stock_level_service.create_initial_stock_levels_for_variant(
-                tenant_id=UUID(request.tenant_id),
-                variant_id=empty_variant.id,
-                created_by=UUID(request.created_by) if request.created_by else None
-            )
-            await stock_level_service.create_initial_stock_levels_for_variant(
-                tenant_id=UUID(request.tenant_id),
-                variant_id=full_variant.id,
-                created_by=UUID(request.created_by) if request.created_by else None
-            )
-            await stock_level_service.create_initial_stock_levels_for_variant(
-                tenant_id=UUID(request.tenant_id),
-                variant_id=gas_variant.id,
-                created_by=UUID(request.created_by) if request.created_by else None
-            )
-            await stock_level_service.create_initial_stock_levels_for_variant(
-                tenant_id=UUID(request.tenant_id),
-                variant_id=deposit_variant.id,
-                created_by=UUID(request.created_by) if request.created_by else None
-            )
-            await stock_level_service.create_initial_stock_levels_for_variant(
-                tenant_id=UUID(request.tenant_id),
-                variant_id=bundle_variant.id,
-                created_by=UUID(request.created_by) if request.created_by else None
-            )
-        except Exception as e:
-            # Log the error but don't fail variant creation
-            # Stock levels can be created manually later if needed
-            print(f"Warning: Failed to create initial stock levels for complete variant set: {str(e)}")
+
         
         return AtomicVariantSetResponse(
             cylinder_empty=VariantResponse(**empty_variant.to_dict()),

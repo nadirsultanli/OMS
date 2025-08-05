@@ -467,7 +467,7 @@ const StockLevels = () => {
                 setSelectedStockLevel(stockLevels[0]);
                 setShowPhysicalCountModal(true);
               } else {
-                setError('No stock levels available for physical count');
+                setError('Please create stock levels first using "Adjust Stock"');
               }
             }}
           >
@@ -480,7 +480,7 @@ const StockLevels = () => {
                 setSelectedStockLevel(stockLevels[0]);
                 setShowTransferModal(true);
               } else {
-                setError('No stock levels available for transfer');
+                setError('Please create stock levels first using "Adjust Stock"');
               }
             }}
           >
@@ -489,12 +489,8 @@ const StockLevels = () => {
           <button 
             className="btn btn-primary" 
             onClick={() => {
-              if (stockLevels.length > 0) {
-                setSelectedStockLevel(stockLevels[0]);
-                setShowAdjustModal(true);
-              } else {
-                setError('No stock levels available for adjustment');
-              }
+              setSelectedStockLevel(null); // Allow creating new stock levels
+              setShowAdjustModal(true);
             }}
           >
             Adjust Stock

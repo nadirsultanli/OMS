@@ -952,7 +952,6 @@ const Products = () => {
                         <th>Size</th>
                         <th>Weight (kg)</th>
                         <th>Capacity (kg)</th>
-                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -967,11 +966,6 @@ const Products = () => {
                           <td>{variant.size || '-'}</td>
                           <td>{variant.tare_weight_kg || '-'}</td>
                           <td>{variant.capacity_kg || '-'}</td>
-                          <td>
-                            <span className={`status-badge ${variant.status === 'ACTIVE' ? 'active' : 'inactive'}`}>
-                              {variant.status}
-                            </span>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
