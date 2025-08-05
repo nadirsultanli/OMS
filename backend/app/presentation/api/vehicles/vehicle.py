@@ -101,7 +101,6 @@ async def list_vehicles(
         limit=limit,
         offset=offset
     )
-
 @router.put("/{vehicle_id}", response_model=VehicleResponse)
 async def update_vehicle(
     vehicle_id: UUID,
