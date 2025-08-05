@@ -377,13 +377,13 @@ const Invoices = () => {
 
   const handleStatusClick = async (invoice, currentStatus) => {
     const statusOptions = [
-      { value: 'DRAFT', label: 'Draft' },
-      { value: 'GENERATED', label: 'Generated' },
-      { value: 'SENT', label: 'Sent' },
-      { value: 'PAID', label: 'Paid' },
-      { value: 'OVERDUE', label: 'Overdue' },
-      { value: 'CANCELLED', label: 'Cancelled' },
-      { value: 'PARTIAL_PAID', label: 'Partial Paid' }
+      { value: 'draft', label: 'Draft' },
+      { value: 'generated', label: 'Generated' },
+      { value: 'sent', label: 'Sent' },
+      { value: 'paid', label: 'Paid' },
+      { value: 'overdue', label: 'Overdue' },
+      { value: 'cancelled', label: 'Cancelled' },
+      { value: 'partial_paid', label: 'Partial Paid' }
     ];
 
     const newStatus = await showStatusSelectionDialog(statusOptions, currentStatus);
@@ -1410,13 +1410,13 @@ const Invoices = () => {
               title="Filter invoices by status"
             >
               <option value="">All Statuses</option>
-              <option value="DRAFT">Draft</option>
-              <option value="GENERATED">Generated</option>
-              <option value="SENT">Sent</option>
-              <option value="PARTIAL_PAID">Partially Paid</option>
-              <option value="PAID">Paid</option>
-              <option value="OVERDUE">Overdue</option>
-              <option value="CANCELLED">Cancelled</option>
+              <option value="draft">Draft</option>
+              <option value="generated">Generated</option>
+              <option value="sent">Sent</option>
+              <option value="partial_paid">Partially Paid</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
         </div>
