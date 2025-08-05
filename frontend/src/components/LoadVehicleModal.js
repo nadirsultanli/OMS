@@ -38,7 +38,7 @@ const LoadVehicleModal = ({
       const [vehiclesRes, warehousesRes, tripsRes] = await Promise.all([
         vehicleService.getVehicles(tenantId, { active: true, limit: 100 }),
         warehouseService.getWarehouses(1, 100),
-        tripService.getTrips({ status: 'planned', limit: 50 })
+        tripService.getTrips({ status: 'planned', limit: 100 })
       ]);
 
       setVehicles(vehiclesRes.success ? vehiclesRes.data.results || [] : []);
@@ -49,6 +49,7 @@ const LoadVehicleModal = ({
       console.log('Vehicles loaded:', vehiclesRes.success ? vehiclesRes.data.results?.length : 0);
       console.log('Warehouses loaded:', warehousesRes.success ? warehousesRes.data.warehouses?.length : 0);
       console.log('Trips loaded:', tripsRes.success ? tripsRes.data.results?.length : 0);
+      console.log('Trips data:', tripsRes.success ? tripsRes.data : 'Failed to load trips');
       
       if (vehiclesRes.success && vehiclesRes.data.results) {
         console.log('Sample vehicle:', vehiclesRes.data.results[0]);
@@ -106,13 +107,12 @@ const LoadVehicleModal = ({
   };
 
   const handleSetupComplete = () => {
-    if (selectedVehicle && selectedTrip && sourceWarehouse) {
+    if (selectedVehicle && sourceWarehouse) {
       setStep(2);
     } else {
       // Show error message for missing selections
       const missingItems = [];
       if (!selectedVehicle) missingItems.push('vehicle');
-      if (!selectedTrip) missingItems.push('trip');
       if (!sourceWarehouse) missingItems.push('source warehouse');
       
       console.error(`Missing required selections: ${missingItems.join(', ')}`);
@@ -259,11 +259,15 @@ const LoadVehicleModal = ({
                       className="form-control"
                     >
                       <option value="">No trip (auto-create loading record)</option>
-                      {trips.map(trip => (
-                        <option key={trip.id} value={trip.id}>
-                          Trip {trip.trip_no} - {trip.status}
-                        </option>
-                      ))}
+                      {trips.length > 0 ? (
+                        trips.map(trip => (
+                          <option key={trip.id} value={trip.id}>
+                            Trip {trip.trip_no || trip.trip_number} - {trip.status || trip.trip_status} - {trip.planned_date ? new Date(trip.planned_date).toLocaleDateString() : 'No date'}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>No planned trips available</option>
+                      )}
                     </select>
                     </div>
                   </div>
@@ -359,7 +363,7 @@ const LoadVehicleModal = ({
                 <button 
                   className="btn btn-primary"
                   onClick={handleSetupComplete}
-                  disabled={!selectedVehicle || !selectedTrip || !sourceWarehouse}
+                  disabled={!selectedVehicle || !sourceWarehouse}
                 >
                   <span className="btn-icon">→</span>
                   Next: Load Vehicle

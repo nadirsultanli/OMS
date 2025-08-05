@@ -635,8 +635,6 @@ const StockLevels = () => {
                 <th>Total Qty</th>
                 <th>Reserved</th>
                 <th>Available</th>
-                <th>Unit Cost</th>
-                <th>Total Value</th>
                 <th>Last Transaction</th>
                 <th>Actions</th>
               </tr>
@@ -644,7 +642,7 @@ const StockLevels = () => {
             <tbody>
               {stockLevels.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="text-center">
+                  <td colSpan="8" className="text-center">
                     No stock levels found matching your criteria.
                   </td>
                 </tr>
@@ -675,8 +673,6 @@ const StockLevels = () => {
                         {formatQuantity(level.available_qty)}
                       </span>
                     </td>
-                    <td className="currency-cell">{formatCurrency(level.unit_cost)}</td>
-                    <td className="currency-cell">{formatCurrency(level.total_cost)}</td>
                     <td className="date-cell">
                       {level.last_transaction_date ? (
                         <span>
