@@ -370,9 +370,10 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                 offset=offset
             )
             
-            cached_result = self._get_cached_result(cache_key)
-            if cached_result is not None:
-                return cached_result
+            # Temporarily disable cache to ensure fresh data with order_id
+            # cached_result = self._get_cached_result(cache_key)
+            # if cached_result is not None:
+            #     return cached_result
             
             # Add debugging
             self.logger.info(
@@ -392,7 +393,7 @@ class InvoiceRepositoryImpl(InvoiceRepository):
                 # Only select essential fields to reduce data transfer
                 query = client.table(self.table_name).select(
                     "id,tenant_id,invoice_no,invoice_type,invoice_status,customer_id,customer_name,customer_address,"
-                    "invoice_date,due_date,delivery_date,subtotal,total_tax,total_amount,paid_amount,balance_due,"
+                    "order_id,order_no,invoice_date,due_date,delivery_date,subtotal,total_tax,total_amount,paid_amount,balance_due,"
                     "currency,payment_terms,notes,created_at,created_by,updated_at,updated_by,sent_at,paid_at"
                 )
                 

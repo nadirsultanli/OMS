@@ -36,7 +36,10 @@ const Invoices = () => {
     invoice_amount: ''
   });
   const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [dataFullyLoaded, setDataFullyLoaded] = useState(false);
+  const [ordersWithInvoices, setOrdersWithInvoices] = useState(new Set());
   const [createInvoiceData, setCreateInvoiceData] = useState({
     customer_id: '',
     customer_name: '',
@@ -101,6 +104,53 @@ const Invoices = () => {
     }
   }, [allInvoices]);
 
+  // Force re-render of order selection when invoices are loaded
+  useEffect(() => {
+    if (allInvoices.length > 0 && orders.length > 0 && !loading && !ordersLoading) {
+      // This will trigger a re-render of the order selection dropdown
+      console.log('Invoices and orders loaded, checking for existing invoices...');
+      console.log('All invoices:', allInvoices.map(inv => ({ id: inv.id, order_id: inv.order_id, invoice_no: inv.invoice_no })));
+      console.log('All orders:', orders.map(ord => ({ id: ord.id, order_no: ord.order_no, status: ord.order_status })));
+      
+      // Find orders that already have invoices
+      const ordersWithExistingInvoices = new Set();
+      orders.forEach(order => {
+        const hasInvoice = allInvoices.some(invoice => {
+          // Check by order_id field
+          if (invoice.order_id && order.id && 
+              invoice.order_id.toLowerCase() === order.id.toLowerCase()) {
+            return true;
+          }
+          // Check by order_no in invoice notes or description
+          if (invoice.notes && invoice.notes.includes(order.order_no)) {
+            return true;
+          }
+          // Check if invoice_no contains order number
+          if (invoice.invoice_no && invoice.invoice_no.includes(order.order_no)) {
+            return true;
+          }
+          return false;
+        });
+        if (hasInvoice) {
+          ordersWithExistingInvoices.add(order.id);
+        }
+      });
+      
+      setOrdersWithInvoices(ordersWithExistingInvoices);
+      setDataFullyLoaded(true);
+    }
+  }, [allInvoices, orders, loading, ordersLoading]);
+
+  // Clear selected order if it's found to have an existing invoice
+  useEffect(() => {
+    if (selectedOrder && ordersWithInvoices.has(selectedOrder.id)) {
+      console.log('Selected order has existing invoice, clearing selection:', selectedOrder.order_no);
+      setSelectedOrder(null);
+      setGenerateInvoiceData(prev => ({ ...prev, order_id: '' }));
+      setError(`Order ${selectedOrder.order_no} already has an invoice and cannot be selected`);
+    }
+  }, [ordersWithInvoices, selectedOrder]);
+
   // Close payment dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -147,6 +197,7 @@ const Invoices = () => {
   };
 
   const loadOrders = async () => {
+    setOrdersLoading(true);
     try {
       const result = await orderService.getOrders();
       if (result.success) {
@@ -154,6 +205,8 @@ const Invoices = () => {
       }
     } catch (err) {
       console.error('Error loading orders:', err);
+    } finally {
+      setOrdersLoading(false);
     }
   };
 
@@ -483,6 +536,34 @@ const Invoices = () => {
       return;
     }
 
+    // Check if order is delivered
+    if (selectedOrder.order_status !== 'delivered') {
+      setError(`Cannot generate invoice from order with status "${selectedOrder.order_status}". Only delivered orders can be used to generate invoices.`);
+      return;
+    }
+
+    // Check if invoice already exists for this order
+    const existingInvoice = allInvoices.find(invoice => {
+      // Check by order_id field
+      if (invoice.order_id && selectedOrder.id && 
+          invoice.order_id.toLowerCase() === selectedOrder.id.toLowerCase()) {
+        return true;
+      }
+      // Check by order_no in invoice notes or description
+      if (invoice.notes && invoice.notes.includes(selectedOrder.order_no)) {
+        return true;
+      }
+      // Check if invoice_no contains order number
+      if (invoice.invoice_no && invoice.invoice_no.includes(selectedOrder.order_no)) {
+        return true;
+      }
+      return false;
+    });
+    if (existingInvoice) {
+      setError(`Invoice already exists for order ${selectedOrder.order_no}. Cannot generate duplicate invoice.`);
+      return;
+    }
+
     try {
       const result = await invoiceService.generateInvoiceFromOrder(
         selectedOrder.id,
@@ -578,13 +659,22 @@ const Invoices = () => {
       ...prev,
       invoice_lines: prev.invoice_lines.map((line, i) => {
         if (i === index) {
-          const updatedLine = { ...line, [field]: value };
+          let updatedValue = value;
+          
+          // Convert numeric fields to numbers
+          if (field === 'quantity' || field === 'unit_price') {
+            updatedValue = parseFloat(value) || 0;
+          }
+          
+          const updatedLine = { ...line, [field]: updatedValue };
+          
           // Calculate line total
           if (field === 'quantity' || field === 'unit_price') {
-            const quantity = field === 'quantity' ? parseFloat(value) || 0 : parseFloat(line.quantity) || 0;
-            const unitPrice = field === 'unit_price' ? parseFloat(value) || 0 : parseFloat(line.unit_price) || 0;
+            const quantity = field === 'quantity' ? updatedValue : parseFloat(line.quantity) || 0;
+            const unitPrice = field === 'unit_price' ? updatedValue : parseFloat(line.unit_price) || 0;
             updatedLine.line_total = quantity * unitPrice;
           }
+          
           return updatedLine;
         }
         return line;
@@ -1080,22 +1170,101 @@ const Invoices = () => {
               <>
                 <div className="form-group">
                   <label>Select Order:</label>
-                  <select
-                    value={generateInvoiceData.order_id}
-                    onChange={(e) => {
-                      const orderId = e.target.value;
-                      const order = orders.find(o => o.id === orderId);
-                      setSelectedOrder(order);
-                      setGenerateInvoiceData(prev => ({ ...prev, order_id: orderId }));
-                    }}
-                  >
-                    <option value="">Select an order...</option>
-                    {orders.map(order => (
-                      <option key={order.id} value={order.id}>
-                        {order.order_no} - {order.customer_name} ({invoiceService.formatCurrency(order.total_amount)})
-                      </option>
-                    ))}
-                  </select>
+                  {!dataFullyLoaded ? (
+                    <div style={{ padding: '8px 12px', color: '#6c757d', fontStyle: 'italic' }}>
+                      Loading orders and checking for existing invoices...
+                    </div>
+                  ) : (
+                    <select
+                      value={generateInvoiceData.order_id}
+                      onChange={(e) => {
+                        const orderId = e.target.value;
+                        const order = orders.find(o => o.id === orderId);
+                        
+                        // Additional validation to prevent selection of orders with existing invoices
+                        if (order && ordersWithInvoices.has(order.id)) {
+                          console.log('Attempted to select order with existing invoice:', order.order_no);
+                          setError(`Cannot select order ${order.order_no} - invoice already exists`);
+                          return;
+                        }
+                        
+                        setSelectedOrder(order);
+                        setGenerateInvoiceData(prev => ({ ...prev, order_id: orderId }));
+                      }}
+                    >
+                      <option value="">Select an order...</option>
+                      {orders.map(order => {
+                        const isDelivered = order.order_status === 'delivered';
+                        const hasInvoice = ordersWithInvoices.has(order.id);
+                        const isSelectable = isDelivered && !hasInvoice;
+                        
+                        // Debug logging for all orders with existing invoices
+                        if (order.order_no === 'ORD-332072C1-000005' || order.order_no === 'ORD-332072C1-000006') {
+                          console.log('Debug order:', order.order_no, 'order.id:', order.id, 'isDelivered:', isDelivered, 'hasInvoice:', hasInvoice, 'isSelectable:', isSelectable);
+                          console.log('Orders with invoices set:', Array.from(ordersWithInvoices));
+                          console.log('All invoices count:', allInvoices.length);
+                          console.log('All invoices:', allInvoices.map(inv => ({ 
+                            id: inv.id, 
+                            order_id: inv.order_id, 
+                            order_no: inv.order_no,
+                            invoice_no: inv.invoice_no, 
+                            notes: inv.notes 
+                          })));
+                          
+                          // Log the first invoice to see the complete structure
+                          if (allInvoices.length > 0) {
+                            console.log('First invoice complete structure:', allInvoices[0]);
+                          }
+                          
+                          // Check if the specific invoices exist in the data
+                          const invoiceFor005 = allInvoices.find(inv => inv.order_id === 'ed5863f3-380e-48d6-9e0a-7151586694e1');
+                          const invoiceFor006 = allInvoices.find(inv => inv.order_id === '61f17d95-38a5-4421-9a48-8c674f3c93d0');
+                          console.log('Invoice for ORD-332072C1-000005:', invoiceFor005);
+                          console.log('Invoice for ORD-332072C1-000006:', invoiceFor006);
+                          
+                          // Also check by order_no field
+                          const invoiceFor005ByOrderNo = allInvoices.find(inv => inv.order_no === 'ORD-332072C1-000005');
+                          const invoiceFor006ByOrderNo = allInvoices.find(inv => inv.order_no === 'ORD-332072C1-000006');
+                          console.log('Invoice for ORD-332072C1-000005 (by order_no):', invoiceFor005ByOrderNo);
+                          console.log('Invoice for ORD-332072C1-000006 (by order_no):', invoiceFor006ByOrderNo);
+                          
+                          // Check all invoices that have any order_id
+                          const invoicesWithOrderId = allInvoices.filter(inv => inv.order_id);
+                          console.log('Invoices with order_id:', invoicesWithOrderId.length);
+                          console.log('Invoices with order_id details:', invoicesWithOrderId.map(inv => ({ 
+                            id: inv.id, 
+                            order_id: inv.order_id, 
+                            order_no: inv.order_no,
+                            invoice_no: inv.invoice_no 
+                          })));
+                        }
+                        
+                        return (
+                          <option 
+                            key={order.id} 
+                            value={order.id}
+                            disabled={!isSelectable}
+                            style={{ 
+                              color: isSelectable ? 'inherit' : '#dc3545',
+                              fontStyle: isSelectable ? 'normal' : 'italic',
+                              opacity: isSelectable ? 1 : 0.6
+                            }}
+                          >
+                            {order.order_no} - {order.customer_name} ({invoiceService.formatCurrency(order.total_amount)}) 
+                            {!isDelivered && ` - ${order.order_status} (Payment will be done when status will be delivered)`}
+                            {isDelivered && hasInvoice && ` - Invoice already exists`}
+                            {!isSelectable && ` (Not available)`}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
+                  <div className="order-selection-help">
+                    <small style={{ color: '#dc3545' }}>
+                      ⚠️ Only delivered orders without existing invoices can be used to generate invoices. 
+                      Orders that are not delivered or already have invoices cannot be selected.
+                    </small>
+                  </div>
                 </div>
                 
                 {selectedOrder && (

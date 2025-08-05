@@ -304,6 +304,8 @@ async def create_manual_invoice(
 
 @router.get("", response_model=InvoiceListResponse)
 async def get_all_invoices_for_client_search(
+    limit: int = Query(1000, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     invoice_service: InvoiceService = Depends(get_invoice_service),
     current_user: User = Depends(get_current_user)
 ):
@@ -312,15 +314,18 @@ async def get_all_invoices_for_client_search(
         logger.info(
             "Fetching all invoices for client-side search",
             user_id=str(current_user.id),
-            tenant_id=str(current_user.tenant_id)
+            tenant_id=str(current_user.tenant_id),
+            limit=limit,
+            offset=offset
         )
         
-        # Fetch invoices with reduced limit to prevent timeouts
+        # Fetch invoices with configurable limit
         # Frontend will handle search/filter logic for better UX
         invoices = await asyncio.wait_for(
             invoice_service.search_invoices(
                 user=current_user,
-                limit=50  # Reduced from 1000 to prevent timeouts
+                limit=limit,
+                offset=offset
             ),
             timeout=25.0  # 25 second timeout
         )
@@ -335,8 +340,8 @@ async def get_all_invoices_for_client_search(
         return InvoiceListResponse(
             invoices=[InvoiceResponse(**invoice.to_dict()) for invoice in invoices],
             total=len(invoices),
-            limit=50,  # Updated to match actual limit
-            offset=0
+            limit=limit,
+            offset=offset
         )
     except asyncio.TimeoutError:
         logger.error(
