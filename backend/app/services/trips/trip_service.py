@@ -8,6 +8,8 @@ from app.domain.entities.truck_inventory import TruckInventory
 from app.domain.entities.deliveries import Delivery, DeliveryLine, DeliveryStatus
 from app.domain.entities.trip_planning import TripPlan, TripPlanningLine, TripPlanningValidationResult
 from app.domain.repositories.trip_repository import TripRepository
+from app.domain.repositories.warehouse_repository import WarehouseRepository
+from app.domain.repositories.vehicle_repository import VehicleRepository
 from app.domain.exceptions.trips.trip_exceptions import (
     TripNotFoundError,
     TripAlreadyExistsError,
@@ -17,7 +19,8 @@ from app.domain.exceptions.trips.trip_exceptions import (
     TripUpdateError,
     TripDeletionError,
     TripStopNotFoundError,
-    TripStopValidationError
+    TripStopValidationError,
+    TripServiceError
 )
 from app.infrastucture.logs.logger import default_logger
 
@@ -31,9 +34,13 @@ class TripService:
     def __init__(
         self, 
         trip_repository: TripRepository,
+        warehouse_repository: Optional[WarehouseRepository] = None,
+        vehicle_repository: Optional[VehicleRepository] = None,
         automation_service: Optional['TripStatusAutomationService'] = None
     ):
         self.trip_repository = trip_repository
+        self.warehouse_repository = warehouse_repository
+        self.vehicle_repository = vehicle_repository
         self.automation_service = automation_service
     
     async def create_trip(self, tenant_id: UUID, trip_no: str, created_by: Optional[UUID] = None, **kwargs) -> Trip:
@@ -419,9 +426,76 @@ class TripService:
         return True
 
     async def get_trips_summary(self, tenant_id: UUID) -> dict:
-        """Get trips summary for dashboard (optimized for performance)"""
-        # Use optimized repository method (single COUNT query with CASE WHEN)
-        return await self.trip_repository.get_trips_summary(tenant_id)
+        """Get trips summary for dashboard"""
+        try:
+            trips = await self.trip_repository.get_trips_by_tenant(tenant_id, limit=10)
+            
+            # Calculate summary statistics
+            total_trips = len(trips)
+            active_trips = len([t for t in trips if t.trip_status in [TripStatus.PLANNED, TripStatus.LOADED, TripStatus.IN_PROGRESS]])
+            completed_trips = len([t for t in trips if t.trip_status == TripStatus.COMPLETED])
+            
+            return {
+                "total_trips": total_trips,
+                "active_trips": active_trips,
+                "completed_trips": completed_trips,
+                "recent_trips": [trip.to_dict() for trip in trips[:5]]
+            }
+        except Exception as e:
+            default_logger.error(f"Error getting trips summary: {str(e)}")
+            raise TripServiceError(f"Failed to get trips summary: {str(e)}")
+
+    async def get_available_warehouses(self, tenant_id: UUID) -> List[dict]:
+        """Get available warehouses for trip creation"""
+        try:
+            warehouses = await self.warehouse_repository.get_warehouses_by_tenant(str(tenant_id), limit=10)
+            
+            warehouse_list = []
+            for warehouse in warehouses:
+                warehouse_list.append({
+                    "id": str(warehouse.id),
+                    "name": warehouse.name,
+                    "code": warehouse.code,
+                    "type": warehouse.type.value if warehouse.type else None
+                })
+            
+            return warehouse_list
+        except Exception as e:
+            default_logger.error(f"Error getting available warehouses: {str(e)}")
+            raise TripServiceError(f"Failed to get available warehouses: {str(e)}")
+
+    async def get_vehicles_with_depots(self, tenant_id: UUID) -> List[dict]:
+        """Get vehicles with their depot information for trip creation"""
+        try:
+            vehicles = await self.vehicle_repository.get_vehicles_by_tenant(tenant_id, limit=100)
+            
+            vehicles_with_depots = []
+            for vehicle in vehicles:
+                # Get depot information for this vehicle
+                depot = None
+                if vehicle.depot_id:
+                    depot_entity = await self.warehouse_repository.get_by_id(str(vehicle.depot_id))
+                    if depot_entity:
+                        depot = {
+                            "id": str(depot_entity.id),
+                            "name": depot_entity.name,
+                            "code": depot_entity.code
+                        }
+                
+                vehicle_data = {
+                    "id": str(vehicle.id),
+                    "plate": vehicle.plate,
+                    "vehicle_type": vehicle.vehicle_type.value,
+                    "capacity_kg": float(vehicle.capacity_kg),
+                    "active": vehicle.active,
+                    "depot": depot
+                }
+                vehicles_with_depots.append(vehicle_data)
+            
+            return vehicles_with_depots
+        except Exception as e:
+            default_logger.error(f"Error getting vehicles with depots: {str(e)}")
+            raise TripServiceError(f"Failed to get vehicles with depots: {str(e)}")
     
     # Trip Planning Methods
     

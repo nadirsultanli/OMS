@@ -79,9 +79,12 @@ async def get_customers(
     status: Optional[str] = Query(None, description="Filter by status (active, pending, rejected, inactive)"),
     customer_type: Optional[str] = Query(None, description="Filter by customer type (cash, credit)"),
     search: Optional[str] = Query(None, description="Search in name, email, or phone"),
-    customer_service: CustomerService = Depends(get_customer_service)
+    customer_service: CustomerService = Depends(get_customer_service),
+    context: UserContext = user_context
 ):
+    """Get customers with tenant-aware filtering"""
     customers, total = await customer_service.get_customers_with_filters(
+        tenant_id=context.get_tenant_id(),
         limit=limit,
         offset=offset,
         status=status,

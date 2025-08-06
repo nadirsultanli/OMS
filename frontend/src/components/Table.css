@@ -44,17 +44,19 @@
 
 .orders-table thead th,
 .trips-table thead th {
-  padding: 16px;
+  padding: 20px 16px;
   text-align: left;
   font-weight: 600;
   color: #1f2937;
   border-bottom: 2px solid #e5e7eb;
-  font-size: 12px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
   background: #f8f9fb;
   box-sizing: border-box;
+  min-height: 60px;
+  height: 60px;
 }
 
 /* ============================================
@@ -69,7 +71,8 @@
 .trips-table tbody tr {
   transition: background-color 0.15s ease;
   cursor: default;
-  max-height: 56px;
+  min-height: 80px;
+  height: 80px;
 }
 
 .orders-table tbody tr:hover,
@@ -87,12 +90,13 @@
    ============================================ */
 .orders-table tbody td,
 .trips-table tbody td {
-  padding: 16px;
+  padding: 20px 16px;
   vertical-align: middle;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 15px;
   color: #374151;
-  max-height: 56px;
+  min-height: 80px;
+  height: 80px;
   box-sizing: border-box;
 }
 

@@ -180,7 +180,7 @@ class OrderBusinessService:
     def validate_status_transition(self, current_status: OrderStatus, new_status: OrderStatus) -> bool:
         """Validate status transition based on business rules"""
         valid_transitions = {
-            OrderStatus.DRAFT: [OrderStatus.SUBMITTED, OrderStatus.CANCELLED],
+            OrderStatus.DRAFT: [OrderStatus.SUBMITTED, OrderStatus.APPROVED, OrderStatus.CANCELLED],
             OrderStatus.SUBMITTED: [OrderStatus.APPROVED, OrderStatus.CANCELLED],
             OrderStatus.APPROVED: [OrderStatus.ALLOCATED, OrderStatus.CANCELLED],
             OrderStatus.ALLOCATED: [OrderStatus.LOADED, OrderStatus.CANCELLED],
@@ -349,16 +349,35 @@ class OrderBusinessService:
         for variant_id in variant_ids:
             try:
                 variant = await self.variant_repository.get_by_id(variant_id)
-                if variant and variant.gross_weight_kg:
-                    variant_weights[variant_id] = variant.gross_weight_kg
+                if variant:
+                    # Calculate weight based on variant type and component type
+                    if variant.sku and 'KIT' in variant.sku.upper():
+                        # For KIT variants: tare_weight + capacity = total weight
+                        if variant.tare_weight_kg and variant.capacity_kg:
+                            variant_weights[variant_id] = variant.tare_weight_kg + variant.capacity_kg
+                        elif variant.gross_weight_kg:
+                            variant_weights[variant_id] = variant.gross_weight_kg
+                    elif variant.sku and 'EMPTY' in variant.sku.upper():
+                        # For empty cylinders: use tare_weight_kg
+                        if variant.tare_weight_kg:
+                            variant_weights[variant_id] = variant.tare_weight_kg
+                    elif variant.sku and 'GAS' in variant.sku.upper():
+                        # For gas fills: use capacity_kg (gas weight only)
+                        if variant.capacity_kg:
+                            variant_weights[variant_id] = variant.capacity_kg
+                    elif variant.sku and 'DEP' in variant.sku.upper():
+                        # For deposits: no weight (price only)
+                        variant_weights[variant_id] = Decimal('0')
+                    else:
+                        # For regular variants: use gross_weight_kg
+                        if variant.gross_weight_kg:
+                            variant_weights[variant_id] = variant.gross_weight_kg
             except Exception:
                 # Continue if variant not found
                 continue
         
         # Calculate total weight using the order method
         order.calculate_total_weight(variant_weights)
-
-        # Old method removed - replaced with direct implementation
 
     async def _process_cylinder_order_line_direct(
         self,
@@ -379,7 +398,7 @@ class OrderBusinessService:
             if not variant:
                 return [await self._create_single_order_line(user, line_data)]
             
-            # Check if this is a cylinder that should use OUT/XCH logic
+            # Check if this is a cylinder that should use OUT/XCH/KIT logic
             is_cylinder = (
                 variant.sku and (
                     'CYL' in variant.sku.upper() or 
@@ -387,6 +406,9 @@ class OrderBusinessService:
                     variant.sku_type == 'ASSET'
                 )
             )
+            
+            # Check if this is a KIT variant (outright purchase)
+            is_kit = variant.sku and 'KIT' in variant.sku.upper()
             
             if not is_cylinder:
                 return [await self._create_single_order_line(user, line_data)]
@@ -467,6 +489,51 @@ class OrderBusinessService:
                 return_line.component_type = "EMPTY_RETURN"
                 return_line.tax_rate = Decimal("0.00")
                 component_lines.append(return_line)
+                
+            elif is_kit:
+                # KIT scenario: Empty Cylinder (weight only) + Gas Fill (price + weight) + Deposit (price only)
+                
+                # Create Empty Cylinder line (weight only, no price)
+                empty_line = OrderLine.create(
+                    order_id=None,
+                    variant_id=None,  # Will try to find EMPTY{size} variant
+                    gas_type=f"EMPTY{size}",
+                    qty_ordered=quantity,
+                    list_price=Decimal('0'),  # No price for empty cylinder
+                    manual_unit_price=None,
+                    created_by=user.id
+                )
+                empty_line.component_type = "CYLINDER_EMPTY"
+                empty_line.tax_rate = Decimal("0.00")
+                component_lines.append(empty_line)
+                
+                # Create Gas Fill line (price + weight)
+                gas_line = OrderLine.create(
+                    order_id=None,
+                    variant_id=None,  # Will try to find GAS{size} variant
+                    gas_type=f"GAS{size}",
+                    qty_ordered=quantity,
+                    list_price=Decimal('0'),  # Will be set by pricing rules
+                    manual_unit_price=manual_price,
+                    created_by=user.id
+                )
+                gas_line.component_type = "GAS_FILL"
+                gas_line.tax_rate = Decimal("23.00")
+                component_lines.append(gas_line)
+                
+                # Create Deposit line (price only, no weight)
+                deposit_line = OrderLine.create(
+                    order_id=None,
+                    variant_id=None,  # Will try to find DEP{size} variant
+                    gas_type=f"DEP{size}",
+                    qty_ordered=quantity,
+                    list_price=Decimal('0'),  # Will be set by pricing rules
+                    manual_unit_price=None,  # Deposits always use list price
+                    created_by=user.id
+                )
+                deposit_line.component_type = "CYLINDER_DEPOSIT"
+                deposit_line.tax_rate = Decimal("0.00")
+                component_lines.append(deposit_line)
             
             # Try to find variant IDs for each component
             variants = await self.variant_repository.get_variants_by_tenant(user.tenant_id)

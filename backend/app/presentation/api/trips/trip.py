@@ -42,17 +42,60 @@ from decimal import Decimal
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 
+@router.get("/warehouses", status_code=200)
+async def get_available_warehouses(
+    current_user: User = Depends(get_current_user),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """
+    Get available warehouses for trip creation
+    Simple endpoint to help frontend show warehouse options
+    """
+    try:
+        warehouses = await trip_service.get_available_warehouses(current_user.tenant_id)
+        
+        return {
+            "success": True,
+            "warehouses": warehouses,
+            "default_warehouse_id": warehouses[0]["id"] if warehouses else None
+        }
+        
+    except Exception as e:
+        default_logger.error(f"Failed to get warehouses: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get warehouses")
+
+@router.get("/vehicles-with-depots", status_code=200)
+async def get_vehicles_with_depots(
+    current_user: User = Depends(get_current_user),
+    trip_service: TripService = Depends(get_trip_service)
+):
+    """
+    Get vehicles with their depot information for trip creation
+    Simple endpoint to help users see which warehouse each vehicle belongs to
+    """
+    try:
+        vehicles_with_depots = await trip_service.get_vehicles_with_depots(current_user.tenant_id)
+        
+        return {
+            "success": True,
+            "vehicles": vehicles_with_depots
+        }
+        
+    except Exception as e:
+        default_logger.error(f"Failed to get vehicles with depots: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get vehicles with depots")
+
 @router.get("/summary/dashboard", status_code=200)
 async def get_trips_dashboard_summary(
-    tenant_id: str = Query(..., description="Tenant ID"),
+    current_user: User = Depends(get_current_user),
     trip_service: TripService = Depends(get_trip_service)
 ):
     """
     Get optimized trips summary for dashboard (cached and lightweight)
     """
     try:
-        from uuid import UUID
-        summary = await trip_service.get_trips_summary(UUID(tenant_id))
+        # Use tenant from authenticated user (no redundant tenant check)
+        summary = await trip_service.get_trips_summary(current_user.tenant_id)
         return {
             "success": True,
             "data": summary,
@@ -78,6 +121,24 @@ async def create_trip(
         driver_id = UUID(request.driver_id) if request.driver_id else None
         start_wh_id = UUID(request.start_wh_id) if request.start_wh_id else None
         end_wh_id = UUID(request.end_wh_id) if request.end_wh_id else None
+        
+        # Auto-select default warehouse if none provided
+        if not start_wh_id:
+            try:
+                warehouses = await trip_service.get_available_warehouses(current_user.tenant_id)
+                if warehouses:
+                    start_wh_id = UUID(warehouses[0]["id"])
+                    default_logger.info(
+                        "Auto-selected default warehouse for trip creation",
+                        warehouse_id=str(start_wh_id),
+                        warehouse_name=warehouses[0]["name"],
+                        trip_no=request.trip_no
+                    )
+                else:
+                    default_logger.warning("No warehouses available for trip creation")
+            except Exception as e:
+                default_logger.error(f"Failed to auto-select warehouse for trip: {str(e)}")
+                # Continue without warehouse - user can set it later
         
         trip = await trip_service.create_trip(
             tenant_id=current_user.tenant_id,
@@ -659,9 +720,15 @@ async def update_trip_status(
             raise HTTPException(status_code=403, detail="Access denied")
         
         # Extract new status from request
-        new_status = request.get("new_status")
-        if not new_status:
+        new_status_str = request.get("new_status")
+        if not new_status_str:
             raise HTTPException(status_code=400, detail="new_status is required")
+        
+        # Convert string to TripStatus enum
+        try:
+            new_status = TripStatus(new_status_str)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid trip status: {new_status_str}")
         
         # Update trip status
         result = await trip_service.update_trip_status(

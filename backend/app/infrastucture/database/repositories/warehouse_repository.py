@@ -34,6 +34,10 @@ class WarehouseRepositoryImpl(WarehouseRepository):
         )
         return [self._to_entity(m) for m in result.scalars().all()]
 
+    async def get_warehouses_by_tenant(self, tenant_id: str, limit: int = 100, offset: int = 0) -> List[Warehouse]:
+        """Get warehouses by tenant (alias for get_all for compatibility)"""
+        return await self.get_all(tenant_id, limit, offset)
+
     async def create_warehouse(self, warehouse: Warehouse) -> Warehouse:
         model = self._to_model(warehouse)
         self.session.add(model)

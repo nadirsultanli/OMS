@@ -278,8 +278,12 @@ class SQLAlchemyStockLevelRepository(StockLevelRepository):
                 total_cost=Decimal('0')
             )
 
-        # Apply quantity change (only positive quantities allowed)
-        existing.add_quantity(quantity_change, Decimal('0'))
+        # Apply quantity change (positive for additions, negative for reductions)
+        if quantity_change > 0:
+            existing.add_quantity(quantity_change, Decimal('0'))
+        elif quantity_change < 0:
+            existing.reduce_quantity(abs(quantity_change))
+        # If quantity_change is 0, no change needed
 
         # Save updated stock level
         return await self.create_or_update_stock_level(existing)

@@ -16,6 +16,7 @@ class CreateTripRequest(BaseModel):
     - Driver must be available for the planned date
     - Trip starts in 'draft' status
     - Planned date is required
+    - If no warehouse specified, system will auto-select default warehouse
     
     **Expected Responses:**
     - 201: Trip created successfully
@@ -28,9 +29,8 @@ class CreateTripRequest(BaseModel):
     planned_date: date = Field(..., description="Date when deliveries will happen")
     start_time: Optional[datetime] = Field(None, description="Planned start time")
     end_time: Optional[datetime] = Field(None, description="Planned end time")
-    starting_warehouse_id: Optional[str] = Field(None, description="Starting warehouse for loading")
-    start_wh_id: Optional[str] = Field(None, description="Starting warehouse ID")
-    end_wh_id: Optional[str] = Field(None, description="Ending warehouse ID")
+    start_wh_id: Optional[str] = Field(None, description="Starting warehouse ID (optional - will auto-select if not provided)")
+    end_wh_id: Optional[str] = Field(None, description="Ending warehouse ID (optional)")
     gross_loaded_kg: Optional[Decimal] = Field(None, description="Total loaded weight in kg")
     notes: Optional[str] = Field(None, max_length=1000, description="Special notes or instructions")
 

@@ -12,8 +12,7 @@ class StockLevelUpdateRequest(BaseModel):
     warehouse_id: UUID = Field(..., description="Warehouse ID")
     variant_id: UUID = Field(..., description="Variant ID")
     stock_status: StockStatus = Field(StockStatus.ON_HAND, description="Stock status bucket")
-    quantity_change: Decimal = Field(..., description="Quantity change (positive or negative)")
-    unit_cost: Optional[Decimal] = Field(None, description="Unit cost for additions")
+    quantity_change: Decimal = Field(..., gt=0, description="Quantity to add (positive only)")
     reason: Optional[str] = Field(None, description="Reason for adjustment")
 
 

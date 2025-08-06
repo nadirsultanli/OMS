@@ -305,6 +305,26 @@
 .trips-table th.vehicle-col { width: 16%; }
 .trips-table th.driver-col { width: 16%; }
 .trips-table th.status-col { width: 12%; }
+.trips-table td.status-cell { 
+  position: relative; 
+  overflow: visible; 
+  z-index: 999999 !important;
+}
+
+/* Ensure dropdown appears above table content */
+.trips-table {
+  position: relative;
+  z-index: 1;
+}
+
+.trips-table tbody tr {
+  position: relative;
+  z-index: 1;
+}
+
+.trips-table tbody tr:hover {
+  z-index: 2;
+}
 .trips-table th.orders-col { width: 8%; text-align: center; }
 .trips-table th.load-col { width: 10%; text-align: right; }
 .trips-table th.actions-col { width: 11%; text-align: center; }
@@ -453,17 +473,17 @@
 
 /* Table row consistency */
 .trips-table tbody tr {
-  height: 60px;
-  min-height: 60px;
-  max-height: 60px;
+  height: 80px;
+  min-height: 80px;
+  max-height: 80px;
 }
 
 .trips-table tbody td {
   vertical-align: middle;
-  height: 60px;
-  min-height: 60px;
-  max-height: 60px;
-  padding: 8px 12px;
+  height: 80px;
+  min-height: 80px;
+  max-height: 80px;
+  padding: 20px 12px;
   overflow: visible;
 }
 
@@ -471,8 +491,8 @@
 .trips-table td:last-child {
   vertical-align: middle;
   text-align: center;
-  padding: 8px 12px;
-  height: 60px;
+  padding: 20px 12px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -483,7 +503,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  min-height: 60px;
+  min-height: 80px;
   width: 100%;
 }
 
@@ -811,10 +831,63 @@
 .form-group input:disabled,
 .form-group select:disabled,
 .form-group textarea:disabled {
-  background-color: #f9fafb;
-  color: #6b7280;
+  background-color: #f3f4f6;
+  color: #9ca3af;
   cursor: not-allowed;
-  opacity: 0.7;
+}
+
+/* Depot Information Display */
+.depot-info {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #0ea5e9;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.depot-label {
+  color: #0369a1;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+
+.depot-label svg {
+  color: #0ea5e9;
+}
+
+/* Warehouse Selection Styles */
+.warehouse-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.warehouse-info {
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.warehouse-info h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.warehouse-info p {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
 }
 
 .error-text {
@@ -1045,6 +1118,7 @@
 .custom-filter-dropdown {
   position: relative;
   min-width: 200px;
+  z-index: 999999 !important;
 }
 
 .custom-filter-dropdown .filter-select {
@@ -1077,7 +1151,7 @@
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  z-index: 999999 !important;
   max-height: 300px;
   overflow: hidden;
   display: flex;

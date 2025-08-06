@@ -118,6 +118,10 @@ class VariantRepositoryImpl(VariantRepository):
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
     
+    async def get_by_id(self, variant_id: UUID) -> Optional[VariantEntity]:
+        """Get a variant by its ID (alias for get_variant_by_id for compatibility)"""
+        return await self.get_variant_by_id(variant_id)
+    
     async def get_variant_by_sku(self, tenant_id: UUID, sku: str) -> Optional[VariantEntity]:
         """Get a variant by SKU within a tenant"""
         stmt = select(VariantModel).where(
@@ -154,6 +158,10 @@ class VariantRepositoryImpl(VariantRepository):
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(model) for model in models]
+    
+    async def get_variants_by_tenant(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[VariantEntity]:
+        """Get all variants for a tenant with pagination (alias for get_all_variants for compatibility)"""
+        return await self.get_all_variants(tenant_id, limit, offset)
     
     async def update_variant(self, variant: VariantEntity) -> VariantEntity:
         """Update an existing variant"""

@@ -170,28 +170,29 @@ class DirectDatabaseConnection:
 
     def configure(self, url: str):
         self._url = url
-        # Optimized connection pool settings to prevent timeouts
+        # Optimized connection pool settings for high performance
         self._engine = create_async_engine(
             url, 
             echo=False, 
             future=True,
-            # Emergency connection pool settings for timeout issues
-            pool_size=5,            # Reduced to prevent connection exhaustion
-            max_overflow=5,         # Reduced to 5 (max 10 total connections)
+            # High-performance connection pool settings
+            pool_size=20,           # Increased for better concurrency
+            max_overflow=30,        # Increased to handle traffic spikes
             pool_pre_ping=True,     # Validate connections before use
-            pool_recycle=180,       # Recycle connections every 3 minutes
-            pool_timeout=10,        # Reduced timeout to 10 seconds
-            # Query performance settings with reasonable timeouts
+            pool_recycle=180,       # Recycle connections every 3 minutes (faster recovery)
+            pool_timeout=15,        # Reduced timeout to 15 seconds (faster failure)
+            pool_reset_on_return='commit',  # Reset connections on return
+            # Query performance settings
             connect_args={
                 "statement_cache_size": 0,  # Disable statement cache for pooled connections
                 "prepared_statement_cache_size": 0,
-                "command_timeout": 15,      # Reduced to 15 seconds for faster failures
+                "command_timeout": 30,      # Reduced to 30 seconds (faster failure)
                 "server_settings": {
                     "application_name": "oms_backend",
                     "tcp_keepalives_idle": "30",      # Reduced keepalive timeout
                     "tcp_keepalives_interval": "5",
                     "tcp_keepalives_count": "2",
-                    "statement_timeout": "15000",     # Reduced to 15 seconds
+                    "statement_timeout": "30000",     # Reduced to 30 seconds
                     "idle_in_transaction_session_timeout": "60000"  # Reduced to 1 minute
                 }
             }
@@ -200,19 +201,36 @@ class DirectDatabaseConnection:
         default_logger.info("Direct SQLAlchemy connection configured with optimized settings", url=url[:20] + "...")
 
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Get async database session with proper lifecycle management"""
+        """Get async database session with proper lifecycle management and retry logic"""
         if not self._sessionmaker:
             raise ValueError("Direct database not configured. Call configure() first.")
         
-        # Use the sessionmaker as an async context manager
-        async with self._sessionmaker() as session:
+        max_retries = 3
+        retry_delay = 1.0
+        
+        for attempt in range(max_retries):
             try:
-                yield session
-            except Exception:
-                # Rollback on any exception
-                await session.rollback()
-                raise
-            # No commit for read-only operations - let the context manager handle cleanup
+                # Use the sessionmaker as an async context manager
+                async with self._sessionmaker() as session:
+                    try:
+                        yield session
+                    except Exception:
+                        # Rollback on any exception
+                        await session.rollback()
+                        raise
+                    # No commit for read-only operations - let the context manager handle cleanup
+                return  # Success, exit retry loop
+                
+            except (asyncio.TimeoutError, SQLAlchemyError, OSError) as e:
+                if attempt == max_retries - 1:
+                    # Last attempt failed, re-raise the exception
+                    default_logger.error(f"Database session failed after {max_retries} attempts: {str(e)}")
+                    raise
+                else:
+                    # Retry with exponential backoff
+                    default_logger.warning(f"Database session attempt {attempt + 1} failed: {str(e)}, retrying in {retry_delay}s")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
 
     async def test_connection(self) -> bool:
         if not self._engine:
@@ -267,10 +285,33 @@ async def init_direct_database() -> None:
     await direct_db_connection.test_connection()
 
 async def cleanup_idle_connections():
-    """Industry-standard connection cleanup with monitoring"""
+    """Enhanced connection cleanup"""
     try:
-        # Use the database function for cleanup
         if direct_db_connection._engine:
+            # Check pool status first
+            pool = direct_db_connection._engine.pool
+            pool_status = {
+                "size": pool.size(),
+                "checked_in": pool.checkedin(),
+                "checked_out": pool.checkedout(),
+                "overflow": pool.overflow(),
+                "usage_percent": (pool.checkedout() / pool.size()) * 100 if pool.size() > 0 else 0
+            }
+            
+            # Log pool status
+            default_logger.info(f"📊 Connection pool status: {pool_status}")
+            
+            # If pool is exhausted, force cleanup
+            if pool_status["usage_percent"] > 90:
+                default_logger.warning(f"🚨 High connection usage: {pool_status['usage_percent']:.1f}% - forcing cleanup")
+                try:
+                    # Force dispose and recreate engine
+                    await direct_db_connection._engine.dispose()
+                    default_logger.info("🔄 Connection pool reset due to high usage")
+                except Exception as e:
+                    default_logger.error(f"❌ Failed to reset connection pool: {str(e)}")
+            
+            # Regular cleanup
             async with direct_db_connection._engine.connect() as conn:
                 # Get connection stats before cleanup
                 stats_before = await conn.execute(sqlalchemy.text("""
@@ -281,7 +322,7 @@ async def cleanup_idle_connections():
                 """))
                 before_stats = {row.state: row.count for row in stats_before}
                 
-                # Call cleanup function (targets idle transactions > 60 seconds)
+                # Call cleanup function (targets idle transactions > 30 seconds)
                 result = await conn.execute(sqlalchemy.text("SELECT cleanup_idle_connections_aggressive()"))
                 terminated_count = result.scalar()
                 

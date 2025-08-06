@@ -72,4 +72,9 @@ class TripStopValidationError(TripError):
     """Raised when trip stop data validation fails"""
     def __init__(self, message: str, field: Optional[str] = None):
         self.field = field
-        super().__init__(f"Trip stop validation error: {message}") 
+        super().__init__(f"Trip stop validation error: {message}")
+
+class TripServiceError(TripError):
+    """Raised when trip service operations fail"""
+    def __init__(self, message: str):
+        super().__init__(f"Trip service error: {message}") 

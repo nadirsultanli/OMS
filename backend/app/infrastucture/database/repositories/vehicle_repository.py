@@ -75,6 +75,17 @@ class VehicleRepositoryImpl(VehicleRepository):
         result = await self._session.execute(query)
         return result.scalar() or 0
 
+    async def get_vehicles_by_tenant(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Vehicle]:
+        """Get vehicles by tenant with pagination"""
+        query = select(VehicleORM).where(
+            VehicleORM.tenant_id == tenant_id, 
+            VehicleORM.deleted_at == None
+        ).order_by(VehicleORM.id.desc()).limit(limit).offset(offset)
+        
+        result = await self._session.execute(query)
+        objs = result.scalars().all()
+        return [self._to_entity(obj) for obj in objs]
+
     async def create_vehicle(self, vehicle: Vehicle) -> Vehicle:
         # Check for unique constraint
         existing = await self.get_by_plate(vehicle.tenant_id, vehicle.plate)

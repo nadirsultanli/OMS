@@ -34,4 +34,9 @@ class VehicleRepository(ABC):
     
     @abstractmethod
     async def get_vehicle_count(self, tenant_id: UUID, active: Optional[bool] = None) -> int:
+        pass
+
+    @abstractmethod
+    async def get_vehicles_by_tenant(self, tenant_id: UUID, limit: int = 100, offset: int = 0) -> List[Vehicle]:
+        """Get vehicles by tenant with pagination"""
         pass 

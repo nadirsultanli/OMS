@@ -103,6 +103,22 @@ class OrderLine:
             'list_price': float(self.list_price),
             'manual_unit_price': float(self.manual_unit_price) if self.manual_unit_price else None,
             'final_price': float(self.final_price),
+            
+            # Tax fields
+            'tax_code': self.tax_code,
+            'tax_rate': float(self.tax_rate),
+            'tax_amount': float(self.tax_amount),
+            'list_price_incl_tax': float(self.list_price_incl_tax),
+            'final_price_incl_tax': float(self.final_price_incl_tax),
+            
+            # New tax fields
+            'net_amount': float(self.net_amount),
+            'gross_amount': float(self.gross_amount),
+            'is_tax_inclusive': self.is_tax_inclusive,
+            
+            # Component type
+            'component_type': self.component_type,
+            
             'created_at': self.created_at.isoformat(),
             'created_by': str(self.created_by) if self.created_by else None,
             'updated_at': self.updated_at.isoformat(),

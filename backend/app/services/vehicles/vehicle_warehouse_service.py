@@ -513,24 +513,58 @@ class VehicleWarehouseService:
                 variant_id = UUID(item["variant_id"])
                 quantity = Decimal(str(item["quantity"]))
             
-            # Issue from ON_HAND in source warehouse
-            await self.stock_level_service.issue_stock(
-                user=user,
-                warehouse_id=source_warehouse_id,
-                variant_id=variant_id,
-                quantity=quantity,
-                stock_status=StockStatus.ON_HAND,
-                allow_negative=False
+            # Check available stock in both ON_HAND and TRUCK_STOCK
+            available_on_hand = await self.stock_level_service.get_available_quantity(
+                user.tenant_id, source_warehouse_id, variant_id, StockStatus.ON_HAND
+            )
+            available_truck_stock = await self.stock_level_service.get_available_quantity(
+                user.tenant_id, source_warehouse_id, variant_id, StockStatus.TRUCK_STOCK
             )
             
-            # Receive into TRUCK_STOCK in source warehouse (vehicle inventory is tracked in source warehouse with TRUCK_STOCK status)
-            await self.stock_level_service.receive_stock(
-                user=user,
-                warehouse_id=source_warehouse_id,
-                variant_id=variant_id,
-                quantity=quantity,
-                stock_status=StockStatus.TRUCK_STOCK
-            )
+            remaining_qty = quantity
+            
+            # First try to issue from ON_HAND if available
+            if available_on_hand > 0:
+                on_hand_qty = min(available_on_hand, remaining_qty)
+                try:
+                    await self.stock_level_service.issue_stock(
+                        user=user,
+                        warehouse_id=source_warehouse_id,
+                        variant_id=variant_id,
+                        quantity=on_hand_qty,
+                        stock_status=StockStatus.ON_HAND,
+                        allow_negative=False
+                    )
+                    remaining_qty -= on_hand_qty
+                    default_logger.info(f"Issued {on_hand_qty} from ON_HAND for variant {variant_id}")
+                except Exception as e:
+                    default_logger.warning(f"Failed to issue from ON_HAND for variant {variant_id}: {str(e)}")
+            
+            # Then try to issue from TRUCK_STOCK if still needed
+            if remaining_qty > 0 and available_truck_stock > 0:
+                truck_qty = min(available_truck_stock, remaining_qty)
+                try:
+                    await self.stock_level_service.issue_stock(
+                        user=user,
+                        warehouse_id=source_warehouse_id,
+                        variant_id=variant_id,
+                        quantity=truck_qty,
+                        stock_status=StockStatus.TRUCK_STOCK,
+                        allow_negative=False
+                    )
+                    remaining_qty -= truck_qty
+                    default_logger.info(f"Issued {truck_qty} from TRUCK_STOCK for variant {variant_id}")
+                except Exception as e:
+                    default_logger.warning(f"Failed to issue from TRUCK_STOCK for variant {variant_id}: {str(e)}")
+            
+            # If we still have remaining quantity, it means we couldn't issue enough stock
+            if remaining_qty > 0:
+                raise ValueError(f"Insufficient stock for variant {variant_id}: requested {quantity}, available ON_HAND: {available_on_hand}, TRUCK_STOCK: {available_truck_stock}")
+            
+            # For vehicle loading, we don't receive back into TRUCK_STOCK
+            # The stock is transferred to the vehicle and tracked in truck_inventory table
+            # The stock document and truck inventory records handle the tracking
+            default_logger.info(f"Transferred {quantity} of variant {variant_id} to vehicle {vehicle_id}")
         
         return stock_doc
     
@@ -667,39 +701,28 @@ class VehicleWarehouseService:
         """Create truck inventory records for trip tracking"""
         truck_inventory_records = []
         
-        # Import the database session to check for existing records
-        from app.infrastucture.database.connection import direct_db_connection
-        from app.infrastucture.database.models.truck_inventory import TruckInventoryModel
-        from sqlalchemy import select, and_
-        
-        async for session in direct_db_connection.get_session():
-            for item in inventory_items:
-                # Handle both dict and Pydantic model
-                if hasattr(item, 'product_id'):
-                    # Pydantic model
-                    product_id = UUID(item.product_id)
-                    variant_id = UUID(item.variant_id)
-                    quantity = Decimal(str(item.quantity))
-                    empties_expected_qty = Decimal(str(getattr(item, 'empties_expected_qty', 0)))
-                else:
-                    # Dict
-                    product_id = UUID(item["product_id"])
-                    variant_id = UUID(item["variant_id"])
-                    quantity = Decimal(str(item["quantity"]))
-                    empties_expected_qty = Decimal(str(item.get("empties_expected_qty", 0)))
-                
-                # Check if record already exists
-                existing_query = select(TruckInventoryModel).where(
-                    and_(
-                        TruckInventoryModel.trip_id == trip_id,
-                        TruckInventoryModel.vehicle_id == vehicle_id,
-                        TruckInventoryModel.product_id == product_id,
-                        TruckInventoryModel.variant_id == variant_id
-                    )
+        for item in inventory_items:
+            # Handle both dict and Pydantic model
+            if hasattr(item, 'product_id'):
+                # Pydantic model
+                product_id = UUID(item.product_id)
+                variant_id = UUID(item.variant_id)
+                quantity = Decimal(str(item.quantity))
+                empties_expected_qty = Decimal(str(getattr(item, 'empties_expected_qty', 0)))
+            else:
+                # Dict
+                product_id = UUID(item["product_id"])
+                variant_id = UUID(item["variant_id"])
+                quantity = Decimal(str(item["quantity"]))
+                empties_expected_qty = Decimal(str(item.get("empties_expected_qty", 0)))
+            
+            # Check if record already exists using repository
+            if self.truck_inventory_repository:
+                existing_record = await self.truck_inventory_repository.get_truck_inventory_by_trip_and_variant(
+                    trip_id=trip_id,
+                    vehicle_id=vehicle_id,
+                    variant_id=variant_id
                 )
-                
-                result = await session.execute(existing_query)
-                existing_record = result.scalar_one_or_none()
                 
                 if existing_record:
                     # Update existing record by adding to loaded_qty
@@ -708,25 +731,13 @@ class VehicleWarehouseService:
                     existing_record.updated_by = created_by
                     existing_record.updated_at = datetime.now(timezone.utc)
                     
-                    # Convert to domain entity for return
-                    truck_inventory = TruckInventory(
-                        id=existing_record.id,
-                        trip_id=existing_record.trip_id,
-                        vehicle_id=existing_record.vehicle_id,
-                        product_id=existing_record.product_id,
-                        variant_id=existing_record.variant_id,
-                        loaded_qty=existing_record.loaded_qty,
-                        delivered_qty=existing_record.delivered_qty,
-                        empties_collected_qty=existing_record.empties_collected_qty,
-                        empties_expected_qty=existing_record.empties_expected_qty,
-                        created_at=existing_record.created_at,
-                        created_by=existing_record.created_by,
-                        updated_at=existing_record.updated_at,
-                        updated_by=existing_record.updated_by
+                    # Update in database
+                    updated_record = await self.truck_inventory_repository.update_truck_inventory(
+                        existing_record.id, existing_record
                     )
-                    truck_inventory_records.append(truck_inventory)
-                    
-                    default_logger.info(f"Updated existing truck inventory record for variant {variant_id}")
+                    if updated_record:
+                        truck_inventory_records.append(updated_record)
+                        default_logger.info(f"Updated existing truck inventory record for variant {variant_id}")
                 else:
                     # Create new record
                     truck_inventory = TruckInventory.create(
@@ -738,11 +749,25 @@ class VehicleWarehouseService:
                         empties_expected_qty=empties_expected_qty,
                         created_by=created_by
                     )
-                    truck_inventory_records.append(truck_inventory)
                     
-                    default_logger.info(f"Created new truck inventory record for variant {variant_id}")
-            
-            break  # Exit the async for loop after first iteration
+                    # Save to database
+                    saved_record = await self.truck_inventory_repository.create_truck_inventory(truck_inventory)
+                    if saved_record:
+                        truck_inventory_records.append(saved_record)
+                        default_logger.info(f"Created new truck inventory record for variant {variant_id}")
+            else:
+                # Fallback: create record without saving to database
+                truck_inventory = TruckInventory.create(
+                    trip_id=trip_id,
+                    vehicle_id=vehicle_id,
+                    product_id=product_id,
+                    variant_id=variant_id,
+                    loaded_qty=quantity,
+                    empties_expected_qty=empties_expected_qty,
+                    created_by=created_by
+                )
+                truck_inventory_records.append(truck_inventory)
+                default_logger.warning(f"TruckInventoryRepository not available, created record without saving: {truck_inventory.to_dict()}")
         
         return truck_inventory_records
     

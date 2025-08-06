@@ -1170,8 +1170,47 @@ const CreateOrder = () => {
     }, 0);
   };
 
+  const calculateOrderWeight = () => {
+    return formData.order_lines.reduce((total, line) => {
+      const selectedVariant = availableVariants.find(v => v.id === line.variant_id);
+      if (!selectedVariant) return total;
+      
+      let lineWeight = 0;
+      
+      // Calculate weight based on variant type
+      if (selectedVariant.sku && selectedVariant.sku.startsWith('KIT')) {
+        // For KIT variants: tare_weight + capacity
+        if (selectedVariant.tare_weight_kg && selectedVariant.capacity_kg) {
+          lineWeight = selectedVariant.tare_weight_kg + selectedVariant.capacity_kg;
+        } else if (selectedVariant.gross_weight_kg) {
+          lineWeight = selectedVariant.gross_weight_kg;
+        }
+      } else if (selectedVariant.sku && selectedVariant.sku.includes('EMPTY')) {
+        // For empty cylinders: tare_weight
+        lineWeight = selectedVariant.tare_weight_kg || 0;
+      } else if (selectedVariant.sku && selectedVariant.sku.includes('GAS')) {
+        // For gas fills: capacity
+        lineWeight = selectedVariant.capacity_kg || 0;
+      } else if (selectedVariant.sku && selectedVariant.sku.includes('DEP')) {
+        // For deposits: no weight
+        lineWeight = 0;
+      } else {
+        // For regular variants: gross_weight
+        lineWeight = selectedVariant.gross_weight_kg || 0;
+      }
+      
+      return total + (lineWeight * (line.qty_ordered || 0));
+    }, 0);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Prevent multiple submissions
+    if (isSubmitting) {
+      setMessage('Order creation in progress. Please wait...');
+      return;
+    }
     
     const isValid = await validateForm();
     if (!isValid) {
@@ -1264,13 +1303,41 @@ const CreateOrder = () => {
   };
 
   const getVariantDisplayName = (variant) => {
-    // For KIT variants, show component breakdown
-    if (variant.sku.startsWith('KIT') && variant.bundle_components) {
-      const components = variant.bundle_components.map(comp => comp.sku).join(' + ');
-      return `${variant.sku} = ${components} (${variant.sku_type})`;
+    // For KIT variants, show component breakdown with total weight
+    if (variant.sku.startsWith('KIT')) {
+      let totalWeight = 0;
+      let weightBreakdown = '';
+      
+      // Calculate total weight for KIT variants
+      if (variant.tare_weight_kg && variant.capacity_kg) {
+        totalWeight = variant.tare_weight_kg + variant.capacity_kg;
+        weightBreakdown = `(${variant.tare_weight_kg}kg empty + ${variant.capacity_kg}kg gas = ${totalWeight}kg total)`;
+      } else if (variant.gross_weight_kg) {
+        totalWeight = variant.gross_weight_kg;
+        weightBreakdown = `(${totalWeight}kg total)`;
+      }
+      
+      if (variant.bundle_components) {
+        const components = variant.bundle_components.map(comp => comp.sku).join(' + ');
+        return `${variant.sku} = ${components} ${weightBreakdown} (${variant.sku_type})`;
+      } else {
+        return `${variant.sku} ${weightBreakdown} (${variant.sku_type})`;
+      }
     }
     
-    return `${variant.sku} - ${variant.capacity_kg || 'N/A'}kg (${variant.product?.name || 'Unknown Product'})`;
+    // For regular variants, show capacity or weight
+    let weightInfo = '';
+    if (variant.capacity_kg) {
+      weightInfo = `${variant.capacity_kg}kg`;
+    } else if (variant.gross_weight_kg) {
+      weightInfo = `${variant.gross_weight_kg}kg`;
+    } else if (variant.tare_weight_kg) {
+      weightInfo = `${variant.tare_weight_kg}kg`;
+    } else {
+      weightInfo = 'N/A';
+    }
+    
+    return `${variant.sku} - ${weightInfo} (${variant.product?.name || 'Unknown Product'})`;
   };
 
   const getCustomerDisplayName = (customer) => {
@@ -1289,6 +1356,7 @@ const CreateOrder = () => {
   }
 
   const orderTotal = calculateOrderTotal();
+  const orderWeight = calculateOrderWeight();
 
   return (
     <div className="create-order-container">
@@ -1534,6 +1602,24 @@ const CreateOrder = () => {
               </button>
             </div>
           </div>
+
+          {/* Order Summary */}
+          {formData.order_lines.length > 0 && (
+            <div className="order-summary">
+              <div className="summary-item">
+                <span className="summary-label">📦 Total Weight:</span>
+                <span className="summary-value">{orderWeight.toFixed(1)} kg</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">💰 Total Amount:</span>
+                <span className="summary-value">Ksh {orderTotal.toFixed(2)}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">📋 Items:</span>
+                <span className="summary-value">{formData.order_lines.length} line(s)</span>
+              </div>
+            </div>
+          )}
 
 
           {errors.order_lines && <span className="error-text">{errors.order_lines}</span>}

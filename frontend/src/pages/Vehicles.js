@@ -1115,8 +1115,6 @@ const VehicleInventoryModal = ({ vehicle, onClose }) => {
                     <th>Quantity</th>
                     <th>Unit Weight</th>
                     <th>Total Weight</th>
-                    <th>Unit Cost</th>
-                    <th>Total Cost</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -1128,8 +1126,6 @@ const VehicleInventoryModal = ({ vehicle, onClose }) => {
                       <td>{item.quantity || item.loaded_qty || 0}</td>
                       <td>{(item.unit_weight_kg || 0).toFixed(1)} kg</td>
                       <td>{(item.total_weight_kg || 0).toFixed(1)} kg</td>
-                      <td>${(item.unit_cost || 0).toFixed(2)}</td>
-                      <td>${(item.total_cost || 0).toFixed(2)}</td>
                       <td>
                         <span className="inventory-status">
                           {item.stock_status || 'On Truck'}

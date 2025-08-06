@@ -45,6 +45,7 @@ class CustomerService:
 
     async def get_customers_with_filters(
         self,
+        tenant_id: Optional[UUID] = None,
         limit: int = 100,
         offset: int = 0,
         status: Optional[str] = None,
@@ -54,6 +55,7 @@ class CustomerService:
     ) -> tuple[List[Customer], int]:
         """Get customers with optional filters and return both customers and total count"""
         customers, total = await self.customer_repository.get_with_filters(
+            tenant_id=tenant_id,
             limit=limit,
             offset=offset,
             status=status,

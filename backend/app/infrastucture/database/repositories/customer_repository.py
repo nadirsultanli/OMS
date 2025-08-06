@@ -44,14 +44,19 @@ class CustomerRepository(CustomerRepositoryInterface):
 
     async def get_with_filters(
         self, 
+        tenant_id: Optional[UUID] = None,
         limit: int = 100, 
         offset: int = 0,
         status: Optional[str] = None,
         customer_type: Optional[str] = None,
         search: Optional[str] = None
     ) -> tuple[List[Customer], int]:
-        """Get customers with optional filters"""
+        """Get customers with optional filters and tenant-aware filtering"""
         query = select(CustomerORM).where(CustomerORM.deleted_at == None)
+        
+        # Apply tenant filter
+        if tenant_id:
+            query = query.where(CustomerORM.tenant_id == tenant_id)
         
         # Apply status filter
         if status:

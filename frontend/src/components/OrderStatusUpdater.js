@@ -131,7 +131,7 @@ const OrderStatusUpdater = ({ order, onStatusUpdate, disabled = false }) => {
             border: '1px solid #dee2e6',
             borderRadius: '4px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            zIndex: 1000,
+            zIndex: 999999,
             minWidth: '150px',
             marginTop: '4px'
           }}

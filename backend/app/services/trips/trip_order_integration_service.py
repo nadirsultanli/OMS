@@ -63,7 +63,27 @@ class TripOrderIntegrationService:
             # Use trip's start warehouse if not specified
             source_warehouse_id = warehouse_id or trip.start_wh_id
             if not source_warehouse_id:
-                raise ValueError("No warehouse specified for stock allocation")
+                # Try to get the first available warehouse for the tenant
+                try:
+                    from app.infrastucture.database.repositories.warehouse_repository import WarehouseRepositoryImpl
+                    from app.infrastucture.database.connection import get_database_session
+                    
+                    async with get_database_session() as session:
+                        warehouse_repo = WarehouseRepositoryImpl(session)
+                        warehouses = await warehouse_repo.get_warehouses_by_tenant(user.tenant_id, limit=1)
+                        if warehouses:
+                            source_warehouse_id = warehouses[0].id
+                            default_logger.info(
+                                "Auto-selected default warehouse for stock allocation",
+                                warehouse_id=str(source_warehouse_id),
+                                warehouse_name=warehouses[0].name,
+                                trip_id=str(trip_id)
+                            )
+                        else:
+                            raise ValueError("No warehouses available for stock allocation")
+                except Exception as e:
+                    default_logger.error(f"Failed to auto-select warehouse: {str(e)}")
+                    raise ValueError("No warehouse specified for stock allocation and no default warehouse available")
             
             # Step 1: Create trip stop for the order
             trip_stop = await self._create_trip_stop_for_order(
@@ -448,6 +468,10 @@ class TripOrderIntegrationService:
     
     async def _calculate_order_weight(self, order: Order) -> Decimal:
         """Calculate total weight for order based on order lines and variants"""
+        # If order already has a calculated weight, use it
+        if order.total_weight_kg and order.total_weight_kg > 0:
+            return order.total_weight_kg
+        
         if not order.order_lines:
             return Decimal('0')
         
@@ -469,8 +493,11 @@ class TripOrderIntegrationService:
                     for variant_id in variant_ids:
                         try:
                             variant = await variant_repo.get_by_id(variant_id)
-                            if variant and variant.unit_weight_kg:
-                                variant_weights[variant_id] = variant.unit_weight_kg
+                            if variant:
+                                # Use unit_weight_kg if available, otherwise use gross_weight_kg
+                                weight = variant.unit_weight_kg or variant.gross_weight_kg
+                                if weight:
+                                    variant_weights[variant_id] = weight
                         except Exception as e:
                             default_logger.warning(f"Failed to fetch variant {variant_id}: {str(e)}")
                     break

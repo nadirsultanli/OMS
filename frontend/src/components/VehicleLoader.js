@@ -85,16 +85,17 @@ const VehicleLoader = ({
     }
   };
 
-  // Validate capacity and check availability whenever inventory changes
+  // Validate capacity whenever inventory changes (but don't reserve stock automatically)
   useEffect(() => {
     if (inventoryItems.length > 0 && vehicle) {
       validateCapacity();
-      checkStockAvailability();
+      // Only check availability, don't auto-reserve
+      checkStockAvailabilityOnly();
     }
   }, [inventoryItems, vehicle]);
 
-  // Check stock availability and create reservation
-  const checkStockAvailability = async () => {
+  // Check stock availability only (without auto-reserving)
+  const checkStockAvailabilityOnly = async () => {
     if (!sourceWarehouse || inventoryItems.length === 0) return;
 
     setReservationStatus('checking');
@@ -118,8 +119,8 @@ const VehicleLoader = ({
         const allAvailable = availabilityResult.data.items?.every(item => item.available);
         
         if (allAvailable) {
-          // Automatically create reservation
-          await createReservation(validItems);
+          setReservationStatus('none');
+          setMessage('✅ All items are available. Click "Load Vehicle" to reserve and load.');
         } else {
           setReservationStatus('none');
           const unavailableItems = availabilityResult.data.items?.filter(item => !item.available) || [];
@@ -137,9 +138,57 @@ const VehicleLoader = ({
     }
   };
 
+  // Check stock availability and create reservation (only called when loading vehicle)
+  const checkStockAvailability = async () => {
+    if (!sourceWarehouse || inventoryItems.length === 0) return false;
+
+    setReservationStatus('checking');
+    try {
+      const validItems = inventoryItems.filter(item => item.variant_id && item.quantity > 0);
+      
+      if (validItems.length === 0) {
+        setReservationStatus('none');
+        return false;
+      }
+
+      const availabilityResult = await stockReservationService.bulkCheckAvailability(
+        sourceWarehouse.id,
+        validItems
+      );
+
+      if (availabilityResult.success) {
+        setAvailabilityCheck(availabilityResult.data);
+        
+        // Check if all items are available
+        const allAvailable = availabilityResult.data.items?.every(item => item.available);
+        
+        if (allAvailable) {
+          // Create reservation only when user clicks Load Vehicle
+          const reservationSuccess = await createReservation(validItems);
+          return reservationSuccess;
+        } else {
+          setReservationStatus('none');
+          const unavailableItems = availabilityResult.data.items?.filter(item => !item.available) || [];
+          setMessage(`⚠️ Some items are not available: ${unavailableItems.map(item => 
+            `${item.variant_id} (need: ${item.requested}, available: ${item.available_qty})`
+          ).join(', ')}`);
+          return false;
+        }
+      } else {
+        setReservationStatus('none');
+        console.error('Failed to check availability:', availabilityResult.error);
+        return false;
+      }
+    } catch (error) {
+      setReservationStatus('none');
+      console.error('Error checking availability:', error);
+      return false;
+    }
+  };
+
   // Create stock reservation
   const createReservation = async (items) => {
-    if (!sourceWarehouse || !vehicle) return;
+    if (!sourceWarehouse || !vehicle) return false;
 
     try {
       const reservationRequest = stockReservationService.createReservationRequest(
@@ -156,13 +205,16 @@ const VehicleLoader = ({
         setReservationStatus('reserved');
         setReservationDetails(reservationResult.data);
         setMessage('✅ Stock reserved successfully for vehicle loading');
+        return true;
       } else {
         setReservationStatus('none');
         setMessage(`❌ Failed to reserve stock: ${reservationResult.error}`);
+        return false;
       }
     } catch (error) {
       setReservationStatus('none');
       setMessage(`❌ Error creating reservation: ${error.message}`);
+      return false;
     }
   };
 
@@ -222,8 +274,8 @@ const VehicleLoader = ({
 
   // Load vehicle with inventory
   const handleLoadVehicle = async () => {
-    if (!tripId || !vehicle || !sourceWarehouse) {
-      setMessage('Missing required information: trip, vehicle, or source warehouse');
+    if (!vehicle || !sourceWarehouse) {
+      setMessage('Missing required information: vehicle or source warehouse');
       return;
     }
 
@@ -249,8 +301,12 @@ const VehicleLoader = ({
       return;
     }
 
-    // Check if we have a reservation
-    if (reservationStatus !== 'reserved') {
+    // Check availability and create reservation first
+    setMessage('Checking stock availability and creating reservation...');
+    const reservationSuccess = await checkStockAvailability();
+    
+    // Check if reservation was successful
+    if (!reservationSuccess) {
       setMessage('⚠️ Stock must be reserved before loading. Please wait for reservation to complete.');
       return;
     }
@@ -513,73 +569,41 @@ const VehicleLoader = ({
                       step="0.01"
                     />
                   </div>
-
-                  <div className="field-group">
-                    <label>Expected Empties:</label>
-                    <input
-                      type="number"
-                      value={item.empties_expected_qty}
-                      onChange={(e) => updateInventoryItem(item.id, 'empties_expected_qty', parseFloat(e.target.value) || 0)}
-                      disabled={loading}
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
                 </div>
 
-                <div className="field-row">
-                  <div className="field-group">
-                    <label>Unit Weight (kg):</label>
-                    <input
-                      type="number"
-                      value={item.unit_weight_kg}
-                      onChange={(e) => updateInventoryItem(item.id, 'unit_weight_kg', parseFloat(e.target.value) || 0)}
-                      disabled={loading}
-                      min="0"
-                      step="0.01"
-                    />
+                {/* Show weight and volume if they exist */}
+                {(item.unit_weight_kg > 0 || item.unit_volume_m3 > 0) && (
+                  <div className="field-row">
+                    {item.unit_weight_kg > 0 && (
+                      <div className="field-group readonly">
+                        <label>Unit Weight:</label>
+                        <div className="readonly-field">{item.unit_weight_kg} kg</div>
+                      </div>
+                    )}
+                    {item.unit_volume_m3 > 0 && (
+                      <div className="field-group readonly">
+                        <label>Unit Volume:</label>
+                        <div className="readonly-field">{item.unit_volume_m3} m³</div>
+                      </div>
+                    )}
                   </div>
-
-                  <div className="field-group">
-                    <label>Unit Volume (m³):</label>
-                    <input
-                      type="number"
-                      value={item.unit_volume_m3}
-                      onChange={(e) => updateInventoryItem(item.id, 'unit_volume_m3', parseFloat(e.target.value) || 0)}
-                      disabled={loading}
-                      min="0"
-                      step="0.001"
-                    />
-                  </div>
-
-                  <div className="field-group">
-                    <label>Unit Cost:</label>
-                    <input
-                      type="number"
-                      value={item.unit_cost}
-                      onChange={(e) => updateInventoryItem(item.id, 'unit_cost', parseFloat(e.target.value) || 0)}
-                      disabled={loading}
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
             <div className="item-totals">
-              <div className="total-item">
-                <span className="label">Weight:</span>
-                <span className="value">{(item.quantity * item.unit_weight_kg).toFixed(2)}kg</span>
-              </div>
-              <div className="total-item">
-                <span className="label">Volume:</span>
-                <span className="value">{(item.quantity * item.unit_volume_m3).toFixed(3)}m³</span>
-              </div>
-              <div className="total-item">
-                <span className="label">Cost:</span>
-                <span className="value">${(item.quantity * item.unit_cost).toFixed(2)}</span>
-              </div>
+              {item.unit_weight_kg > 0 && (
+                <div className="total-item">
+                  <span className="label">Weight:</span>
+                  <span className="value">{(item.quantity * item.unit_weight_kg).toFixed(2)}kg</span>
+                </div>
+              )}
+              {item.unit_volume_m3 > 0 && (
+                <div className="total-item">
+                  <span className="label">Volume:</span>
+                  <span className="value">{(item.quantity * item.unit_volume_m3).toFixed(3)}m³</span>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -620,17 +644,15 @@ const VehicleLoader = ({
             loading || 
             validating || 
             reservationStatus === 'checking' ||
-            reservationStatus === 'none' ||
-            (capacityValidation && !capacityValidation.is_valid)
+            (capacityValidation && !capacityValidation.is_valid) ||
+            inventoryItems.length === 0
           }
-          className={`btn btn-primary btn-large ${reservationStatus === 'reserved' ? 'ready-to-load' : ''}`}
+          className={`btn btn-primary btn-large`}
         >
           {loading && '🚛 Loading Vehicle...'}
           {validating && '⚖️ Validating Capacity...'}
           {reservationStatus === 'checking' && '🔄 Checking Stock...'}
-          {reservationStatus === 'none' && '⏳ Add Items First'}
-          {reservationStatus === 'reserved' && !loading && !validating && '🚛 Load Vehicle'}
-          {reservationStatus === 'confirmed' && '✅ Loading Complete'}
+          {!loading && !validating && reservationStatus !== 'checking' && '🚛 Load Vehicle'}
         </button>
         
         {reservationStatus === 'reserved' && (
@@ -641,7 +663,7 @@ const VehicleLoader = ({
         
         {reservationStatus === 'none' && inventoryItems.length > 0 && (
           <p className="load-instructions">
-            ⚠️ Please wait for stock availability check and reservation to complete.
+            ✅ Items are available. Click "Load Vehicle" to reserve stock and load the vehicle.
           </p>
         )}
       </div>

@@ -6,8 +6,17 @@ import os
 from datetime import datetime
 from typing import Any, Dict, Optional
 from pathlib import Path
+from decimal import Decimal
 
 from app.domain.common.logger import AbstractLogger
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles Decimal objects"""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
 
 
 class StructuredFormatter(logging.Formatter):
@@ -32,7 +41,7 @@ class StructuredFormatter(logging.Formatter):
         if record.exc_info:
             log_entry["exception"] = self.formatException(record.exc_info)
         
-        return json.dumps(log_entry, ensure_ascii=False)
+        return json.dumps(log_entry, ensure_ascii=False, cls=DecimalEncoder)
 
 
 class AppLogger(AbstractLogger):

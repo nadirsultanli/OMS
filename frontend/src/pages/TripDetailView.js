@@ -421,6 +421,13 @@ const TripDetailView = ({ tripId: propTripId, onClose }) => {
 
   const canEditTrip = trip?.trip_status === 'draft' || trip?.trip_status === 'planned';
   const totalValue = tripOrders.reduce((sum, order) => sum + order.total_amount, 0);
+  
+  // Calculate total weight from assigned orders
+  const totalWeight = tripOrders.reduce((sum, order) => {
+    // Use order's total_weight_kg if available, otherwise calculate from order lines
+    const orderWeight = order.total_weight_kg || 0;
+    return sum + orderWeight;
+  }, 0);
 
   let content;
 
@@ -498,7 +505,7 @@ const TripDetailView = ({ tripId: propTripId, onClose }) => {
               </div>
               <div className="info-row">
                 <span className="label">Load Capacity:</span>
-                <span className="value">{trip.gross_loaded_kg || 0} kg</span>
+                <span className="value">{totalWeight} kg</span>
               </div>
             </div>
           </div>
@@ -546,7 +553,7 @@ const TripDetailView = ({ tripId: propTripId, onClose }) => {
               </div>
               <div className="info-row">
                 <span className="label">Total Weight:</span>
-                <span className="value">{trip.gross_loaded_kg || 0} kg</span>
+                <span className="value">{totalWeight} kg</span>
               </div>
               <div className="info-row">
                 <span className="label">Total Value:</span>

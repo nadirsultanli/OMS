@@ -52,9 +52,16 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
   const handleStatusUpdate = async (newStatus) => {
     if (!newStatus || newStatus === trip.status) return;
 
+    console.log('TripStatusUpdater: Updating status', { 
+      tripId: trip.id, 
+      fromStatus: trip.status, 
+      toStatus: newStatus 
+    });
+
     setIsUpdating(true);
     try {
       const result = await tripService.updateTripStatus(trip.id, newStatus);
+      console.log('TripStatusUpdater: Update result', result);
       if (result.success) {
         onStatusUpdate && onStatusUpdate(trip.id, newStatus);
         setShowDropdown(false);
@@ -90,6 +97,12 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
 
   const handleStatusClick = (e) => {
     e.stopPropagation();
+    console.log('TripStatusUpdater: Status clicked', { 
+      tripId: trip.id, 
+      currentStatus: trip.status, 
+      canUpdateStatus, 
+      allowedTransitions 
+    });
     if (canUpdateStatus) {
       setShowDropdown(!showDropdown);
     }
@@ -110,12 +123,23 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
             display: 'inline-block',
             cursor: canUpdateStatus ? 'pointer' : 'default',
             transition: 'all 0.2s ease',
-            border: '1px solid transparent'
+            border: '1px solid transparent',
+            position: 'relative',
+            userSelect: 'none'
           }}
           onClick={handleStatusClick}
           title={canUpdateStatus ? "Click to change status" : "Status"}
         >
           {statusConfig[trip.status]?.label || trip.status}
+          {canUpdateStatus && (
+            <span style={{
+              marginLeft: '4px',
+              fontSize: '10px',
+              opacity: 0.8
+            }}>
+              ▼
+            </span>
+          )}
           {isUpdating && <span className="loading-dots">...</span>}
         </span>
       </div>
@@ -130,11 +154,16 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
             backgroundColor: 'white',
             border: '1px solid #dee2e6',
             borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 1000,
+            boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
+            zIndex: 999999,
             minWidth: '180px',
             marginTop: '8px',
-            padding: '8px 0'
+            padding: '8px 0',
+            transform: 'translateY(0)',
+            opacity: 1,
+            transition: 'all 0.2s ease',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.2)'
           }}
         >
           <div className="dropdown-header" style={{
@@ -146,7 +175,7 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
-            Change Status
+            Select Status
           </div>
           {allowedTransitions.map(status => (
             <button

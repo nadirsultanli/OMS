@@ -319,10 +319,6 @@ const VehicleInventoryDisplay = ({
               <label>🔒 Reserved:</label>
               <span>{(totals.reservedQuantity || 0).toFixed(2)}</span>
             </div>
-            <div className="summary-item">
-              <label>💰 Total Value:</label>
-              <span>${(totals.totalValue || 0).toFixed(2)}</span>
-            </div>
           </>
         )}
       </div>
@@ -398,12 +394,6 @@ const VehicleInventoryDisplay = ({
                     <th onClick={() => handleSort('reserved_qty')} className="sortable">
                       🔒 Reserved {getSortIcon('reserved_qty')}
                     </th>
-                    <th onClick={() => handleSort('unit_cost')} className="sortable">
-                      💰 Unit Cost {getSortIcon('unit_cost')}
-                    </th>
-                    <th onClick={() => handleSort('total_cost')} className="sortable">
-                      💵 Total Cost {getSortIcon('total_cost')}
-                    </th>
                     <th onClick={() => handleSort('stock_status')} className="sortable">
                       🏷️ Status {getSortIcon('stock_status')}
                     </th>
@@ -433,8 +423,6 @@ const VehicleInventoryDisplay = ({
                       <td className="quantity">{(item.quantity || 0).toFixed(2)}</td>
                       <td className="available-qty">{(item.available_qty || 0).toFixed(2)}</td>
                       <td className="reserved-qty">{(item.reserved_qty || 0).toFixed(2)}</td>
-                      <td className="unit-cost">${(item.unit_cost || 0).toFixed(2)}</td>
-                      <td className="total-cost">${(item.total_cost || 0).toFixed(2)}</td>
                       <td className="stock-status">
                         <span 
                           className="status-badge"

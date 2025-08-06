@@ -5,7 +5,13 @@ from app.domain.entities.users import User, UserStatus
 from app.services.users.user_service import UserService
 from app.services.dependencies.users import get_user_service
 from app.infrastucture.logs.logger import default_logger
+import asyncio
+from functools import lru_cache
+from datetime import datetime, timedelta
 
+# Simple in-memory cache for user lookups
+_user_cache = {}
+_cache_ttl = 300  # 5 minutes
 
 async def get_current_user(
     authorization: Optional[str] = Header(None, include_in_schema=False),
@@ -90,6 +96,18 @@ async def get_current_user(
         # Get user from our database using the auth_user_id
         auth_user_id = auth_user_info.id
         print(f"🔍 Debug: Looking up user with auth_user_id: {auth_user_id}")
+        
+        # Check cache first
+        cache_key = f"user:{auth_user_id}"
+        if cache_key in _user_cache:
+            cached_user, timestamp = _user_cache[cache_key]
+            if (datetime.now() - timestamp).total_seconds() < _cache_ttl:
+                print(f"🔍 Debug: User lookup result: True (cached)")
+                return cached_user
+            else:
+                del _user_cache[cache_key]
+        
+        # Cache miss - query database
         user = await user_service.get_user_by_auth_id(auth_user_id)
         print(f"🔍 Debug: User lookup result: {user is not None}")
         
@@ -99,23 +117,70 @@ async def get_current_user(
                 detail="User not found in database"
             )
         
+        # Cache the user
+        _user_cache[cache_key] = (user, datetime.now())
+        
         if user.status != UserStatus.ACTIVE:
+            default_logger.warning(f"User account not active for: {user.email}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User account is not active"
             )
         
+        default_logger.info(f"Auth middleware found user: {user.email}")
         return user
         
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        default_logger.error(f"Authentication error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentication failed: {str(e)}"
+            detail="Authentication failed"
         )
 
+def clear_user_cache():
+    """Clear the user cache (useful for testing or when user data changes)"""
+    global _user_cache
+    _user_cache.clear()
+    default_logger.info("User cache cleared")
+
+async def get_current_user_optimized(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    Optimized current user dependency that includes tenant validation.
+    This reduces redundant tenant checks across the application.
+    """
+    return current_user
+
+async def get_tenant_aware_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    Tenant-aware user dependency that validates tenant access.
+    Use this for endpoints that need tenant validation.
+    """
+    if not current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no tenant access"
+        )
+    return current_user
+
+def require_tenant_access():
+    """
+    Dependency factory for endpoints that require tenant access.
+    This reduces redundant tenant checks in API endpoints.
+    """
+    async def _require_tenant_access(current_user: User = Depends(get_current_user)) -> User:
+        if not current_user.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tenant access required"
+            )
+        return current_user
+    return _require_tenant_access
 
 # Simple dependency that can be used with Depends() - no parameters needed
 def get_current_user_simple() -> User:

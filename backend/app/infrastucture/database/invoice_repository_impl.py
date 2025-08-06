@@ -603,7 +603,6 @@ class InvoiceRepositoryImpl(InvoiceRepository):
             result = self.supabase.table(self.table_name)\
                 .select("invoice_status,due_date")\
                 .eq("tenant_id", str(tenant_id))\
-                .is_("deleted_at", None)\
                 .execute()
             
             if not result.data:

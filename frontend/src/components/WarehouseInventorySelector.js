@@ -45,9 +45,9 @@ const WarehouseInventorySelector = ({
       try {
         stockResponse = await stockService.getStockLevels({ 
           warehouseId: warehouse.id, 
-          stockStatus: 'on_hand', // Use lowercase as per API
-          includeZeroStock: false,
-          minQuantity: 0.01,
+          // Don't filter by stock status to include both ON_HAND and TRUCK_STOCK
+          includeZeroStock: true, // Include zero stock for EMPTY variants
+          minQuantity: 0, // Allow zero quantity
           limit: 1000
         });
         console.log('Direct warehouse stock response:', stockResponse);
@@ -55,8 +55,9 @@ const WarehouseInventorySelector = ({
         console.log('Direct warehouse query failed, trying fallback:', directError);
         // Fallback: load all stock and filter by warehouse
         stockResponse = await stockService.getStockLevels({ 
-          includeZeroStock: false,
-          minQuantity: 0.01,
+          // Don't filter by stock status to include both ON_HAND and TRUCK_STOCK
+          includeZeroStock: true, // Include zero stock for EMPTY variants
+          minQuantity: 0, // Allow zero quantity
           limit: 1000
         });
         console.log('Fallback stock response:', stockResponse);
@@ -75,23 +76,25 @@ const WarehouseInventorySelector = ({
            console.log('Stock item stock_status:', stockData[0].stock_status);
          }
         
-        // Filter to only show items with available stock for this warehouse
+        // Filter to show items for this warehouse (including EMPTY variants with zero quantity)
         const availableStock = stockData.filter(item => {
           // Handle both string and UUID warehouse IDs
           const itemWarehouseId = String(item.warehouse_id);
           const targetWarehouseId = String(warehouse.id);
           const matchesWarehouseById = itemWarehouseId === targetWarehouseId;
           const matchesWarehouseByCode = item.warehouse_code === warehouse.code;
-          const hasAvailableQty = (item.available_qty || 0) > 0;
           
-          // Handle different status formats
+          // Handle different status formats - accept both ON_HAND and TRUCK_STOCK
           const status = (item.stock_status || '').toLowerCase().replace(/[_\s]/g, '');
-          const hasCorrectStatus = status === 'onhand';
+          const hasCorrectStatus = status === 'onhand' || status === 'truckstock';
           
-          const matches = (matchesWarehouseById || matchesWarehouseByCode) && hasAvailableQty && hasCorrectStatus;
+          // Include all items for this warehouse, even with zero quantity (for EMPTY variants)
+          const matches = (matchesWarehouseById || matchesWarehouseByCode) && hasCorrectStatus;
           
           if (matches) {
             console.log(`✅ Item ${item.variant_id}: warehouse_id=${item.warehouse_id}, available_qty=${item.available_qty}, status=${item.stock_status}`);
+          } else {
+            console.log(`❌ Item ${item.variant_id}: warehouse_id=${item.warehouse_id}, available_qty=${item.available_qty}, status=${item.stock_status} - not matching criteria`);
           }
           
           return matches;
@@ -126,7 +129,7 @@ const WarehouseInventorySelector = ({
            
            console.log('All items for warehouse (including non-ON_HAND):', allWarehouseItems);
            
-           setError(`No available inventory found for warehouse ${warehouse.code}. Found ${debugStock.length} total items for this warehouse but none have available quantity > 0 with ON_HAND status.`);
+           setError(`No available inventory found for warehouse ${warehouse.code}. Found ${debugStock.length} total items for this warehouse but none have available quantity > 0 with ON_HAND or TRUCK_STOCK status.`);
          }
         
         // Add product_id to stock items using variant mapping
@@ -587,7 +590,6 @@ const WarehouseInventorySelector = ({
                           </div>
                           <div className="cart-item-details">
                             <span>Qty: {cartItem.quantity}</span>
-                            <span>Cost: ${(cartItem.total_cost || 0).toFixed(2)}</span>
                             {(cartItem.total_weight || 0) > 0 && (
                               <span>Weight: {(cartItem.total_weight || 0).toFixed(2)}kg</span>
                             )}
@@ -606,7 +608,6 @@ const WarehouseInventorySelector = ({
                   <div className="cart-totals">
                     <span data-label="Items">{cartItems.length}</span>
                     <span data-label="Quantity">{cartItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)}</span>
-                    <span data-label="Value">${cartItems.reduce((sum, item) => sum + (item.total_cost || 0), 0).toFixed(2)}</span>
                   </div>
                 </div>
               )}
@@ -649,11 +650,12 @@ const WarehouseInventorySelector = ({
                           </div>
                           <div className="item-details">
                             <span>📦 SKU: {variant?.sku || product?.sku || `VAR-${item.variant_id}`}</span>
-                            <span className="available-stock">✅ Available: {item.available_qty}</span>
+                            <span className="available-stock">
+                              {item.available_qty > 0 ? `✅ Available: ${item.available_qty}` : `📦 Stock Level: ${item.available_qty}`}
+                            </span>
                             {cartQty > 0 && (
                               <span className="cart-quantity">🛒 In Cart: {cartQty}</span>
                             )}
-                                                         <span className="unit-cost">💰 ${(parseFloat(item.unit_cost) || 0).toFixed(2)}</span>
                              {itemWeight > 0 && (
                                <span>⚖️ {itemWeight}kg</span>
                              )}
@@ -666,18 +668,18 @@ const WarehouseInventorySelector = ({
                           <input
                             type="number"
                             min="1"
-                            max={remainingQty}
+                            max={remainingQty >= 0 ? remainingQty : 999999} // Allow large numbers for EMPTY variants
                             value={getTempQuantity(item)}
                             onChange={(e) => handleQuantityChange(item, e.target.value)}
                             placeholder="Qty"
                             className="quantity-input"
-                            disabled={remainingQty <= 0}
+                            disabled={false} // Allow input even for zero quantity items
                           />
                           <button
                             onClick={() => handleAddToCart(item)}
                             className="add-to-cart-btn"
-                            disabled={remainingQty <= 0 || !getTempQuantity(item)}
-                            title={remainingQty <= 0 ? 'No stock remaining' : 'Add to selection'}
+                            disabled={!getTempQuantity(item)}
+                            title={getTempQuantity(item) ? 'Add to selection' : 'Enter quantity'}
                           >
                             Add
                           </button>

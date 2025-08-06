@@ -38,7 +38,7 @@ const LoadVehicleModal = ({
       const [vehiclesRes, warehousesRes, tripsRes] = await Promise.all([
         vehicleService.getVehicles(tenantId, { active: true, limit: 100 }),
         warehouseService.getWarehouses(1, 100),
-        tripService.getTrips({ status: 'planned', limit: 100 })
+        tripService.getTrips({ limit: 100 }) // Remove status filter to get all trips
       ]);
 
       setVehicles(vehiclesRes.success ? vehiclesRes.data.results || [] : []);
@@ -59,6 +59,11 @@ const LoadVehicleModal = ({
       }
       if (tripsRes.success && tripsRes.data.results) {
         console.log('Sample trip:', tripsRes.data.results[0]);
+        console.log('All trips loaded:', tripsRes.data.results.length);
+        console.log('Trips by vehicle:', tripsRes.data.results.reduce((acc, trip) => {
+          acc[trip.vehicle_id] = (acc[trip.vehicle_id] || 0) + 1;
+          return acc;
+        }, {}));
       }
       
       if (!vehiclesRes.success) {
@@ -232,6 +237,14 @@ const LoadVehicleModal = ({
                       onChange={(e) => {
                         const vehicle = vehicles.find(v => v.id === e.target.value);
                         setSelectedVehicle(vehicle);
+                        // Clear selected trip when vehicle changes
+                        setSelectedTrip(null);
+                        
+                        // Debug: Show trips for selected vehicle
+                        if (vehicle) {
+                          const vehicleTrips = trips.filter(trip => trip.vehicle_id === vehicle.id);
+                          console.log(`Trips for vehicle ${vehicle.plate || vehicle.plate_number}:`, vehicleTrips);
+                        }
                       }}
                       className="form-control"
                     >
@@ -260,13 +273,15 @@ const LoadVehicleModal = ({
                     >
                       <option value="">No trip (auto-create loading record)</option>
                       {trips.length > 0 ? (
-                        trips.map(trip => (
-                          <option key={trip.id} value={trip.id}>
-                            Trip {trip.trip_no || trip.trip_number} - {trip.status || trip.trip_status} - {trip.planned_date ? new Date(trip.planned_date).toLocaleDateString() : 'No date'}
-                          </option>
-                        ))
+                        trips
+                          .filter(trip => !selectedVehicle || trip.vehicle_id === selectedVehicle.id)
+                          .map(trip => (
+                            <option key={trip.id} value={trip.id}>
+                              {trip.trip_no || `Trip-${trip.id.slice(0, 8)}`} - {trip.trip_status || trip.status || 'Unknown'} - {trip.planned_date ? new Date(trip.planned_date).toLocaleDateString() : 'No date'}
+                            </option>
+                          ))
                       ) : (
-                        <option value="" disabled>No planned trips available</option>
+                        <option value="" disabled>No trips available</option>
                       )}
                     </select>
                     </div>

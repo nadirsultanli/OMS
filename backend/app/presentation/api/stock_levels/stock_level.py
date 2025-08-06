@@ -683,16 +683,22 @@ async def bulk_check_availability(
             variant_id = item.variant_id
             requested_quantity = item.requested_quantity
             
-            available_qty = await stock_level_service.get_available_quantity(
+            # Check both ON_HAND and TRUCK_STOCK availability
+            available_qty_on_hand = await stock_level_service.get_available_quantity(
                 current_user.tenant_id, warehouse_id, variant_id, StockStatus.ON_HAND
             )
             
-            is_available = available_qty >= requested_quantity
+            available_qty_truck = await stock_level_service.get_available_quantity(
+                current_user.tenant_id, warehouse_id, variant_id, StockStatus.TRUCK_STOCK
+            )
+            
+            total_available = available_qty_on_hand + available_qty_truck
+            is_available = total_available >= requested_quantity
             
             result_items.append(BulkAvailabilityCheckItem(
                 variant_id=str(variant_id),
                 requested=float(requested_quantity),
-                available_qty=float(available_qty),
+                available_qty=float(total_available),
                 available=is_available
             ))
         
@@ -737,21 +743,53 @@ async def reserve_stock_for_vehicle(
             variant_id = item.variant_id
             quantity = item.quantity
             
-            # Check availability first
-            available_qty = await stock_level_service.get_available_quantity(
+            # Check availability first - try ON_HAND, then TRUCK_STOCK
+            available_qty_on_hand = await stock_level_service.get_available_quantity(
                 current_user.tenant_id, warehouse_id, variant_id, StockStatus.ON_HAND
             )
             
-            if available_qty < quantity:
+            available_qty_truck = await stock_level_service.get_available_quantity(
+                current_user.tenant_id, warehouse_id, variant_id, StockStatus.TRUCK_STOCK
+            )
+            
+            total_available = available_qty_on_hand + available_qty_truck
+            
+            if total_available < quantity:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Insufficient stock for variant {variant_id}: requested {quantity}, available {available_qty}"
+                    detail=f"Insufficient stock for variant {variant_id}: requested {quantity}, available ON_HAND: {available_qty_on_hand}, TRUCK_STOCK: {available_qty_truck}, total: {total_available}"
                 )
             
-            # Reserve the stock
-            success = await stock_level_service.reserve_stock_for_order(
-                current_user, warehouse_id, variant_id, quantity, StockStatus.ON_HAND
-            )
+            # Reserve the stock - try ON_HAND first, then TRUCK_STOCK
+            success = False
+            if available_qty_on_hand >= quantity:
+                success = await stock_level_service.reserve_stock_for_order(
+                    current_user, warehouse_id, variant_id, quantity, StockStatus.ON_HAND
+                )
+            elif available_qty_truck >= quantity:
+                success = await stock_level_service.reserve_stock_for_order(
+                    current_user, warehouse_id, variant_id, quantity, StockStatus.TRUCK_STOCK
+                )
+            else:
+                # Try to reserve from both statuses
+                remaining_qty = quantity
+                if available_qty_on_hand > 0:
+                    on_hand_qty = min(available_qty_on_hand, remaining_qty)
+                    success_on_hand = await stock_level_service.reserve_stock_for_order(
+                        current_user, warehouse_id, variant_id, on_hand_qty, StockStatus.ON_HAND
+                    )
+                    if success_on_hand:
+                        remaining_qty -= on_hand_qty
+                
+                if remaining_qty > 0 and available_qty_truck > 0:
+                    truck_qty = min(available_qty_truck, remaining_qty)
+                    success_truck = await stock_level_service.reserve_stock_for_order(
+                        current_user, warehouse_id, variant_id, truck_qty, StockStatus.TRUCK_STOCK
+                    )
+                    if success_truck:
+                        remaining_qty -= truck_qty
+                
+                success = (remaining_qty == 0)
             
             if not success:
                 raise HTTPException(

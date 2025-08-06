@@ -39,6 +39,8 @@ const Trips = () => {
   const [filteredTrips, setFilteredTrips] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [vehiclesWithDepots, setVehiclesWithDepots] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -95,6 +97,8 @@ const Trips = () => {
     fetchTrips();
     fetchVehicles();
     fetchDrivers();
+    fetchWarehouses();
+    fetchVehiclesWithDepots();
   }, [pagination.currentPage]);
 
   useEffect(() => {
@@ -165,9 +169,37 @@ const Trips = () => {
           user.role?.toLowerCase() === 'driver' && user.status?.toLowerCase() === 'active'
         ) || [];
         setDrivers(driverUsers);
+      } else {
+        console.error('Failed to fetch drivers:', result.error);
       }
     } catch (error) {
       console.error('Failed to fetch drivers:', error);
+    }
+  };
+
+  const fetchWarehouses = async () => {
+    try {
+      const response = await tripService.getAvailableWarehouses();
+      if (response.success) {
+        setWarehouses(response.data.warehouses || []);
+      } else {
+        console.error('Failed to fetch warehouses:', response.error);
+      }
+    } catch (error) {
+      console.error('Error fetching warehouses:', error);
+    }
+  };
+
+  const fetchVehiclesWithDepots = async () => {
+    try {
+      const response = await tripService.getVehiclesWithDepots();
+      if (response.success) {
+        setVehiclesWithDepots(response.data.vehicles || []);
+      } else {
+        console.error('Failed to fetch vehicles with depots:', response.error);
+      }
+    } catch (error) {
+      console.error('Error fetching vehicles with depots:', error);
     }
   };
 
@@ -342,8 +374,10 @@ const Trips = () => {
   };
 
   const handleStatusUpdate = async (tripId, newStatus) => {
+    console.log('Trips: handleStatusUpdate called', { tripId, newStatus });
     try {
       const result = await tripService.updateTripStatus(tripId, newStatus);
+      console.log('Trips: Status update result', result);
       if (result.success) {
         setMessage({ type: 'success', text: `Trip status updated to ${newStatus}` });
         fetchTrips();
@@ -351,6 +385,7 @@ const Trips = () => {
         setMessage({ type: 'error', text: ensureStringError(result.error) });
       }
     } catch (error) {
+      console.error('Trips: Status update error', error);
       setMessage({ type: 'error', text: 'Failed to update trip status' });
     }
   };
@@ -527,6 +562,8 @@ const Trips = () => {
         <CreateTripModal
           vehicles={vehicles}
           drivers={drivers}
+          warehouses={warehouses}
+          vehiclesWithDepots={vehiclesWithDepots}
           onClose={() => setShowCreateForm(false)}
           onSubmit={handleCreateTrip}
           errors={errors}
@@ -733,14 +770,49 @@ const Trips = () => {
   );
 };
 
-const CreateTripModal = ({ vehicles, drivers, onClose, onSubmit, errors }) => {
+const CreateTripModal = ({ vehicles, drivers, warehouses, vehiclesWithDepots, onClose, onSubmit, errors }) => {
   const [formData, setFormData] = useState({
     trip_number: '',
     vehicle_id: '',
     driver_id: '',
+    start_wh_id: '',
+    end_wh_id: '',
     planned_date: '',
     notes: ''
   });
+
+  const [selectedVehicleDepot, setSelectedVehicleDepot] = useState(null);
+
+  // When vehicle is selected, find its depot information
+  const handleVehicleChange = (vehicleId) => {
+    if (vehicleId) {
+      const vehicleWithDepot = vehiclesWithDepots.find(v => v.id === vehicleId);
+      setSelectedVehicleDepot(vehicleWithDepot?.depot || null);
+      
+      // Auto-select the vehicle's depot as start warehouse if available
+      if (vehicleWithDepot?.depot?.id) {
+        setFormData(prev => ({ 
+          ...prev, 
+          vehicle_id: vehicleId,
+          start_wh_id: vehicleWithDepot.depot.id 
+        }));
+      } else {
+        setFormData(prev => ({ 
+          ...prev, 
+          vehicle_id: vehicleId,
+          start_wh_id: ''
+        }));
+      }
+    } else {
+      setSelectedVehicleDepot(null);
+      // Clear warehouse selection when no vehicle is selected
+      setFormData(prev => ({ 
+        ...prev, 
+        vehicle_id: '',
+        start_wh_id: ''
+      }));
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -774,7 +846,7 @@ const CreateTripModal = ({ vehicles, drivers, onClose, onSubmit, errors }) => {
               <label>Vehicle *</label>
               <select
                 value={formData.vehicle_id}
-                onChange={(e) => setFormData({ ...formData, vehicle_id: e.target.value })}
+                onChange={(e) => handleVehicleChange(e.target.value)}
                 required
                 className={errors.vehicle_id ? 'error' : ''}
               >
@@ -786,6 +858,16 @@ const CreateTripModal = ({ vehicles, drivers, onClose, onSubmit, errors }) => {
                 ))}
               </select>
               {errors.vehicle_id && <span className="error-text">{errors.vehicle_id}</span>}
+              
+              {/* Show depot information if vehicle is selected */}
+              {selectedVehicleDepot && (
+                <div className="depot-info">
+                  <small className="depot-label">
+                    <MapPin size={14} />
+                    Vehicle Depot: {selectedVehicleDepot.name}
+                  </small>
+                </div>
+              )}
             </div>
 
             <div className="form-group">
@@ -804,6 +886,41 @@ const CreateTripModal = ({ vehicles, drivers, onClose, onSubmit, errors }) => {
                 ))}
               </select>
               {errors.driver_id && <span className="error-text">{errors.driver_id}</span>}
+            </div>
+
+            <div className="form-group">
+              <label>Start Warehouse *</label>
+              <select
+                value={formData.start_wh_id}
+                onChange={(e) => setFormData({ ...formData, start_wh_id: e.target.value })}
+                required
+                className={errors.start_wh_id ? 'error' : ''}
+              >
+                <option value="">Select Start Warehouse</option>
+                {warehouses.map(warehouse => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name}
+                  </option>
+                ))}
+              </select>
+              {errors.start_wh_id && <span className="error-text">{errors.start_wh_id}</span>}
+            </div>
+
+            <div className="form-group">
+              <label>End Warehouse</label>
+              <select
+                value={formData.end_wh_id}
+                onChange={(e) => setFormData({ ...formData, end_wh_id: e.target.value })}
+                className={errors.end_wh_id ? 'error' : ''}
+              >
+                <option value="">Select End Warehouse (Optional)</option>
+                {warehouses.map(warehouse => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name}
+                  </option>
+                ))}
+              </select>
+              {errors.end_wh_id && <span className="error-text">{errors.end_wh_id}</span>}
             </div>
 
             <div className="form-group">

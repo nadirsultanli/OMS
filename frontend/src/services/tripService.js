@@ -29,7 +29,7 @@ const extractErrorMessage = (error) => {
 const transformTripData = (trip) => ({
   ...trip,
   trip_number: trip.trip_no, // Map trip_no to trip_number for frontend
-  status: trip.trip_status?.toUpperCase(), // Convert status to uppercase
+  status: trip.trip_status?.toLowerCase(), // Keep status in lowercase for TripStatusUpdater
   vehicle: trip.vehicle || null,
   driver: trip.driver || null,
   order_count: trip.order_count || 0
@@ -192,6 +192,26 @@ const tripService = {
   completeTrip: async (tripId, completeData) => {
     try {
       const response = await api.post(`/trips/${tripId}/complete`, completeData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: extractErrorMessage(error.response?.data) };
+    }
+  },
+
+  // Get available warehouses for trip creation
+  getAvailableWarehouses: async () => {
+    try {
+      const response = await api.get('/trips/warehouses');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: extractErrorMessage(error.response?.data) };
+    }
+  },
+
+  // Get vehicles with depot information
+  getVehiclesWithDepots: async () => {
+    try {
+      const response = await api.get('/trips/vehicles-with-depots');
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: extractErrorMessage(error.response?.data) };
