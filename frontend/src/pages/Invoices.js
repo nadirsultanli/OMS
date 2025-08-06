@@ -81,6 +81,16 @@ const Invoices = () => {
     } else if (urlParams.get('canceled') === 'true') {
       setError('Payment was canceled');
     }
+    
+    // Fallback: force dataFullyLoaded to true after 3 seconds if orders are loaded
+    const timeout = setTimeout(() => {
+      if (orders.length > 0 && !dataFullyLoaded) {
+        console.log('Fallback: forcing dataFullyLoaded to true');
+        setDataFullyLoaded(true);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(timeout);
   }, []); // Only run once on mount
 
   // Apply filters whenever filters change
@@ -106,9 +116,12 @@ const Invoices = () => {
 
   // Force re-render of order selection when invoices are loaded
   useEffect(() => {
-    if (allInvoices.length > 0 && orders.length > 0 && !loading && !ordersLoading) {
-      // This will trigger a re-render of the order selection dropdown
-      console.log('Invoices and orders loaded, checking for existing invoices...');
+    console.log('useEffect triggered - orders.length:', orders.length, 'loading:', loading, 'ordersLoading:', ordersLoading);
+    console.log('Current orders:', orders);
+    
+    // Set dataFullyLoaded to true as soon as orders are loaded, regardless of invoices
+    if (orders.length > 0 && !ordersLoading) {
+      console.log('Orders loaded, checking for existing invoices...');
       console.log('All invoices:', allInvoices.map(inv => ({ id: inv.id, order_id: inv.order_id, invoice_no: inv.invoice_no })));
       console.log('All orders:', orders.map(ord => ({ id: ord.id, order_no: ord.order_no, status: ord.order_status })));
       
@@ -136,8 +149,12 @@ const Invoices = () => {
         }
       });
       
+      console.log('Setting ordersWithInvoices:', Array.from(ordersWithExistingInvoices));
+      console.log('Setting dataFullyLoaded to true');
       setOrdersWithInvoices(ordersWithExistingInvoices);
       setDataFullyLoaded(true);
+    } else {
+      console.log('Conditions not met for setting dataFullyLoaded - orders.length:', orders.length, 'ordersLoading:', ordersLoading);
     }
   }, [allInvoices, orders, loading, ordersLoading]);
 
@@ -199,13 +216,19 @@ const Invoices = () => {
   const loadOrders = async () => {
     setOrdersLoading(true);
     try {
+      console.log('Loading orders...');
       const result = await orderService.getOrders();
+      console.log('Orders API result:', result);
       if (result.success) {
+        console.log('Setting orders:', result.data.orders);
         setOrders(result.data.orders || []);
+      } else {
+        console.error('Failed to load orders:', result.error);
       }
     } catch (err) {
       console.error('Error loading orders:', err);
     } finally {
+      console.log('Setting ordersLoading to false');
       setOrdersLoading(false);
     }
   };
@@ -1170,9 +1193,14 @@ const Invoices = () => {
               <>
                 <div className="form-group">
                   <label>Select Order:</label>
-                  {!dataFullyLoaded ? (
+                  {console.log('dataFullyLoaded:', dataFullyLoaded, 'orders.length:', orders.length, 'ordersLoading:', ordersLoading)}
+                  {(!dataFullyLoaded && ordersLoading) ? (
                     <div style={{ padding: '8px 12px', color: '#6c757d', fontStyle: 'italic' }}>
                       Loading orders and checking for existing invoices...
+                    </div>
+                  ) : orders.length === 0 ? (
+                    <div style={{ padding: '8px 12px', color: '#dc3545', fontStyle: 'italic' }}>
+                      No delivered orders found
                     </div>
                   ) : (
                     <select
@@ -1193,76 +1221,44 @@ const Invoices = () => {
                       }}
                     >
                       <option value="">Select an order...</option>
-                      {orders.map(order => {
-                        const isDelivered = order.order_status === 'delivered';
-                        const hasInvoice = ordersWithInvoices.has(order.id);
-                        const isSelectable = isDelivered && !hasInvoice;
-                        
-                        // Debug logging for all orders with existing invoices
-                        if (order.order_no === 'ORD-332072C1-000005' || order.order_no === 'ORD-332072C1-000006') {
-                          console.log('Debug order:', order.order_no, 'order.id:', order.id, 'isDelivered:', isDelivered, 'hasInvoice:', hasInvoice, 'isSelectable:', isSelectable);
-                          console.log('Orders with invoices set:', Array.from(ordersWithInvoices));
-                          console.log('All invoices count:', allInvoices.length);
-                          console.log('All invoices:', allInvoices.map(inv => ({ 
-                            id: inv.id, 
-                            order_id: inv.order_id, 
-                            order_no: inv.order_no,
-                            invoice_no: inv.invoice_no, 
-                            notes: inv.notes 
-                          })));
+                      {orders
+                        .filter(order => order.order_status === 'delivered')
+                        .map(order => {
+                          const hasInvoice = ordersWithInvoices.has(order.id);
+                          const isSelectable = !hasInvoice;
                           
-                          // Log the first invoice to see the complete structure
-                          if (allInvoices.length > 0) {
-                            console.log('First invoice complete structure:', allInvoices[0]);
-                          }
+                          console.log('Filtered delivered order:', order.order_no, 'hasInvoice:', hasInvoice, 'isSelectable:', isSelectable);
                           
-                          // Check if the specific invoices exist in the data
-                          const invoiceFor005 = allInvoices.find(inv => inv.order_id === 'ed5863f3-380e-48d6-9e0a-7151586694e1');
-                          const invoiceFor006 = allInvoices.find(inv => inv.order_id === '61f17d95-38a5-4421-9a48-8c674f3c93d0');
-                          console.log('Invoice for ORD-332072C1-000005:', invoiceFor005);
-                          console.log('Invoice for ORD-332072C1-000006:', invoiceFor006);
-                          
-                          // Also check by order_no field
-                          const invoiceFor005ByOrderNo = allInvoices.find(inv => inv.order_no === 'ORD-332072C1-000005');
-                          const invoiceFor006ByOrderNo = allInvoices.find(inv => inv.order_no === 'ORD-332072C1-000006');
-                          console.log('Invoice for ORD-332072C1-000005 (by order_no):', invoiceFor005ByOrderNo);
-                          console.log('Invoice for ORD-332072C1-000006 (by order_no):', invoiceFor006ByOrderNo);
-                          
-                          // Check all invoices that have any order_id
-                          const invoicesWithOrderId = allInvoices.filter(inv => inv.order_id);
-                          console.log('Invoices with order_id:', invoicesWithOrderId.length);
-                          console.log('Invoices with order_id details:', invoicesWithOrderId.map(inv => ({ 
-                            id: inv.id, 
-                            order_id: inv.order_id, 
-                            order_no: inv.order_no,
-                            invoice_no: inv.invoice_no 
-                          })));
-                        }
-                        
-                        return (
-                          <option 
-                            key={order.id} 
-                            value={order.id}
-                            disabled={!isSelectable}
-                            style={{ 
-                              color: isSelectable ? 'inherit' : '#dc3545',
-                              fontStyle: isSelectable ? 'normal' : 'italic',
-                              opacity: isSelectable ? 1 : 0.6
-                            }}
-                          >
-                            {order.order_no} - {order.customer_name} ({invoiceService.formatCurrency(order.total_amount)}) 
-                            {!isDelivered && ` - ${order.order_status} (Payment will be done when status will be delivered)`}
-                            {isDelivered && hasInvoice && ` - Invoice already exists`}
-                            {!isSelectable && ` (Not available)`}
-                          </option>
-                        );
-                      })}
+                          return (
+                            <option 
+                              key={order.id} 
+                              value={order.id}
+                              disabled={!isSelectable}
+                              style={{ 
+                                color: isSelectable ? 'inherit' : '#dc3545',
+                                fontStyle: isSelectable ? 'normal' : 'italic',
+                                opacity: isSelectable ? 1 : 0.6
+                              }}
+                            >
+                              {order.order_no} - {order.customer_name} ({invoiceService.formatCurrency(order.total_amount)}) 
+                              {hasInvoice && ` - Invoice already exists`}
+                              {!isSelectable && ` (Not available)`}
+                            </option>
+                          );
+                        })}
                     </select>
                   )}
                   <div className="order-selection-help">
                     <small style={{ color: '#dc3545' }}>
                       ⚠️ Only delivered orders without existing invoices can be used to generate invoices. 
                       Orders that are not delivered or already have invoices cannot be selected.
+                    </small>
+                    <br />
+                    <small style={{ color: '#007bff', cursor: 'pointer' }} onClick={() => {
+                      console.log('Manual trigger - setting dataFullyLoaded to true');
+                      setDataFullyLoaded(true);
+                    }}>
+                      🔧 Debug: Force show orders
                     </small>
                   </div>
                 </div>

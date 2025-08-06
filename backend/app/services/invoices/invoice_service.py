@@ -120,15 +120,26 @@ class InvoiceService:
             raise InvoiceNotFoundError(f"Customer {order.customer_id} not found")
             
         customer_name = customer.name
-        customer_address = f"{customer.address_line_1}"
-        if customer.address_line_2:
-            customer_address += f", {customer.address_line_2}"
-        if customer.city:
-            customer_address += f", {customer.city}"
-        if customer.postal_code:
-            customer_address += f" {customer.postal_code}"
-        if customer.country:
-            customer_address += f", {customer.country}"
+        
+        # Build customer address from addresses list or use a default
+        customer_address = "Address not specified"
+        if customer.addresses and len(customer.addresses) > 0:
+            # Use the first address
+            address = customer.addresses[0]
+            address_parts = []
+            if address.address_line_1:
+                address_parts.append(address.address_line_1)
+            if address.address_line_2:
+                address_parts.append(address.address_line_2)
+            if address.city:
+                address_parts.append(address.city)
+            if address.postal_code:
+                address_parts.append(address.postal_code)
+            if address.country:
+                address_parts.append(address.country)
+            
+            if address_parts:
+                customer_address = ", ".join(address_parts)
 
         # Create the invoice
         invoice = Invoice.create(
