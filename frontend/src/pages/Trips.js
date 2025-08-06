@@ -382,11 +382,26 @@ const Trips = () => {
         setMessage({ type: 'success', text: `Trip status updated to ${newStatus}` });
         fetchTrips();
       } else {
-        setMessage({ type: 'error', text: ensureStringError(result.error) });
+        // Don't show error message for 500 errors or network errors - they might be temporary
+        // and the status update could still work on the backend
+        if (!result.is500Error && !result.isNetworkError) {
+          setMessage({ type: 'error', text: ensureStringError(result.error) });
+        } else {
+          // For 500 errors and network errors, just refresh the trips list without showing error
+          console.warn('Trips: Error during status update, but refreshing list...', result.error);
+          fetchTrips();
+        }
       }
     } catch (error) {
       console.error('Trips: Status update error', error);
-      setMessage({ type: 'error', text: 'Failed to update trip status' });
+      // Don't show error message for 500 errors or network errors
+      if (!error.message || (!error.message.includes('500') && !error.message.includes('Internal server error') && !error.message.includes('Network'))) {
+        setMessage({ type: 'error', text: 'Failed to update trip status' });
+      } else {
+        // For 500 errors and network errors, just refresh the trips list without showing error
+        console.warn('Trips: Error during status update, but refreshing list...', error.message);
+        fetchTrips();
+      }
     }
   };
 

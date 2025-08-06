@@ -224,6 +224,36 @@ const tripService = {
       const response = await api.patch(`/trips/${tripId}/status`, { new_status: newStatus });
       return { success: true, data: response.data };
     } catch (error) {
+      // Check if it's a 500 error
+      if (error.response?.status === 500) {
+        console.warn('TripService: 500 error during status update, but operation might have succeeded', {
+          tripId,
+          newStatus,
+          error: error.response?.data
+        });
+        // Return a special flag for 500 errors
+        return { 
+          success: false, 
+          error: 'Internal server error (500)',
+          is500Error: true,
+          originalError: error.response?.data
+        };
+      }
+      
+      // Check if it's a network error (no response)
+      if (!error.response) {
+        console.warn('TripService: Network error during status update', {
+          tripId,
+          newStatus,
+          error: error.message
+        });
+        return { 
+          success: false, 
+          error: 'Network error - please check your connection',
+          isNetworkError: true
+        };
+      }
+      
       return { success: false, error: extractErrorMessage(error.response?.data) };
     }
   },

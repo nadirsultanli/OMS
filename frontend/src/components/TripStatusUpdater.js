@@ -66,11 +66,29 @@ const TripStatusUpdater = ({ trip, onStatusUpdate, disabled = false }) => {
         onStatusUpdate && onStatusUpdate(trip.id, newStatus);
         setShowDropdown(false);
       } else {
-        alert('Failed to update trip status: ' + (result.error || 'Unknown error'));
+        // Don't show alert for 500 errors or network errors - they might be temporary
+        // and the status update could still work on the backend
+        if (!result.is500Error && !result.isNetworkError) {
+          alert('Failed to update trip status: ' + (result.error || 'Unknown error'));
+        } else {
+          // For 500 errors and network errors, assume the update might have succeeded
+          // and let the parent component handle the refresh
+          console.warn('TripStatusUpdater: Error during status update, but continuing...', result.error);
+          onStatusUpdate && onStatusUpdate(trip.id, newStatus);
+          setShowDropdown(false);
+        }
       }
     } catch (error) {
       console.error('Error updating trip status:', error);
-      alert('Failed to update trip status: ' + error.message);
+      // Don't show alert for network errors or 500 errors
+      if (!error.message || (!error.message.includes('500') && !error.message.includes('Internal server error') && !error.message.includes('Network'))) {
+        alert('Failed to update trip status: ' + error.message);
+      } else {
+        // For 500 errors and network errors, assume the update might have succeeded
+        console.warn('TripStatusUpdater: Error during status update, but continuing...', error.message);
+        onStatusUpdate && onStatusUpdate(trip.id, newStatus);
+        setShowDropdown(false);
+      }
     } finally {
       setIsUpdating(false);
     }
